@@ -1,0 +1,67 @@
+{
+  "id": "yZf7RKAPLc3ZiO5E",
+  "name": "Darwin Integration Cases",
+  "columns": [
+    {
+      "id": "Q9liWvgqeNoHJuem",
+      "name": "case_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "iLTG3fZoPoESXkxq",
+      "name": "target_type",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "gwux7cajZfHUsP20",
+      "name": "target",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "ypv9ZTnQyk7P18KC",
+      "name": "agent",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "dysmQixp8V25LkIH",
+      "name": "description",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "TPTI9o42TGmBtanC",
+      "name": "inputs",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "IXISLcmK1Q9CKilC",
+      "name": "assertions",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "RSo03e1xGRgPkNkC",
+      "name": "last_status",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "MNola8hIe9Bvr7II",
+      "name": "last_run_at",
+      "type": "date",
+      "index": 8
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-07-30T12:54:52.605Z",
+  "updatedAt": "2026-07-31T08:14:41.725Z"
+}

@@ -1,0 +1,594 @@
+{
+  "id": "fPAICfE6SOP5Q2Fa",
+  "name": "EvalDispatch",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "c720d63a-2ab7-4d0c-81c2-c75259b96d2c",
+      "name": "Case Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -192,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "HDMvthliXrAcZrXp",
+          "cachedResultName": "Darwin — Darwin",
+          "cachedResultUrl": "/workflow/HDMvthliXrAcZrXp"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chatInput": "={{ $json.input }}",
+            "sessionId": "=eval-{{ $json.run_id }}-{{ $json.case_id }}",
+            "channel": "={{ $json.env }}",
+            "env": "={{ $json.env }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "env",
+              "displayName": "env",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "8241b655-1259-4bdc-842a-a2889b734d75",
+      "name": "Run Darwin",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const c = $('Case Input').item.json;\nconst prohibited = typeof c.prohibited_tools === 'string' ? JSON.parse(c.prohibited_tools || '[]') : (c.prohibited_tools || []);\nconst contextMessages = typeof c.context_messages === 'string' ? JSON.parse(c.context_messages || '[]') : (c.context_messages || []);\nconst d = $json || {};\nconst answer = (d.output ?? d.text ?? d.response ?? '').toString();\nconst steps = Array.isArray(d.intermediateSteps) ? d.intermediateSteps : [];\nconst tools = [...new Set(steps.map((s) => s && s.action && s.action.tool).filter(Boolean))];\nconst prohibited_used = prohibited.filter((t) => tools.includes(t));\nconst quoteMatches = [...answer.matchAll(/\"([^\"\\n]{12,180})\"/g)].map((m) => m[1].trim());\nconst quotes = [...new Set(quoteMatches)].filter((s) => !/https?:|\\]\\(|netlify/.test(s));\nconst hasHeading = /^\\s{0,3}#{1,6}\\s/m.test(answer);\nconst hasBlockquote = /^\\s*>\\s/m.test(answer);\nconst rawUrls = answer.match(/(?<!\\]\\()https?:\\/\\/[^\\s)]+/g) || [];\nconst format_flags = { env: c.env, has_markdown_heading: hasHeading, has_blockquote: hasBlockquote, raw_url_count: rawUrls.length };\nconst citations = [];\nconst linkRe = /\\[([0-9:]+)\\]\\(https?:\\/\\/pidgeonhead\\.netlify\\.app\\/sessions\\/([0-9a-fA-F-]{36})\\?t=([0-9.]+)\\)/g;\nlet lm;\nwhile ((lm = linkRe.exec(answer)) !== null) {\n  const before = answer.slice(0, lm.index);\n  const qm = [...before.matchAll(/\"([^\"\\n]{6,200})\"/g)].pop();\n  citations.push({ quote: qm ? qm[1].trim() : '', session_id: lm[2], cited_seconds: parseFloat(lm[3]) });\n}\nconst cited_session_ids = [...new Set(citations.map((x) => x.session_id))];\nconst vq_payload = JSON.stringify({ quotes, sids: cited_session_ids });\nreturn { json: {\n  run_id: c.run_id, run_date: c.run_date, env: c.env, case_id: c.case_id,\n  question: c.input, answer, tools_used: tools, prohibited_used,\n  quotes, citations, cited_session_ids, vq_payload, format_flags, ground_truth: c.ground_truth, rubric: c.rubric,\n} };"
+      },
+      "id": "1ccb5970-c8e8-4401-bd99-e6860fd10fe6",
+      "name": "Extract & Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH payload AS (SELECT $1::jsonb AS p),\nq AS (SELECT value AS quote FROM payload, jsonb_array_elements_text(p->'quotes') AS value),\nqc AS (\n  SELECT COALESCE(jsonb_agg(jsonb_build_object('quote', quote, 'found', EXISTS (\n    SELECT 1 FROM session s WHERE s.transcript ILIKE '%' || quote || '%'\n    UNION ALL SELECT 1 FROM clip c WHERE c.text ILIKE '%' || quote || '%'\n    UNION ALL SELECT 1 FROM gong_calls g WHERE g.data::text ILIKE '%' || quote || '%'\n    UNION ALL SELECT 1 FROM forum f WHERE f.content ILIKE '%' || quote || '%'\n  ))), '[]'::jsonb) AS quote_checks FROM q\n),\nsids AS (SELECT DISTINCT (value)::uuid AS sid FROM payload, jsonb_array_elements_text(p->'sids') AS value),\ntx AS (\n  SELECT COALESCE(jsonb_object_agg(sid::text, jsonb_build_object('words', words, 'starts', starts)), '{}'::jsonb) AS transcripts\n  FROM (\n    SELECT ss.id AS sid,\n           array_agg(lower(regexp_replace((e->>'word'), '[^a-zA-Z0-9]', '', 'g')) ORDER BY ord) AS words,\n           array_agg((e->>'start')::float8 ORDER BY ord) AS starts\n    FROM sids JOIN session ss ON ss.id = sids.sid\n    CROSS JOIN unnest(ss.transcript_object) WITH ORDINALITY AS t(e, ord)\n    GROUP BY ss.id\n  ) z\n)\nSELECT qc.quote_checks, tx.transcripts FROM qc, tx",
+        "options": {
+          "queryReplacement": "={{ $json.vq_payload }}"
+        }
+      },
+      "id": "f49c7a2f-06e1-4199-9b71-3fe3824239dd",
+      "name": "Verify Quotes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a strict evaluation judge for the Darwin research agent. Score the answer on six rubric dimensions, each an integer 1-5.\n\nReturn ONLY a single JSON object — no preamble, no markdown fences, no text around it — in exactly this shape:\n{\"scores\":{\"faithfulness\":0,\"citation_validity\":0,\"source_routing\":0,\"completeness\":0,\"relevance\":0,\"format\":0},\"justifications\":{\"faithfulness\":\"\",\"citation_validity\":\"\",\"source_routing\":\"\",\"completeness\":\"\",\"relevance\":\"\",\"format\":\"\"},\"overall_verdict\":\"pass|borderline|fail\"}\nEach justification is one short sentence.\n\n=== QUESTION ===\n{{ $('Extract & Check').item.json.question }}\n\n=== AGENT ANSWER ===\n{{ $('Extract & Check').item.json.answer }}\n\n=== TOOLS THE AGENT CALLED ===\n{{ $('Extract & Check').item.json.tools_used }}\nProhibited tools it used (should be empty): {{ $('Extract & Check').item.json.prohibited_used }}\n\n=== FORMAT CHECKS (env=slack) ===\n{{ JSON.stringify($('Extract & Check').item.json.format_flags) }}\n\n=== DB QUOTE VERIFICATION (found=false means the quoted string was NOT located verbatim in the source DB) ===\n{{ JSON.stringify($json.quote_checks) }}\n\n=== VERIFIED GROUND TRUTH FOR THIS CASE ===\n{{ $('Extract & Check').item.json.ground_truth }}\n\n=== RUBRIC ===\n{{ $('Extract & Check').item.json.rubric }}\n\nScoring rules:\n- faithfulness and citation_validity are GATING, but the quote extractor is heuristic and may include non-quote fragments — judge fabrication primarily against the ground-truth grounding set, using the quote verification as supporting signal.\n- If a prohibited tool was used, set source_routing low and overall_verdict to \"fail\".\n- For env=slack, penalise the format score for markdown headings, blockquotes, or raw URLs.\n- Judge completeness and relevance against the ground truth only. Do not invent facts not in the ground truth or checks.\n- overall_verdict is one of \"pass\", \"borderline\", \"fail\".\nReturn the JSON now.",
+        "batching": {}
+      },
+      "id": "b0765b3f-1487-4ac1-8698-4fcc81654dae",
+      "name": "Judge",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        688,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {
+          "maxTokensToSample": 4000,
+          "temperature": 0
+        }
+      },
+      "id": "f835ef0e-a2fd-45b7-9f57-60184a4fe340",
+      "name": "Judge Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        688,
+        336
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const e = $('Extract & Check').item.json;\nconst vq = $('Verify Quotes').item.json || {};\nconst qc = vq.quote_checks || [];\nconst transcripts = vq.transcripts || {};\nconst raw = ($json.text ?? $json.output ?? $json.response ?? '').toString();\nlet j = {};\ntry { const m = raw.match(/\\{[\\s\\S]*\\}/); j = JSON.parse(m ? m[0] : raw); } catch (err) { j = {}; }\nconst scores = j.scores || (j.output && j.output.scores) || {};\nconst just = j.justifications || (j.output && j.output.justifications) || {};\nlet verdict = j.overall_verdict || (j.output && j.output.overall_verdict) || 'unknown';\nfunction normWords(str){ return String(str).split(/\\s+/).map((t) => t.toLowerCase().replace(/[^a-z0-9]/g, '')).filter(Boolean); }\nfunction locate(words, starts, quote){ const qw = normWords(quote); if (!qw.length) return null; const k = Math.min(qw.length, 6); for (let i = 0; i + k <= words.length; i++) { let ok = true; for (let x = 0; x < k; x++) { if (words[i + x] !== qw[x]) { ok = false; break; } } if (ok) return Number(starts[i]); } return null; }\nconst TOL = 8;\nconst timestamp_checks = (e.citations || []).map((c) => {\n  const tx = transcripts[c.session_id];\n  const actual = (tx && Array.isArray(tx.words)) ? locate(tx.words, tx.starts, c.quote) : null;\n  const matched = actual != null;\n  const delta = matched ? Math.round(Math.abs(actual - c.cited_seconds)) : null;\n  return { quote: c.quote, session_id: c.session_id, cited: c.cited_seconds, actual: matched ? Math.round(actual) : null, delta, ok: matched && delta <= TOL };\n});\nif (timestamp_checks.length) {\n  const good = timestamp_checks.filter((t) => t.ok).length;\n  scores.citation_validity = Math.max(1, Math.round((5 * good) / timestamp_checks.length));\n  just.citation_validity = good + '/' + timestamp_checks.length + ' cited timestamps matched within ' + TOL + 's (deterministic, no judge)';\n}\nconst fabricated = (Array.isArray(qc) ? qc : []).filter((x) => x && x.found === false).map((x) => x.quote);\nif ((e.prohibited_used || []).length) verdict = 'fail';\nconst tsOff = timestamp_checks.filter((t) => !t.ok).length;\nconst deterministic = { prohibited_tools_used: e.prohibited_used, unverified_quotes: fabricated, timestamp_checks, format: e.format_flags };\nconst row = { run_id: e.run_id, run_date: e.run_date, case_id: e.case_id, env: e.env, question: e.question, answer: e.answer, tools_used: e.tools_used || [], prohibited_tools_used: e.prohibited_used || [], scores, overall_verdict: verdict, quote_checks: qc, deterministic_checks: deterministic, judge_rationale: just };\nreturn { json: { row, scorecard: { case_id: e.case_id, verdict, scores, unverified_quotes: fabricated, prohibited_tools_used: e.prohibited_used || [], timestamps: { total: timestamp_checks.length, ok: timestamp_checks.length - tsOff, off: tsOff }, format_flags: e.format_flags } } };"
+      },
+      "id": "1e516e8d-a1e3-4afb-acdb-7d7f2cc94e1c",
+      "name": "Assemble",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const row = $json.row || {};\nconst sc = $json.scorecard || {};\nconst scores = row.scores || {};\nconst caseId = row.case_id || sc.case_id || '';\nconst runId = row.run_id || '';\nconst tools = Array.isArray(row.tools_used) ? row.tools_used.join(', ') : '';\nconst verdict = row.overall_verdict || sc.verdict || 'unknown';\nconst s = (v) => (v === undefined || v === null) ? '' : String(v);\nreturn { json: {\n  result_id: $execution.id + '-' + caseId,\n  run_id: runId,\n  case_id: caseId,\n  response: row.answer || '',\n  tools_called: tools,\n  faithfulness: s(scores.faithfulness),\n  citation_validity: s(scores.citation_validity),\n  source_routing: s(scores.source_routing),\n  completeness: s(scores.completeness),\n  relevance: s(scores.relevance),\n  format: s(scores.format),\n  verdict: verdict,\n  run_date: new Date().toISOString()\n} };"
+      },
+      "id": "fe559687-01c2-4f41-8673-7d9cfbc65e3b",
+      "name": "Map to Data Table",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "bVLPI1lsi9GsAaQc",
+          "mode": "list",
+          "cachedResultName": "Darwin Eval Results",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/bVLPI1lsi9GsAaQc"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "case_id": "={{ $json.case_id }}",
+            "tools_called": "={{ $json.tools_called }}",
+            "citation_validity": "={{ $json.citation_validity }}",
+            "completeness": "={{ $json.completeness }}",
+            "faithfulness": "={{ $json.faithfulness }}",
+            "format": "={{ $json.format }}",
+            "relevance": "={{ $json.relevance }}",
+            "response": "={{ $json.response }}",
+            "result_id": "={{ $json.result_id }}",
+            "run_date": "={{ $json.run_date }}",
+            "run_id": "={{ $json.run_id }}",
+            "source_routing": "={{ $json.source_routing }}",
+            "verdict": "={{ $json.verdict }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "input",
+              "displayName": "input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_response",
+              "displayName": "last_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source_thread",
+              "displayName": "source_thread",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tools_called",
+              "displayName": "tools_called",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prohibited_tools",
+              "displayName": "prohibited_tools",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_tools",
+              "displayName": "expected_tools",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_response",
+              "displayName": "expected_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "context_messages",
+              "displayName": "context_messages",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ea886e24-c4ca-4d28-aba1-75d4f67af446",
+      "name": "Save Result",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "G3P55vPsJtpt1pk5",
+          "mode": "list",
+          "cachedResultName": "Darwin Evals",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/G3P55vPsJtpt1pk5"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "case_id",
+              "keyValue": "={{ $('Map to Data Table').item.json.case_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "last_response": "={{ $('Map to Data Table').item.json.response }}",
+            "tools_called": "={{ $('Map to Data Table').item.json.tools_called }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "input",
+              "displayName": "input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_response",
+              "displayName": "last_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "source_thread",
+              "displayName": "source_thread",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tools_called",
+              "displayName": "tools_called",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prohibited_tools",
+              "displayName": "prohibited_tools",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_tools",
+              "displayName": "expected_tools",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_response",
+              "displayName": "expected_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "context_messages",
+              "displayName": "context_messages",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f9e04333-c3ad-4084-b4bc-2076a950d662",
+      "name": "Update Case",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1648,
+        112
+      ]
+    }
+  ],
+  "connections": {
+    "Case Input": {
+      "main": [
+        [
+          {
+            "node": "Run Darwin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Darwin": {
+      "main": [
+        [
+          {
+            "node": "Extract & Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract & Check": {
+      "main": [
+        [
+          {
+            "node": "Verify Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Quotes": {
+      "main": [
+        [
+          {
+            "node": "Judge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge": {
+      "main": [
+        [
+          {
+            "node": "Assemble",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Judge",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble": {
+      "main": [
+        [
+          {
+            "node": "Map to Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map to Data Table": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Result": {
+      "main": [
+        [
+          {
+            "node": "Update Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "332a1fbe-041d-4600-9479-8d7966629024",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "1Nj94pfgQnese9NZ",
+  "isArchived": false,
+  "nodeGroups": []
+}

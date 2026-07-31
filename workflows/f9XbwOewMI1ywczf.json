@@ -1,0 +1,73 @@
+{
+  "id": "f9XbwOewMI1ywczf",
+  "name": "ErrorHarnessGlobal",
+  "nodes": [
+    {
+      "id": "6dc2473c-2fd9-4423-89b0-2a3bff6a2c5a",
+      "name": "Set Custom Data and Fail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json;\n$execution.customData.set('channel', String(input.channel || ''));\n$execution.customData.set('sessionId', String(input.threadTs || ''));\nthrow new Error('Intentional chaos-harness failure (global Error handler test)');"
+      }
+    },
+    {
+      "id": "f464f2bd-4edf-44ae-a6e9-aa854322f56f",
+      "name": "Chaos Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "channel",
+              "type": "string"
+            },
+            {
+              "name": "threadTs",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chaos Input": {
+      "main": [
+        [
+          {
+            "node": "Set Custom Data and Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
+  },
+  "triggerCount": 0,
+  "versionId": "5c93f0ab-7479-4ba7-80f8-630f3a328160",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "CyWks1CgMZeohO4a",
+  "isArchived": false,
+  "nodeGroups": []
+}

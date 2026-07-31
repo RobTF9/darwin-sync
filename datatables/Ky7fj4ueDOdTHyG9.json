@@ -1,0 +1,61 @@
+{
+  "id": "Ky7fj4ueDOdTHyG9",
+  "name": "Darwin Integration Results",
+  "columns": [
+    {
+      "id": "62QvFCsBe07hBMHy",
+      "name": "result_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "2vVfuAtptWBYTt9k",
+      "name": "run_id",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "nBvCdNtgQxzNIaVu",
+      "name": "case_id",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "kRmzWR9ohR8e2jJY",
+      "name": "target",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "Kys9xnuMOW3jU2Qr",
+      "name": "status",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "hJZo74lju9mDsdWq",
+      "name": "actual_output",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "ltEMpku3QSJ3Vuum",
+      "name": "assertion_detail",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "0BbnhXdf8tirltBF",
+      "name": "run_date",
+      "type": "date",
+      "index": 7
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-07-30T12:54:52.494Z",
+  "updatedAt": "2026-07-31T08:14:41.666Z"
+}

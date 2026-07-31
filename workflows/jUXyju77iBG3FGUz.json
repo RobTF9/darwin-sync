@@ -1,0 +1,105 @@
+{
+  "id": "jUXyju77iBG3FGUz",
+  "name": "SessionTranscript",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cef12dcd-6153-4dc1-b4ce-99074ae10689",
+      "name": "sub_trigger"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        192,
+        0
+      ],
+      "id": "9561862e-62a8-4c51-888c-91e6b4efc0ab",
+      "name": "get",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Darwin Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "  const words = $input.first().json.transcript_object;\n  const MARKER_EVERY = 20; // timestamp marker every N words\n\n  const lines = [];\n  let currentSpeaker = null;\n  let wordCount = 0;\n  let lineWords = [];\n\n  for (const w of words) {\n    // New speaker turn\n    if (w.speaker !== currentSpeaker) {\n      if (lineWords.length) {\n        lines.push(lineWords.join(' '));\n      }\n      currentSpeaker = w.speaker;\n      wordCount = 0;\n      lineWords = [`\\nS${w.speaker} [${w.start.toFixed(2)}]:`];\n    }\n\n    // Insert timestamp marker every N words\n    if (wordCount > 0 && wordCount % MARKER_EVERY === 0) {\n      lineWords.push(`[${w.start.toFixed(2)}]`);\n    }\n\n    lineWords.push(w.punctuated_word);\n    wordCount++;\n  }\n\n  if (lineWords.length) {\n    lines.push(lineWords.join(' '));\n  }\n\n  // Also pass the last word's end time so the agent knows the total duration\n  const lastWord = words[words.length - 1];\n\n  return {\n    transcript: lines.join('').trim(),\n    duration: lastWord.end,\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "982a072c-b130-4b48-a7b3-268e22cbaac3",
+      "name": "prime"
+    }
+  ],
+  "connections": {
+    "sub_trigger": {
+      "main": [
+        [
+          {
+            "node": "get",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get": {
+      "main": [
+        [
+          {
+            "node": "prime",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "32834b03-2bf9-4d16-a88c-3c0e8c41639e",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

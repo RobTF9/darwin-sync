@@ -1,0 +1,43 @@
+{
+  "id": "lxbB2v0RHaAAVH6E",
+  "name": "Darwin Sessions",
+  "columns": [
+    {
+      "id": "kChGbVZJFIwP1o0n",
+      "name": "Memory",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "TejpFORcjOvHqkaj",
+      "name": "Source",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "s0xsMnOKBaRZJKD1",
+      "name": "From",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "7aAj6p0gkzv0c7YK",
+      "name": "User",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "eLXDQkBF8noIpn1N",
+      "name": "SessionId",
+      "type": "string",
+      "index": 4
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-07-30T08:45:21.301Z",
+  "updatedAt": "2026-07-31T05:40:30.052Z"
+}

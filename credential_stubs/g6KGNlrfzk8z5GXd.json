@@ -1,0 +1,14 @@
+{
+  "id": "g6KGNlrfzk8z5GXd",
+  "name": "Google Drive API",
+  "type": "httpHeaderAuth",
+  "data": {},
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

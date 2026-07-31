@@ -1,0 +1,202 @@
+{
+  "id": "kQpnddaGTylQGQXl",
+  "name": "EvalRead",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "table"
+            },
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "case_id"
+            }
+          ]
+        }
+      },
+      "id": "23162f7e-62f2-499e-966b-e57d2b464c9f",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.table }}",
+              "rightValue": "cases",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bf6bc870-72ae-4d98-b05c-fc20e0d3387e",
+      "name": "Is Cases?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        304,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "G3P55vPsJtpt1pk5",
+          "mode": "list",
+          "cachedResultName": "Darwin Evals",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/G3P55vPsJtpt1pk5"
+        },
+        "returnAll": true
+      },
+      "id": "1b4e5d60-f163-446b-8b5e-d6864e18355b",
+      "name": "Get Cases",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        352
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Get Cases').all().map(i => i.json);\n\nif (rows.length === 0) {\n  return [{ json: { table: 'cases', count: 0, cases: [], summary: 'No eval cases found.' } }];\n}\n\nreturn [{ json: {\n  table: 'cases',\n  count: rows.length,\n  cases: rows.map(r => ({ case_id: r.case_id, input: (r.input || '').substring(0, 200), expected_tools: r.expected_tools, prohibited_tools: r.prohibited_tools, source_thread: r.source_thread, created_at: r.created_at })),\n  summary: `${rows.length} eval cases loaded.`\n} }];"
+      },
+      "id": "aae91657-2c80-4dcb-bcc8-71ff450639e1",
+      "name": "Format Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "bVLPI1lsi9GsAaQc",
+          "mode": "list",
+          "cachedResultName": "Darwin Eval Results",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/bVLPI1lsi9GsAaQc"
+        },
+        "returnAll": true
+      },
+      "id": "ccf80dbc-2eb0-494b-9db9-11d4e47c61b1",
+      "name": "Get Results",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        544
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('Input').first().json;\nconst allRows = $('Get Results').all().map(i => i.json);\n\n// Apply filters\nlet rows = allRows;\nif (input.run_id) {\n  rows = rows.filter(r => String(r.run_id) === String(input.run_id));\n}\nif (input.case_id) {\n  rows = rows.filter(r => String(r.case_id) === String(input.case_id));\n}\n\nif (rows.length === 0) {\n  return [{ json: { table: 'results', count: 0, results: [], summary: 'No results found.' + (input.run_id ? ' Run may still be in progress.' : '') } }];\n}\n\nconst verdicts = rows.reduce((acc, r) => { acc[r.verdict] = (acc[r.verdict] || 0) + 1; return acc; }, {});\nconst dims = ['faithfulness', 'citation_validity', 'source_routing', 'completeness', 'relevance', 'format'];\nconst avgScores = {};\ndims.forEach(d => {\n  const vals = rows.map(r => parseFloat(r[d])).filter(v => !isNaN(v));\n  avgScores[d] = vals.length ? (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(2) : 'N/A';\n});\n\nreturn [{ json: {\n  table: 'results',\n  count: rows.length,\n  stats: { verdicts, avg_scores: avgScores },\n  results: rows.map(r => ({ run_id: r.run_id, case_id: r.case_id, verdict: r.verdict, faithfulness: r.faithfulness, citation_validity: r.citation_validity, source_routing: r.source_routing, completeness: r.completeness, relevance: r.relevance, format: r.format, response: r.response, tools_called: r.tools_called })),\n  summary: `${rows.length} results: ${verdicts.pass || 0} pass, ${verdicts.borderline || 0} borderline, ${verdicts.fail || 0} fail`\n} }];"
+      },
+      "id": "74ed38c0-5ef1-4aba-a38c-9ce996fb53ec",
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        544
+      ]
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Is Cases?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Cases?": {
+      "main": [
+        [
+          {
+            "node": "Get Cases",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Cases": {
+      "main": [
+        [
+          {
+            "node": "Format Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Results": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "9c151945-5e24-442f-af6f-02d7f5153d6c",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "1Nj94pfgQnese9NZ",
+  "isArchived": false,
+  "nodeGroups": []
+}

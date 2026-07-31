@@ -1,0 +1,197 @@
+{
+  "id": "MLxaOYbzMS9DFoIv",
+  "name": "Slack Error",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a55881fa-823d-420f-a110-d6c15d9f4e73",
+      "name": "OnError",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $json.execution.id }}",
+        "options": {
+          "activeWorkflows": true
+        },
+        "requestOptions": {}
+      },
+      "id": "0f620a55-4caf-45c9-8fe3-793356a3a204",
+      "name": "Get Execution",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "reaction",
+        "operation": "remove",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Get Execution').first().json.customData.channel || $('Get Execution').first().json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.channel }}"
+        },
+        "timestamp": "={{ $('Get Execution').first().json.customData.msgTs || $('Get Execution').first().json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.msgTs }}",
+        "name": "loading"
+      },
+      "id": "dc2da0dc-7805-4d7b-9db9-77d3c9447bb4",
+      "name": "Remove Loading Reaction",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ],
+      "webhookId": "c9be7008-a028-4c98-b8c2-a6a553ee14ca",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "reaction",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Get Execution').first().json.customData.channel || $('Get Execution').first().json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.channel }}"
+        },
+        "timestamp": "={{ $('Get Execution').first().json.customData.msgTs || $('Get Execution').first().json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.msgTs }}",
+        "name": "x"
+      },
+      "id": "3480adb6-827f-41e8-a6bd-433b13c61d54",
+      "name": "Add X Reaction",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "webhookId": "87fd86ad-11d0-4f29-9cde-a6f2e67caa43",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Get Execution').first().json.customData.channel || $('Get Execution').first().json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.channel }}"
+        },
+        "text": "=❌ Sorry — this execution failed. Details: https://darwin-staging.app.n8n.cloud/workflow/{{ $('Get Execution').first().json.workflowId }}/executions/{{ $('Get Execution').first().json.id }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $('Get Execution').first().json.customData.sessionId || $('Get Execution').first().json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.threadTs }}"
+            }
+          },
+          "mrkdwn": true,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "id": "0704ac86-38f0-4093-824d-2c9f32778866",
+      "name": "Reply Failed",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        0
+      ],
+      "webhookId": "e1ac985a-e13c-4113-8340-75a71296dcc5",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "OnError": {
+      "main": [
+        [
+          {
+            "node": "Get Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Execution": {
+      "main": [
+        [
+          {
+            "node": "Remove Loading Reaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Loading Reaction": {
+      "main": [
+        [
+          {
+            "node": "Add X Reaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add X Reaction": {
+      "main": [
+        [
+          {
+            "node": "Reply Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "975e5d21-5627-4f42-bad6-7f8aa3157d93",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wWGhCjDluNfE1cPJ",
+  "isArchived": false,
+  "nodeGroups": []
+}

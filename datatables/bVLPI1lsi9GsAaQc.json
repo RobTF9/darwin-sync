@@ -1,0 +1,91 @@
+{
+  "id": "bVLPI1lsi9GsAaQc",
+  "name": "Darwin Eval Results",
+  "columns": [
+    {
+      "id": "ktyoBXKUwQ472o2X",
+      "name": "result_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "JliY3gxRBOrkd9xk",
+      "name": "run_id",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "3AT8oWz4KB50Dj5P",
+      "name": "case_id",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "kpLXHavmfKj9BzgB",
+      "name": "response",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "ZetKXOOKJUHqj5nz",
+      "name": "tools_called",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "2JABrQl8Ll5mklls",
+      "name": "faithfulness",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "6wLsiSuXc4omuPsS",
+      "name": "citation_validity",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "zoo82SuMBCOMM4zG",
+      "name": "source_routing",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "6VGUede1cePCTCXG",
+      "name": "completeness",
+      "type": "string",
+      "index": 8
+    },
+    {
+      "id": "Dgk6u27pOtQDVsLt",
+      "name": "relevance",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "DUCI8bams6UbXGzA",
+      "name": "format",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "hGfyRKW8Rg06bDQZ",
+      "name": "verdict",
+      "type": "string",
+      "index": 11
+    },
+    {
+      "id": "SstYWqMeiuzIaiJj",
+      "name": "run_date",
+      "type": "string",
+      "index": 12
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-07-28T18:36:50.499Z",
+  "updatedAt": "2026-07-31T08:13:49.324Z"
+}

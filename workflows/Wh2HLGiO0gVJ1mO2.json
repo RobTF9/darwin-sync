@@ -1,0 +1,268 @@
+{
+  "id": "Wh2HLGiO0gVJ1mO2",
+  "name": "SessionEmails",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "session_ids",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "id": "f0379a7f-8c99-4d65-8b29-a0bd520dc238",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.google_drive_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "id,name,owners(emailAddress,displayName),permissions(emailAddress,role,displayName),lastModifyingUser(emailAddress,displayName),description,appProperties"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "e662b122-5d36-4ec9-8f6f-5b87d7a85b94",
+      "name": "Get Drive File Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1408,
+        384
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $input.item.json;\nconst session_id = $('Code in JavaScript').item.json.session_id;\n\nlet search_query = data.name || '';\nconst dashIndex = search_query.indexOf(' - ');\nif (dashIndex > 0) {\n  search_query = search_query.substring(0, dashIndex);\n}\n\nreturn {\n  json: {\n    session_id,\n    file_name: data.name,\n    owner_email: data.owners?.[0]?.emailAddress || null,\n    search_query\n  }\n};"
+      },
+      "id": "a9f6e295-af24-4a3d-84b5-2a61fe3154cb",
+      "name": "Extract File Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.owner_email }}"
+        },
+        "limit": 1,
+        "timeMin": "={{ $now.minus({ months: 12 }) }}",
+        "timeMax": "={{ $now }}",
+        "options": {
+          "fields": "*",
+          "maxAttendees": 10,
+          "query": "={{ $json.search_query }}"
+        }
+      },
+      "id": "1348d8df-81b4-42fe-a4e0-9711c73059e6",
+      "name": "Search Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1952,
+        576
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "Nz6ihXnCupaynaoe",
+          "name": "Rob's Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const event = $input.item.json;\nconst sessionData = $('Extract File Info').item.json;\n\nlet email = null;\nlet email_source = null;\nlet all_emails = [];\n\nif (event.id) {\n  const attendees = event.attendees || [];\n  const nonN8nAttendees = attendees.filter(a => a.email && !a.email.toLowerCase().endsWith('@n8n.io'));\n  if (nonN8nAttendees.length > 0) {\n    all_emails = nonN8nAttendees.map(a => a.email);\n    email = all_emails[0];\n    email_source = 'google_calendar';\n  }\n}\n\nreturn {\n  json: {\n    session_id: sessionData.session_id,\n    file_name: sessionData.file_name,\n    email,\n    email_source,\n    all_emails,\n    owner_email: sessionData.owner_email\n  }\n};"
+      },
+      "id": "f754ff09-604f-4791-b34b-d6ba2ec46363",
+      "name": "Extract Calendar Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.session_ids;\nconst ids = Array.isArray(raw) ? raw : String(raw || '').split(',');\nreturn ids.map((s) => String(s).trim()).filter(Boolean).map((s) => ({ session_id: s }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        384
+      ],
+      "id": "3a35b8f3-3447-4ffd-9f8f-09b2d5c8db6f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "session",
+          "mode": "list",
+          "cachedResultName": "session"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "id",
+              "value": "={{ $json.session_id }}"
+            }
+          ]
+        },
+        "options": {
+          "outputColumns": [
+            "google_drive_id"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1168,
+        384
+      ],
+      "id": "9352768c-bb80-4dbd-b051-5b59cafafa2b",
+      "name": "Select rows from a table",
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Drive File Metadata": {
+      "main": [
+        [
+          {
+            "node": "Extract File Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract File Info": {
+      "main": [
+        [
+          {
+            "node": "Search Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Calendar": {
+      "main": [
+        [
+          {
+            "node": "Extract Calendar Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Select rows from a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table": {
+      "main": [
+        [
+          {
+            "node": "Get Drive File Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "42c4a53b-7707-48f7-9abf-adb38b61f37b",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

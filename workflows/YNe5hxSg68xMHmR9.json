@@ -1,0 +1,172 @@
+{
+  "id": "YNe5hxSg68xMHmR9",
+  "name": "UnitCreate",
+  "nodes": [
+    {
+      "id": "96d12cc6-5122-49aa-8bf3-c2c7c4bcef1f",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        300
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "case_id"
+            },
+            {
+              "name": "target"
+            },
+            {
+              "name": "description"
+            },
+            {
+              "name": "inputs"
+            },
+            {
+              "name": "assertions"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "42c28368-f20a-42da-997d-aed579a41a3d",
+      "name": "Insert Case",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -160,
+        300
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "njlfan4ReESe4VAZ"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "case_id": "={{ $json.case_id }}",
+            "target": "={{ $json.target }}",
+            "description": "={{ $json.description }}",
+            "inputs": "={{ $json.inputs }}",
+            "assertions": "={{ $json.assertions }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target",
+              "displayName": "target",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "inputs",
+              "displayName": "inputs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "assertions",
+              "displayName": "assertions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "69b42a7f-def9-4b72-901c-d36b9adbc1ae",
+      "name": "Confirm",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { ok: true, case_id: $('Input').item.json.case_id, target: $('Input').item.json.target } };"
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Insert Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Case": {
+      "main": [
+        [
+          {
+            "node": "Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "d21a56f3-cfbe-4a2d-a429-a95ed8cf8926",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "3zWRx6NwTt4fnCuu",
+  "isArchived": false,
+  "nodeGroups": []
+}

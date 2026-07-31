@@ -1,0 +1,25 @@
+{
+  "id": "eTTy7a2k7jQdE6ts",
+  "name": "Sync Project State",
+  "columns": [
+    {
+      "id": "WDnnqKdXztjff7j7",
+      "name": "drive_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "wP5r5deKG6arV31s",
+      "name": "supabase_id",
+      "type": "string",
+      "index": 1
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-07-28T18:36:49.846Z",
+  "updatedAt": "2026-07-30T08:37:10.000Z"
+}

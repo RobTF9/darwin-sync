@@ -1,0 +1,278 @@
+{
+  "id": "wEWAPWX57mAvF0Rs",
+  "name": "EvalNotifier",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "expected_count"
+            },
+            {
+              "name": "slack_channel"
+            },
+            {
+              "name": "slack_thread_ts"
+            }
+          ]
+        }
+      },
+      "id": "143899ca-570a-4c1a-b627-12819554546b",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "id": "de70d2de-27ad-41cc-9ac1-994482358945",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        688,
+        720
+      ],
+      "webhookId": "9e550566-1614-41c4-97a2-4187cd845e15"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "bVLPI1lsi9GsAaQc",
+          "mode": "list",
+          "cachedResultName": "Darwin Eval Results",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/bVLPI1lsi9GsAaQc"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "keyValue": "={{ $json.run_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "9bc5d748-49f0-4931-a1b1-a5b5cd3d1202",
+      "name": "Check Results",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        640
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const runId = $('Input').first().json.run_id;\nconst expectedCount = parseInt($('Input').first().json.expected_count, 10) || 0;\nconst pollCount = ($runIndex || 0) + 1;\nconst rows = $input.all().map(i => i.json);\nconst matching = rows.filter(r => String(r.run_id) === String(runId));\nconst count = matching.length;\nconst complete = count >= expectedCount;\nconst timeout = pollCount >= 10;\nreturn [{ json: {\n  run_id: runId,\n  expected_count: expectedCount,\n  count: count,\n  poll_count: pollCount,\n  complete: complete,\n  timeout: timeout,\n  results: matching,\n  slack_channel: $('Input').first().json.slack_channel,\n  slack_thread_ts: $('Input').first().json.slack_thread_ts,\n} }];"
+      },
+      "id": "08b72e93-1ff0-4763-873b-e3f923db2a0c",
+      "name": "Count Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.complete }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.timeout }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4ef47654-4cc1-4cc8-b5dc-a29e9aaa62c4",
+      "name": "Is Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst results = Array.isArray(data.results) ? data.results : [];\nconst runId = data.run_id;\nconst timedOut = data.timeout && !data.complete;\n\nconst getScore = (r) => {\n  const v = r.score ?? r.overall_score ?? r.overall ?? null;\n  return (v === null || v === undefined || v === '') ? null : Number(v);\n};\nconst getVerdict = (r) => String(r.verdict ?? r.status ?? r.result ?? '').toLowerCase();\n\nlet pass = 0, borderline = 0, fail = 0;\nconst failures = [];\nfor (const r of results) {\n  const v = getVerdict(r);\n  const s = getScore(r);\n  let bucket = v;\n  if (!bucket) {\n    if (s === null) bucket = 'unknown';\n    else if (s >= 0.8) bucket = 'pass';\n    else if (s >= 0.5) bucket = 'borderline';\n    else bucket = 'fail';\n  }\n  if (bucket === 'pass') pass++;\n  else if (bucket === 'borderline') borderline++;\n  else if (bucket === 'fail') { fail++; failures.push(r); }\n}\n\nconst dimSums = {};\nconst dimCounts = {};\nconst skip = new Set(['id','run_id','created_at','createdAt','updated_at','updatedAt','verdict','status','result','case_id','case','name','notes']);\nfor (const r of results) {\n  for (const key of Object.keys(r)) {\n    if (skip.has(key)) continue;\n    const num = Number(r[key]);\n    if (!isNaN(num) && r[key] !== null && r[key] !== '' && typeof r[key] !== 'boolean') {\n      dimSums[key] = (dimSums[key] || 0) + num;\n      dimCounts[key] = (dimCounts[key] || 0) + 1;\n    }\n  }\n}\nconst dimLines = Object.keys(dimSums).map(k => {\n  const avg = dimSums[k] / dimCounts[k];\n  return '\\u2022 *' + k + '*: ' + avg.toFixed(2);\n});\n\nconst failLines = failures.map(r => {\n  const label = r.case_id ?? r.case ?? r.name ?? r.id ?? 'unknown';\n  const s = getScore(r);\n  return '\\u2022 ' + label + (s !== null ? ' (score ' + s.toFixed(2) + ')' : '');\n});\n\nconst lines = [];\nlines.push('*Eval Results \\u2014 run `' + runId + '`*');\nif (timedOut) lines.push('_:warning: Timed out waiting for all results (' + data.count + '/' + data.expected_count + ' received)_');\nlines.push('');\nlines.push('*Summary*');\nlines.push('\\u2022 :white_check_mark: Pass: ' + pass);\nlines.push('\\u2022 :large_yellow_circle: Borderline: ' + borderline);\nlines.push('\\u2022 :x: Fail: ' + fail);\nlines.push('\\u2022 Total: ' + results.length);\nif (dimLines.length) { lines.push(''); lines.push('*Average scores by dimension*'); for (const l of dimLines) lines.push(l); }\nif (failLines.length) { lines.push(''); lines.push('*Failures*'); for (const l of failLines) lines.push(l); }\n\nreturn [{ json: {\n  summary: lines.join('\\n'),\n  slack_channel: data.slack_channel,\n  slack_thread_ts: data.slack_thread_ts,\n  pass: pass, borderline: borderline, fail: fail, total: results.length,\n} }];"
+      },
+      "id": "022412ab-493f-413c-ad1c-bbc752a29a02",
+      "name": "Format Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.slack_channel }}"
+        },
+        "text": "={{ $json.summary }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $json.slack_thread_ts }}"
+            }
+          },
+          "mrkdwn": true
+        },
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "messageType": "text"
+      },
+      "id": "77bbfd24-19b4-4ed0-9621-7537e776fcef",
+      "name": "Post to Thread",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1808,
+        720
+      ],
+      "webhookId": "e02c536f-a4c1-4720-9e94-6c6ae5593a1b",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Results": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Is Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Complete?": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Summary": {
+      "main": [
+        [
+          {
+            "node": "Post to Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "6f2a4153-db15-4e49-b50a-73125913d39e",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "1Nj94pfgQnese9NZ",
+  "isArchived": false,
+  "nodeGroups": []
+}

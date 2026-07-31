@@ -1,0 +1,273 @@
+{
+  "id": "ddTn14clNhuZSR1D",
+  "name": "IntegrationNotifier",
+  "nodes": [
+    {
+      "id": "e8952666-6d5d-44f7-8bd7-ed11e4517df9",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "expected_count"
+            },
+            {
+              "name": "slack_channel"
+            },
+            {
+              "name": "slack_thread_ts"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ad3c9041-4794-475f-a479-10f2bf0fbaf8",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "amount": 1
+      },
+      "webhookId": "a1ce2516-5c31-4985-a083-cf8a627f5b68"
+    },
+    {
+      "id": "84688a6a-d96d-4d30-bda1-55109025bed8",
+      "name": "Check Results",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        220
+      ],
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Ky7fj4ueDOdTHyG9"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "keyValue": "={{ $json.run_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "3a47f269-2b59-4e65-997e-e9fecdbff27d",
+      "name": "Count Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const runId = $('Input').first().json.run_id;\nconst expectedCount = parseInt($('Input').first().json.expected_count, 10) || 0;\nconst pollCount = ($runIndex || 0) + 1;\nconst matching = $input.all().map((i) => i.json).filter((r) => String(r.run_id) === String(runId));\nreturn [{ json: { run_id: runId, expected_count: expectedCount, count: matching.length, poll_count: pollCount, complete: matching.length >= expectedCount, timeout: pollCount >= 15, results: matching, slack_channel: $('Input').first().json.slack_channel, slack_thread_ts: $('Input').first().json.slack_thread_ts } }];"
+      }
+    },
+    {
+      "id": "a8c59e39-2462-484d-a9a7-b57dd0e54924",
+      "name": "Is Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.complete }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "leftValue": "={{ $json.timeout }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c3fa9e91-608b-4545-a629-62083b53203e",
+      "name": "Format Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $input.first().json;\nconst results = Array.isArray(data.results) ? data.results : [];\nconst timedOut = data.timeout && !data.complete;\nconst pass = results.filter((r) => r.status === 'pass').length;\nconst failures = results.filter((r) => r.status !== 'pass');\nconst lines = [];\nlines.push('*Integration Results — run `' + data.run_id + '`*');\nif (timedOut) lines.push('_:warning: Timed out waiting for all results (' + data.count + '/' + data.expected_count + ' received)_');\nlines.push('');\nlines.push(':white_check_mark: Pass: ' + pass);\nlines.push(':x: Fail/Error: ' + failures.length);\nlines.push('Total: ' + results.length);\nif (failures.length) {\n  lines.push('');\n  lines.push('*Failures*');\n  for (const r of failures) {\n    let detail = '';\n    try {\n      const d = JSON.parse(r.assertion_detail || '[]');\n      const bad = d.find((x) => !x.pass);\n      detail = bad ? ' — ' + bad.assertion + ': ' + JSON.stringify(bad.got ?? bad.detail ?? '').slice(0, 120) : '';\n    } catch (e) {}\n    lines.push('• ' + r.case_id + ' (' + r.target + '): ' + r.status + detail);\n  }\n}\nreturn [{ json: { summary: lines.join('\\n'), slack_channel: data.slack_channel, slack_thread_ts: data.slack_thread_ts, pass, fail: failures.length, total: results.length } }];"
+      }
+    },
+    {
+      "id": "7f4b821e-1aff-4156-9d8d-b60bc4efa28b",
+      "name": "Post to Thread",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1320,
+        220
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.slack_channel }}"
+        },
+        "messageType": "text",
+        "text": "={{ $json.summary }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $json.slack_thread_ts }}",
+              "reply_broadcast": false
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "executeOnce": true,
+      "webhookId": "db4e8030-5b1b-47e2-b2c8-5097ff37692e"
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Results": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Is Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Complete?": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Summary": {
+      "main": [
+        [
+          {
+            "node": "Post to Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "b9f7fba6-3f20-4782-90ad-0caf95c081b2",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "CVkK9Ao2Onp9a2Gp",
+  "isArchived": false,
+  "nodeGroups": []
+}

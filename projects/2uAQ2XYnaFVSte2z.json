@@ -1,0 +1,16 @@
+{
+  "id": "2uAQ2XYnaFVSte2z",
+  "name": "Darwin",
+  "icon": {
+    "type": "icon",
+    "value": "brain-cog"
+  },
+  "description": "",
+  "type": "team",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "variableStubs": []
+}

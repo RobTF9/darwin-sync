@@ -1,0 +1,191 @@
+{
+  "id": "6uai446yon1JhTBU",
+  "name": "UnitRead",
+  "nodes": [
+    {
+      "id": "18285309-8d31-4c1f-96ad-685855171725",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        300
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "table"
+            },
+            {
+              "name": "case_id"
+            },
+            {
+              "name": "run_id"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7ba387e4-e666-4d1e-a5b5-ec0c705d740b",
+      "name": "Route Table",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -180,
+        300
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "results",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.table }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "results"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "cases"
+        }
+      }
+    },
+    {
+      "id": "4892acbe-99da-4da0-9e91-7701a1783834",
+      "name": "Get Results",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        60,
+        220
+      ],
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "AYj3ouAaGTX0dThE"
+        },
+        "returnAll": true
+      }
+    },
+    {
+      "id": "e4fc2260-dc2d-49b8-8dab-a838face9651",
+      "name": "Filter Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const f = $('Input').first().json;\nlet rows = $input.all().map((i) => i.json);\nif (f.case_id) rows = rows.filter((r) => r.case_id === f.case_id);\nif (f.run_id) rows = rows.filter((r) => r.run_id === f.run_id);\nrows = rows.slice(0, 100);\nreturn [{ json: { count: rows.length, rows } }];"
+      }
+    },
+    {
+      "id": "25a6a98d-4630-4cdf-a897-bfeb99a94258",
+      "name": "Get Cases",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        60,
+        380
+      ],
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "njlfan4ReESe4VAZ"
+        },
+        "returnAll": true
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Route Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Table": {
+      "main": [
+        [
+          {
+            "node": "Get Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Results": {
+      "main": [
+        [
+          {
+            "node": "Filter Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Cases": {
+      "main": [
+        [
+          {
+            "node": "Filter Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "7856047d-1b74-476d-8ce5-fd02a2083272",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "3zWRx6NwTt4fnCuu",
+  "isArchived": false,
+  "nodeGroups": []
+}

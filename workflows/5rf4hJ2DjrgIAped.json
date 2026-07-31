@@ -1,0 +1,357 @@
+{
+  "id": "5rf4hJ2DjrgIAped",
+  "name": "EvalRun",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "slack_channel"
+            },
+            {
+              "name": "slack_thread_ts"
+            }
+          ]
+        }
+      },
+      "id": "2782e66e-6be5-4122-8a64-c01a99d81109",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "G3P55vPsJtpt1pk5",
+          "mode": "list",
+          "cachedResultName": "Darwin Evals",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/G3P55vPsJtpt1pk5"
+        },
+        "returnAll": true
+      },
+      "id": "ff3936fb-441a-4662-9ed7-3a13a40c8bc5",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const runId = $execution.id;\nconst rows = $input.all();\nconst cases = rows.map((item) => {\n  const r = item.json;\n  return {\n    json: {\n      run_id: runId,\n      case_id: r.case_id ?? r.id ?? null,\n      env: 'slack',\n      input: r.input ?? \"\",\n      context_messages: r.context_messages ?? \"[]\",\n      prohibited_tools: r.prohibited_tools ?? \"[]\",\n      ground_truth: r.expected_response ?? \"\",\n      rubric: r.rubric ?? \"\",\n      total_cases: rows.length\n    }\n  };\n});\nreturn cases;"
+      },
+      "id": "f806decd-18cd-480d-aa6c-096f22ccd895",
+      "name": "Format Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "fPAICfE6SOP5Q2Fa",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/fPAICfE6SOP5Q2Fa",
+          "cachedResultName": "Darwin — EvalDispatch"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.run_id }}",
+            "case_id": "={{ $json.case_id }}",
+            "input": "={{ $json.input }}",
+            "context_messages": "={{ $json.context_messages }}",
+            "prohibited_tools": "={{ $json.prohibited_tools }}",
+            "ground_truth": "={{ $json.ground_truth }}",
+            "rubric": "={{ $json.rubric }}",
+            "env": "={{ $json.env }}"
+          }
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "93be241c-084f-4461-8a55-d7efeb6c23ca",
+      "name": "Dispatch Case",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Input').isExecuted ? $('Input').item.json.slack_channel : '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "leftValue": "={{ $('Input').isExecuted ? $('Input').item.json.slack_thread_ts : '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9d15873e-4bda-4873-b759-6653435ff8aa",
+      "name": "Has Slack Thread?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "wEWAPWX57mAvF0Rs",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/wEWAPWX57mAvF0Rs",
+          "cachedResultName": "Darwin — EvalNotifier"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $(\"Format Cases\").first().json.run_id }}",
+            "expected_count": "={{ String($('Format Cases').first().json.total_cases) }}",
+            "slack_channel": "={{ $(\"Input\").item.json.slack_channel }}",
+            "slack_thread_ts": "={{ $(\"Input\").item.json.slack_thread_ts }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "expected_count",
+              "displayName": "expected_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "slack_channel",
+              "displayName": "slack_channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "slack_thread_ts",
+              "displayName": "slack_thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "e9320ec4-b270-4bd9-94dc-e5eb5d9d4945",
+      "name": "Start Notifier",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        752
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {},
+      "id": "69eb4e64-d3ef-4480-b4cf-16654e0a6ced",
+      "name": "Merge Branches",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const runId = $(\"Format Cases\").first().json.run_id;\nconst caseCount = $(\"Format Cases\").all().length;\nlet channel = ''; let threadTs = '';\ntry { channel = $(\"Input\").first().json.slack_channel || ''; threadTs = $(\"Input\").first().json.slack_thread_ts || ''; } catch (e) {}\nconst hasThread = Boolean(channel) && Boolean(threadTs);\nconst message = hasThread\n  ? (\"Dispatched \" + caseCount + \" eval cases. Results will be posted to the thread when complete.\")\n  : (\"Dispatched \" + caseCount + \" eval cases. Results available via read_evals tool.\");\nreturn [{ json: { run_id: runId, case_count: caseCount, status: \"dispatched\", message } }];"
+      },
+      "id": "e10de109-9026-4ff6-a56c-0d0b3943ee85",
+      "name": "Return Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        832
+      ]
+    },
+    {
+      "id": "6703f9a4-d92e-412e-9af1-b31b2af0e329",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        832
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Format Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Cases": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Case": {
+      "main": [
+        [
+          {
+            "node": "Has Slack Thread?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Slack Thread?": {
+      "main": [
+        [
+          {
+            "node": "Start Notifier",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Branches",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Start Notifier": {
+      "main": [
+        [
+          {
+            "node": "Merge Branches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Branches": {
+      "main": [
+        [
+          {
+            "node": "Return Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "timezone": "Europe/London"
+  },
+  "triggerCount": 1,
+  "versionId": "c4d9a59f-2b60-4f86-a655-cc7c454872c3",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "1Nj94pfgQnese9NZ",
+  "isArchived": false,
+  "nodeGroups": []
+}

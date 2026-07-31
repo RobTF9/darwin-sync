@@ -1,0 +1,14 @@
+{
+  "id": "bXwaLvJM3XTPyBDr",
+  "name": "Google Drive",
+  "type": "googleDriveOAuth2Api",
+  "data": {},
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

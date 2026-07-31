@@ -1,0 +1,76 @@
+{
+  "folders": [
+    {
+      "id": "DTre4lbkGJubF43l",
+      "name": "Agent",
+      "parentFolderId": null,
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-28T19:06:28.533Z",
+      "updatedAt": "2026-07-28T19:06:28.533Z"
+    },
+    {
+      "id": "wkVsUQ3LVUIdgVe0",
+      "name": "Tools",
+      "parentFolderId": "DTre4lbkGJubF43l",
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-29T17:18:02.142Z",
+      "updatedAt": "2026-07-29T17:18:23.000Z"
+    },
+    {
+      "id": "1Nj94pfgQnese9NZ",
+      "name": "Evals",
+      "parentFolderId": "fxhuxPGdNIHdYUsf",
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-30T07:44:53.601Z",
+      "updatedAt": "2026-07-30T18:08:28.000Z"
+    },
+    {
+      "id": "qCAZDE7UzbMrEFJa",
+      "name": "Triggers",
+      "parentFolderId": "DTre4lbkGJubF43l",
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-30T08:26:18.548Z",
+      "updatedAt": "2026-07-30T08:26:18.548Z"
+    },
+    {
+      "id": "wWGhCjDluNfE1cPJ",
+      "name": "Utils",
+      "parentFolderId": null,
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-30T08:48:28.024Z",
+      "updatedAt": "2026-07-30T08:48:28.024Z"
+    },
+    {
+      "id": "fxhuxPGdNIHdYUsf",
+      "name": "Testing",
+      "parentFolderId": null,
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-30T18:08:26.635Z",
+      "updatedAt": "2026-07-30T18:08:26.635Z"
+    },
+    {
+      "id": "3zWRx6NwTt4fnCuu",
+      "name": "Unit",
+      "parentFolderId": "fxhuxPGdNIHdYUsf",
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-30T18:08:35.969Z",
+      "updatedAt": "2026-07-30T19:22:20.000Z"
+    },
+    {
+      "id": "CVkK9Ao2Onp9a2Gp",
+      "name": "Integration",
+      "parentFolderId": "fxhuxPGdNIHdYUsf",
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-30T19:28:07.399Z",
+      "updatedAt": "2026-07-30T19:28:30.000Z"
+    },
+    {
+      "id": "CyWks1CgMZeohO4a",
+      "name": "Chaos",
+      "parentFolderId": "fxhuxPGdNIHdYUsf",
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-07-31T12:05:05.525Z",
+      "updatedAt": "2026-07-31T12:05:05.525Z"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "id": "wyNafb6mqOy3MWHV",
+  "name": "ErrorHarnessSlack",
+  "nodes": [
+    {
+      "id": "7b6b9678-07e8-45f2-80a7-2cfa589645d5",
+      "name": "Set Custom Data and Fail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json;\n$execution.customData.set('channel', String(input.channel || ''));\n$execution.customData.set('sessionId', String(input.threadTs || ''));\n$execution.customData.set('msgTs', String(input.msgTs || ''));\nthrow new Error('Intentional chaos-harness failure (Slack Error handler test)');"
+      }
+    },
+    {
+      "id": "084e9c5a-248b-49ad-9d53-2c173ae20806",
+      "name": "Chaos Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "channel",
+              "type": "string"
+            },
+            {
+              "name": "msgTs",
+              "type": "string"
+            },
+            {
+              "name": "threadTs",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chaos Input": {
+      "main": [
+        [
+          {
+            "node": "Set Custom Data and Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "MLxaOYbzMS9DFoIv"
+  },
+  "triggerCount": 0,
+  "versionId": "74449f02-c138-4ff1-b1ae-490775b5b2bc",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "CyWks1CgMZeohO4a",
+  "isArchived": false,
+  "nodeGroups": []
+}

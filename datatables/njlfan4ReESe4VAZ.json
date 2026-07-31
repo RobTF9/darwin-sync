@@ -1,0 +1,55 @@
+{
+  "id": "njlfan4ReESe4VAZ",
+  "name": "Darwin Unit Cases",
+  "columns": [
+    {
+      "id": "bkL1FgDqF8ThBW3p",
+      "name": "case_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "SlTUFiPxczrBoFK5",
+      "name": "target",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "hEw5RHVMpn5XHfKs",
+      "name": "description",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "eAFXbsYrtFf5VRj3",
+      "name": "inputs",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "6prAWtjz35o7vhbb",
+      "name": "assertions",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "EcsuNyuxPBtPCGBj",
+      "name": "last_status",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "nFVXiBbKQhpwTGBn",
+      "name": "last_run_at",
+      "type": "date",
+      "index": 6
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-07-30T12:54:52.544Z",
+  "updatedAt": "2026-07-31T08:10:55.719Z"
+}

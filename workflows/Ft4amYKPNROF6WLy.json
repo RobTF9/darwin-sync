@@ -1,0 +1,107 @@
+{
+  "id": "Ft4amYKPNROF6WLy",
+  "name": "ForumThread",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "topic_id"
+            }
+          ]
+        }
+      },
+      "id": "c0900678-9b60-4d01-bca4-756095b062e0",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://community.n8n.io/t/{{ $json.topic_id }}.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "include_raw",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "5dcd91f9-896c-4793-a8d9-1d6ba6970808",
+      "name": "Discourse Topic Fetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        384,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const t = $input.first().json;\nconst stripHtml = (html) => {\n  if (!html) return '';\n  return String(html).replace(/<br\\s*\\/?\\s*>/gi, '\\n').replace(/<\\/p>/gi, '\\n\\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\\\"').replace(/&#39;/g, \"'\").replace(/\\n{3,}/g, '\\n\\n').trim();\n};\nconst clip = (s, n) => { const x = String(s || ''); return x.length > n ? x.slice(0, n) + '\\u2026' : x; };\nconst baseUrl = 'https://community.n8n.io';\nconst posts = (t.post_stream && t.post_stream.posts) || [];\nconst topicUrl = baseUrl + '/t/' + t.slug + '/' + t.id;\nconst originalPost = posts.find(p => p.post_number === 1) || posts[0];\nconst acceptedAnswer = posts.find(p => p.accepted_answer === true) || null;\nconst replies = posts.filter(p => p !== originalPost && p !== acceptedAnswer).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 5);\nconst formatPost = (p, role) => p ? {\n  role,\n  post_number: p.post_number,\n  url: topicUrl + '/' + p.post_number,\n  username: p.username,\n  name: p.name,\n  staff: p.staff === true || p.admin === true || p.moderator === true,\n  trust_level: p.trust_level,\n  created_at: p.created_at,\n  score: p.score,\n  like_count: (p.actions_summary || []).find(a => a.id === 2) ? (p.actions_summary || []).find(a => a.id === 2).count : 0,\n  body: clip(p.raw || stripHtml(p.cooked), 2500),\n  accepted_answer: p.accepted_answer === true\n} : null;\nconst out = {\n  topic_id: t.id,\n  title: t.fancy_title || t.title,\n  url: topicUrl,\n  category_id: t.category_id,\n  tags: t.tags || [],\n  solved: t.has_accepted_answer === true,\n  closed: t.closed === true,\n  archived: t.archived === true,\n  archetype: t.archetype,\n  posts_count: t.posts_count,\n  reply_count: t.reply_count,\n  views: t.views,\n  like_count: t.like_count,\n  created_at: t.created_at,\n  last_posted_at: t.last_posted_at,\n  total_posts_in_thread: (t.post_stream && t.post_stream.stream) ? t.post_stream.stream.length : posts.length,\n  posts_returned: posts.length,\n  original_post: formatPost(originalPost, 'question'),\n  accepted_answer: formatPost(acceptedAnswer, 'accepted_answer'),\n  top_replies: replies.map(p => formatPost(p, 'reply'))\n};\nreturn [out];"
+      },
+      "id": "a6b99d78-9c4f-48f0-830a-b43826be231d",
+      "name": "Reshape Thread",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        272
+      ]
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Discourse Topic Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discourse Topic Fetch": {
+      "main": [
+        [
+          {
+            "node": "Reshape Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "06cb1a53-4e13-4311-9d2e-8d5c42f17ec7",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

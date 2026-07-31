@@ -1,0 +1,1163 @@
+{
+  "id": "9UJFDlOnoxSzFCS1",
+  "name": "Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ef722b63-606e-42a3-83e2-8a22464231d4",
+              "name": "chatInput",
+              "type": "string",
+              "value": "={{  $json.chatInput || $('OnEvent')?.item.json.text.replace(/<@(U09Q22R53T6|U0BLRFB0FJR)>\\s*/g, '') }}"
+            },
+            {
+              "id": "de444cf3-7171-4e73-8bbf-819181a8e9d9",
+              "name": "sessionId",
+              "type": "string",
+              "value": "={{ $json.sessionId || $('OnEvent').item.json.ts}}"
+            },
+            {
+              "id": "f1de5e0f-83d9-4b18-a3dd-2bc66215e7e2",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.channelId || $('OnEvent').item.json.channel }}"
+            },
+            {
+              "id": "a38aac54-e46b-4fc4-9021-c1f9d1c14612",
+              "name": "env",
+              "type": "string",
+              "value": "={{ $json.env || '' }}"
+            },
+            {
+              "id": "28f59283-e70e-41f8-b9b3-41eafdddd73e",
+              "name": "case",
+              "type": "number",
+              "value": "={{ $json.case || 0 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -496,
+        64
+      ],
+      "id": "6d5a587d-71bd-44b6-8ee1-86393728be91",
+      "name": "SetState"
+    },
+    {
+      "parameters": {
+        "resource": "reaction",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('OnEvent').item.json.channel }}",
+          "mode": "id"
+        },
+        "timestamp": "={{ $('OnEvent').item.json.ts }}",
+        "name": "loading"
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -944,
+        208
+      ],
+      "id": "1dfc2f01-45af-4fbb-98ec-541fbc833883",
+      "name": "ConfirmReciept",
+      "webhookId": "cf8aaad6-9fa0-428f-81a4-cbb865192c62",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "trigger": [
+          "app_mention"
+        ],
+        "watchWorkspace": true,
+        "options": {
+          "userIds": [
+            "U09Q22R53T6",
+            "U0BLRFB0FJR"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.slackTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2672,
+        128
+      ],
+      "id": "9af570c0-ad94-42c5-837b-bf2b2e0b5a37",
+      "name": "OnEvent",
+      "webhookId": "dfc1525f-c9bd-4ed5-ad50-4ffd16f3b437",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "reaction",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('OnEvent').item.json.channel }}",
+          "mode": "id"
+        },
+        "timestamp": "={{ $('OnEvent').item.json.ts }}",
+        "name": "loading"
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -1168,
+        384
+      ],
+      "id": "4e0161d5-6c4c-4423-b956-136b13074047",
+      "name": "ConfirmContinuation",
+      "webhookId": "a3871c84-8767-4a70-9dd3-f202d11a2e02",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cd37628f-da04-49bd-8cd0-6eb3baf725d2",
+              "name": "chatInput",
+              "value": "={{ $('OnEvent').item.json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "af9f21fa-5b6c-4637-a2d2-09ff226cea23",
+              "name": "sessionId",
+              "value": "={{ $('FindSession').item.json.SessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "436f2368-6087-445c-80b2-8885fc91d012",
+              "name": "channel",
+              "value": "={{ $('OnEvent').item.json.channel }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -944,
+        384
+      ],
+      "id": "a48b9014-12a0-4ffa-96fc-c1fbba2c1fd0",
+      "name": "RefreshState"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "HDMvthliXrAcZrXp",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/HDMvthliXrAcZrXp",
+          "cachedResultName": "Darwin — Darwin"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chatInput": "={{ $json.chatInput }}",
+            "sessionId": "={{ $json.sessionId }}",
+            "channel": "={{ $json.channel }}",
+            "env": "slack"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "baseline",
+              "displayName": "baseline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "env",
+              "displayName": "env",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        128
+      ],
+      "id": "07e5e571-3baa-40a4-a22d-e44e84e48186",
+      "name": "Darwin"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('OnEvent').item.json.channel }}",
+          "mode": "id"
+        },
+        "text": "={{ $('format').item.json.output }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $('SetState').item.json.sessionId }}"
+            }
+          },
+          "mrkdwn": true,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1184,
+        144
+      ],
+      "id": "afc3fda6-60e9-4120-9f3f-42fe24e43efc",
+      "name": "SlackReply",
+      "webhookId": "81f3bba2-ef9e-4c9b-8104-719454b2de93",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "reaction",
+        "operation": "remove",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('OnEvent').item.json.channel }}"
+        },
+        "timestamp": "={{ $('OnEvent').item.json.ts }}",
+        "name": "loading"
+      },
+      "id": "28986a16-b51c-4a3b-8387-559822e859c8",
+      "name": "Remove Loading Reaction",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        736,
+        144
+      ],
+      "webhookId": "d3de8cb5-c53e-454c-8d85-328a72b55985",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "reaction",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('OnEvent').item.json.channel }}"
+        },
+        "timestamp": "={{ $('OnEvent').item.json.ts }}",
+        "name": "white_check_mark"
+      },
+      "id": "9ac50b15-a043-405d-995d-ea41274b817b",
+      "name": "Add Check Reaction",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        960,
+        144
+      ],
+      "webhookId": "2bf8c71d-9dde-4b4a-aa3e-cb88b5d75044",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "1VtBcx3zHBLVXrec",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/1VtBcx3zHBLVXrec",
+          "cachedResultName": "Darwin — Slack Markdown"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "output": "={{ $json.output }}"
+          },
+          "matchingColumns": [
+            "output"
+          ],
+          "schema": [
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        512,
+        144
+      ],
+      "id": "772ec5a9-b146-4b2f-9d06-1fca4a8de5b1",
+      "name": "format"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lxbB2v0RHaAAVH6E",
+          "mode": "list",
+          "cachedResultName": "Darwin Sessions",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/lxbB2v0RHaAAVH6E"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "SessionId",
+              "keyValue": "={{ $json.thread_ts }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -2080,
+        128
+      ],
+      "id": "462c0b63-fd57-4aa4-ac68-065f089ab5a1",
+      "name": "FindSession",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "lxbB2v0RHaAAVH6E",
+          "mode": "list",
+          "cachedResultName": "Darwin Sessions",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/lxbB2v0RHaAAVH6E"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "SessionId": "={{ $('OnEvent').item.json.ts }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "SessionId",
+              "displayName": "SessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Memory",
+              "displayName": "Memory",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "From",
+              "displayName": "From",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "User",
+              "displayName": "User",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1168,
+        208
+      ],
+      "id": "a12e07f9-9129-443a-aafc-2600c35a205f",
+      "name": "InsertSession"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1b2c3d4-0001-0001-0001-000000000001",
+              "leftValue": "={{ $('OnEvent').first().json.thread_ts }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2b06b753-c20d-40a6-87d6-c24690d5dcb5",
+      "name": "IsThread",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1632,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "channel",
+        "operation": "replies",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('OnEvent').first().json.channel }}",
+          "mode": "id"
+        },
+        "ts": "={{ $('OnEvent').first().json.thread_ts }}",
+        "limit": 100,
+        "filters": {}
+      },
+      "id": "bb8c615a-4dfb-41b4-9338-a005484f5b15",
+      "name": "GetThreadMessages",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -1168,
+        32
+      ],
+      "webhookId": "3e69554e-c9ad-4f7e-b8c5-962416b78bfd",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const BOTS=['U09Q22R53T6','U0BLRFB0FJR'];\nconst mentionRe=new RegExp('<@('+BOTS.join('|')+')>\\\\s*','g');\nconst ev=$('OnEvent').first().json.event||$('OnEvent').first().json;\nconst triggerTs=ev.ts;\nconst channelId=ev.channel;\nconst sessionId=ev.ts;\nconst rawCurrent=(ev.text||'').replace(mentionRe,'').trim();\nconst msgs=$input.all().map(i=>i.json);\nconst prior=msgs.filter(m=>m && m.ts!==triggerTs && !BOTS.includes(m.user) && (m.bot_id?false:true));\nconst lines=prior.map(m=>{const who=m.user||m.username||'unknown';const txt=(m.text||'').replace(mentionRe,'').trim();return '['+who+']: '+txt;});\nconst context=['--- Thread context (previous messages) ---',...lines,'--- End thread context ---','','Current question: '+rawCurrent].join('\\n');\nreturn [{json:{chatInput:context,sessionId:sessionId,channelId:channelId}}];"
+      },
+      "id": "f8aca9de-fd46-47e1-a2aa-450f96fbf819",
+      "name": "BuildThreadContext",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "de5ee9c4-ed63-427c-944a-1e7b9717fc95",
+              "leftValue": "={{ $json.SessionId }}",
+              "operator": {
+                "operation": "notExists",
+                "singleValue": true,
+                "type": "string"
+              },
+              "rightValue": "<@U0BLRFB0FJR>"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1856,
+        128
+      ],
+      "id": "d06d35db-75d6-4b8d-b9d8-57743ee801c1",
+      "name": "SessionDoesntExists"
+    },
+    {
+      "parameters": {
+        "resource": "reaction",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('OnEvent').item.json.channel }}",
+          "mode": "id"
+        },
+        "timestamp": "={{ $('OnEvent').item.json.ts }}",
+        "name": "loading"
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -496,
+        32
+      ],
+      "id": "67762a68-b907-4df0-b44b-e68acb700683",
+      "name": "ConfirmReciept1",
+      "webhookId": "cf8aaad6-9fa0-428f-81a4-cbb865192c62",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "lxbB2v0RHaAAVH6E",
+          "mode": "list",
+          "cachedResultName": "Darwin Sessions",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/lxbB2v0RHaAAVH6E"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "SessionId": "={{ $('OnEvent').item.json.thread_ts }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "SessionId",
+              "displayName": "SessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Memory",
+              "displayName": "Memory",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "From",
+              "displayName": "From",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "User",
+              "displayName": "User",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        32
+      ],
+      "id": "951f8e98-3cec-46ee-88d8-bc219d7907ed",
+      "name": "InsertSession1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ef722b63-606e-42a3-83e2-8a22464231d4",
+              "name": "chatInput",
+              "value": "={{$('BuildThreadContext')?.first()?.json?.chatInput }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -272,
+        32
+      ],
+      "id": "8e456f58-151f-43bd-935a-b7d507f64d1b",
+      "name": "ThreadState"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rc1",
+              "leftValue": "={{ $json.channel }}",
+              "rightValue": "C09DRCJLQCE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8fc7cc56-1b11-41ae-86a5-4634e1c22005",
+      "name": "Route Channel",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -256,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ZMyr5DWlrfXlhhKs",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ZMyr5DWlrfXlhhKs",
+          "cachedResultName": "Darwin — Builder"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "task": "={{ $json.chatInput }}",
+            "session_id": "={{ $json.sessionId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "task",
+              "displayName": "task",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "0d821afc-e439-4beb-a10b-b0304c0f6424",
+      "name": "Call Builder",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "channel",
+              "value": "={{ $json.channel }}"
+            },
+            {
+              "key": "sessionId",
+              "value": "={{ $json.thread_ts || $json.ts }}"
+            },
+            {
+              "key": "msgTs",
+              "value": "={{ $('OnEvent').item.json.ts }}"
+            }
+          ]
+        }
+      },
+      "id": "c9bdd669-4254-41be-8495-a9479e22a5ab",
+      "name": "exec_data",
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        -2368,
+        128
+      ]
+    }
+  ],
+  "connections": {
+    "ConfirmReciept": {
+      "main": [
+        [
+          {
+            "node": "SetState",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OnEvent": {
+      "main": [
+        [
+          {
+            "node": "exec_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ConfirmContinuation": {
+      "main": [
+        [
+          {
+            "node": "RefreshState",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RefreshState": {
+      "main": [
+        [
+          {
+            "node": "SetState",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Darwin": {
+      "main": [
+        [
+          {
+            "node": "format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Loading Reaction": {
+      "main": [
+        [
+          {
+            "node": "Add Check Reaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Check Reaction": {
+      "main": [
+        [
+          {
+            "node": "SlackReply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format": {
+      "main": [
+        [
+          {
+            "node": "Remove Loading Reaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FindSession": {
+      "main": [
+        [
+          {
+            "node": "SessionDoesntExists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "InsertSession": {
+      "main": [
+        [
+          {
+            "node": "ConfirmReciept",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IsThread": {
+      "main": [
+        [
+          {
+            "node": "GetThreadMessages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "InsertSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetThreadMessages": {
+      "main": [
+        [
+          {
+            "node": "BuildThreadContext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildThreadContext": {
+      "main": [
+        [
+          {
+            "node": "InsertSession1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SessionDoesntExists": {
+      "main": [
+        [
+          {
+            "node": "IsThread",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ConfirmContinuation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ConfirmReciept1": {
+      "main": [
+        [
+          {
+            "node": "ThreadState",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "InsertSession1": {
+      "main": [
+        [
+          {
+            "node": "ConfirmReciept1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ThreadState": {
+      "main": [
+        [
+          {
+            "node": "SetState",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Channel": {
+      "main": [
+        [
+          {
+            "node": "Call Builder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Darwin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Builder": {
+      "main": [
+        [
+          {
+            "node": "format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SetState": {
+      "main": [
+        [
+          {
+            "node": "Route Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "exec_data": {
+      "main": [
+        [
+          {
+            "node": "FindSession",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "errorWorkflow": "MLxaOYbzMS9DFoIv"
+  },
+  "triggerCount": 1,
+  "versionId": "520c1ba6-e7e5-409d-bf5c-ed884d1d46b2",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "qCAZDE7UzbMrEFJa",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "3ac8b18b-89ba-41f0-ab09-bab1ab63704a",
+      "name": "Build thread context",
+      "nodeIds": [
+        "bb8c615a-4dfb-41b4-9338-a005484f5b15",
+        "f8aca9de-fd46-47e1-a2aa-450f96fbf819",
+        "67762a68-b907-4df0-b44b-e68acb700683",
+        "951f8e98-3cec-46ee-88d8-bc219d7907ed",
+        "8e456f58-151f-43bd-935a-b7d507f64d1b"
+      ]
+    },
+    {
+      "id": "817b91b0-f7f4-420e-80ea-2124c308d5ad",
+      "name": "Insert session",
+      "nodeIds": [
+        "1dfc2f01-45af-4fbb-98ec-541fbc833883",
+        "a12e07f9-9129-443a-aafc-2600c35a205f"
+      ]
+    },
+    {
+      "id": "785e9150-975c-457e-be18-f3f5f07f8375",
+      "name": "Continue session",
+      "nodeIds": [
+        "4e0161d5-6c4c-4423-b956-136b13074047",
+        "a48b9014-12a0-4ffa-96fc-c1fbba2c1fd0"
+      ]
+    },
+    {
+      "id": "fdbefa19-71ef-464f-9439-943c8c67bfe6",
+      "name": "Respond",
+      "nodeIds": [
+        "afc3fda6-60e9-4120-9f3f-42fe24e43efc",
+        "28986a16-b51c-4a3b-8387-559822e859c8",
+        "9ac50b15-a043-405d-995d-ea41274b817b",
+        "772ec5a9-b146-4b2f-9d06-1fca4a8de5b1"
+      ]
+    }
+  ]
+}

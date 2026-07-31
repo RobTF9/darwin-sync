@@ -1,0 +1,159 @@
+{
+  "id": "MQ4Hq5QqwMFpFS4j",
+  "name": "ForumSearch",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "query"
+            },
+            {
+              "name": "category"
+            },
+            {
+              "name": "tags"
+            },
+            {
+              "name": "status"
+            },
+            {
+              "name": "after"
+            },
+            {
+              "name": "before"
+            },
+            {
+              "name": "min_likes"
+            },
+            {
+              "name": "order"
+            },
+            {
+              "name": "page"
+            }
+          ]
+        }
+      },
+      "id": "b7124e2b-77b3-40f3-8b81-c789d15a07e6",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst parts = [];\nif (item.query) parts.push(String(item.query).trim());\nif (item.category) parts.push('#' + String(item.category).trim());\nif (item.tags) {\n  const tagList = String(item.tags).split(',').map(t => t.trim()).filter(Boolean);\n  if (tagList.length) parts.push('tags:' + tagList.join('+'));\n}\nconst allowedStatus = ['solved','unsolved','open','closed','archived','noreplies','single_user','public'];\nif (item.status && allowedStatus.includes(String(item.status))) parts.push('status:' + item.status);\nif (item.after) parts.push('after:' + String(item.after).trim());\nif (item.before) parts.push('before:' + String(item.before).trim());\nif (item.min_likes) parts.push('min_likes:' + String(item.min_likes).trim());\nconst allowedOrder = ['latest','likes','views','latest_topic'];\nif (item.order && allowedOrder.includes(String(item.order))) parts.push('order:' + item.order);\nconst q = parts.join(' ');\nconst page = item.page && Number(item.page) > 0 ? Number(item.page) : 1;\nreturn [{ q, page }];"
+      },
+      "id": "b8aecbb5-5858-4ae7-8e89-cd1ca4e4d383",
+      "name": "Build Discourse Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://community.n8n.io/search.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.q }}"
+            },
+            {
+              "name": "page",
+              "value": "={{ $json.page }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "68b747e0-f2e2-4fe4-81df-994a8e3503a1",
+      "name": "Discourse Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        864,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst topics = data.topics || [];\nconst posts = data.posts || [];\nconst categoryMap = new Map((data.categories || []).map(c => [c.id, { name: c.name, slug: c.slug }]));\nconst firstPostPerTopic = new Map();\nfor (const p of posts) {\n  const existing = firstPostPerTopic.get(p.topic_id);\n  if (!existing || (p.post_number && p.post_number < existing.post_number)) firstPostPerTopic.set(p.topic_id, p);\n}\nconst baseUrl = 'https://community.n8n.io';\nconst buildQuery = $('Build Discourse Query').item.json;\nconst results = topics.map(t => {\n  const cat = categoryMap.get(t.category_id);\n  const firstPost = firstPostPerTopic.get(t.id);\n  return {\n    topic_id: t.id,\n    title: t.fancy_title || t.title,\n    url: baseUrl + '/t/' + t.slug + '/' + t.id,\n    category: cat ? cat.name : null,\n    tags: t.tags || [],\n    solved: t.has_accepted_answer === true,\n    closed: t.closed === true,\n    archetype: t.archetype,\n    reply_count: t.reply_count,\n    posts_count: t.posts_count,\n    views: t.views,\n    like_count: t.like_count,\n    created_at: t.created_at,\n    last_posted_at: t.last_posted_at,\n    excerpt: firstPost ? (firstPost.blurb || '').slice(0, 400) : null,\n    matched_post_url: firstPost ? baseUrl + '/t/' + t.slug + '/' + t.id + '/' + firstPost.post_number : null,\n    matched_username: firstPost ? firstPost.username : null\n  };\n});\nreturn [{ total_returned: results.length, page: buildQuery.page, query: buildQuery.q, results }];"
+      },
+      "id": "961ff118-e758-40ce-a583-3a61ca12f73a",
+      "name": "Reshape Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        624
+      ]
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Build Discourse Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Discourse Query": {
+      "main": [
+        [
+          {
+            "node": "Discourse Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discourse Search": {
+      "main": [
+        [
+          {
+            "node": "Reshape Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "94c1f2f8-ea37-4111-9d24-c96073bc079e",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

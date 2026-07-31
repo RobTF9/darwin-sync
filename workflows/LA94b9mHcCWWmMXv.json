@@ -1,0 +1,200 @@
+{
+  "id": "LA94b9mHcCWWmMXv",
+  "name": "IntegrationCreate",
+  "nodes": [
+    {
+      "id": "14c1b992-e77d-4b41-a465-76da390e36ab",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        300
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "case_id"
+            },
+            {
+              "name": "target_type"
+            },
+            {
+              "name": "target"
+            },
+            {
+              "name": "agent"
+            },
+            {
+              "name": "description"
+            },
+            {
+              "name": "inputs"
+            },
+            {
+              "name": "assertions"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "16a38480-c178-444c-9dad-5c59c55c9f32",
+      "name": "Insert Case",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -160,
+        300
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "yZf7RKAPLc3ZiO5E"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "case_id": "={{ $json.case_id }}",
+            "target_type": "={{ $json.target_type || \"workflow\" }}",
+            "target": "={{ $json.target }}",
+            "agent": "={{ $json.agent }}",
+            "description": "={{ $json.description }}",
+            "inputs": "={{ $json.inputs }}",
+            "assertions": "={{ $json.assertions }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_type",
+              "displayName": "target_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target",
+              "displayName": "target",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "agent",
+              "displayName": "agent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "inputs",
+              "displayName": "inputs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "assertions",
+              "displayName": "assertions",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2b024e9a-2cec-4eeb-8901-415f65657782",
+      "name": "Confirm",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { ok: true, case_id: $('Input').item.json.case_id, target: $('Input').item.json.target } };"
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Insert Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Case": {
+      "main": [
+        [
+          {
+            "node": "Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "44e1b5ff-c7a4-4591-b054-73e2a8c51556",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "CVkK9Ao2Onp9a2Gp",
+  "isArchived": false,
+  "nodeGroups": []
+}

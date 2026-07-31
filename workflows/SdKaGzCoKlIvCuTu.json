@@ -1,0 +1,289 @@
+{
+  "id": "SdKaGzCoKlIvCuTu",
+  "name": "EvalCreate",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId"
+            },
+            {
+              "name": "expected_response"
+            },
+            {
+              "name": "prohibited_tools"
+            },
+            {
+              "name": "expected_tools"
+            },
+            {
+              "name": "source_thread"
+            }
+          ]
+        }
+      },
+      "id": "4e8a4544-4c96-4a40-8593-2c568cc5da64",
+      "name": "When Executed by Darwin",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        96,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM public.memory WHERE session_id = '{{ $json.sessionId }}' ORDER BY id ASC",
+        "options": {}
+      },
+      "id": "3f9f060f-8fa6-420c-a6b5-5cd6e0b6b18f",
+      "name": "Fetch Memory",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        320,
+        384
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Darwin Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst triggerData = $('When Executed by Darwin').first().json;\n\nfunction parseMessage(raw) {\n  let msg = raw;\n  if (typeof msg === 'string') {\n    try { msg = JSON.parse(msg); } catch (e) { return null; }\n  }\n  if (!msg || typeof msg !== 'object') return null;\n  let role = msg.role || msg.type || (msg.data && msg.data.type);\n  let content = msg.content;\n  if (content === undefined && msg.data) content = msg.data.content;\n  if (role === 'human') role = 'user';\n  if (role === 'ai') role = 'assistant';\n  if (content === undefined || content === null) return null;\n  if (typeof content !== 'string') content = JSON.stringify(content);\n  return { role, content };\n}\n\nconst messages = [];\nfor (const r of rows) {\n  const parsed = parseMessage(r.message);\n  if (parsed) messages.push(parsed);\n}\n\nlet lastUserIdx = -1;\nfor (let i = messages.length - 1; i >= 0; i--) {\n  if (messages[i].role === 'user') { lastUserIdx = i; break; }\n}\nlet lastAssistantIdx = -1;\nfor (let i = messages.length - 1; i >= 0; i--) {\n  if (messages[i].role === 'assistant') { lastAssistantIdx = i; break; }\n}\n\nconst input = lastUserIdx >= 0 ? messages[lastUserIdx].content : '';\nconst assistantLast = lastAssistantIdx >= 0 ? messages[lastAssistantIdx].content : '';\n\nconst excludeIdx = new Set();\nif (lastUserIdx >= 0) excludeIdx.add(lastUserIdx);\nif (lastAssistantIdx >= 0) excludeIdx.add(lastAssistantIdx);\nconst contextMessages = messages.filter((m, idx) => !excludeIdx.has(idx));\n\nconst override = (triggerData.expected_response || '').trim();\nconst expected_response = override !== '' ? override : assistantLast;\n\nconst case_id = 'eval-' + Date.now();\n\nreturn [{ json: {\n  case_id,\n  input,\n  context_messages: JSON.stringify(contextMessages),\n  context_turns: contextMessages.length,\n  expected_response,\n  prohibited_tools: triggerData.prohibited_tools || '',\n  expected_tools: triggerData.expected_tools || '',\n  source_thread: triggerData.source_thread || '',\n  created_at: new Date().toISOString()\n} }];"
+      },
+      "id": "b4bda19a-60be-4bd5-b35c-c5404b179350",
+      "name": "Parse Conversation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "G3P55vPsJtpt1pk5",
+          "mode": "list",
+          "cachedResultName": "Darwin Evals",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/G3P55vPsJtpt1pk5"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "case_id": "={{ $json.case_id }}",
+            "input": "={{ $json.input }}",
+            "context_messages": "={{ $json.context_messages }}",
+            "expected_response": "={{ $json.expected_response }}",
+            "expected_tools": "={{ $json.expected_tools }}",
+            "prohibited_tools": "={{ $json.prohibited_tools }}",
+            "source_thread": "={{ $json.source_thread }}",
+            "created_at": "={{ $json.created_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "input",
+              "displayName": "input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "context_messages",
+              "displayName": "context_messages",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expected_response",
+              "displayName": "expected_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expected_tools",
+              "displayName": "expected_tools",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prohibited_tools",
+              "displayName": "prohibited_tools",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source_thread",
+              "displayName": "source_thread",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "62b6f242-5ef4-4138-860f-811c64293c1a",
+      "name": "Save Case",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        768,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "success",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "case_id",
+              "name": "case_id",
+              "value": "={{ $('Parse Conversation').item.json.case_id }}",
+              "type": "string"
+            },
+            {
+              "id": "input",
+              "name": "input",
+              "value": "={{ $('Parse Conversation').item.json.input.slice(0, 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "context_turns",
+              "name": "context_turns",
+              "value": "={{ $('Parse Conversation').item.json.context_turns }}",
+              "type": "number"
+            },
+            {
+              "id": "message",
+              "name": "message",
+              "value": "Eval case saved successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5b4d353b-2338-4595-8787-98afc19349fd",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        992,
+        384
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Darwin": {
+      "main": [
+        [
+          {
+            "node": "Fetch Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Memory": {
+      "main": [
+        [
+          {
+            "node": "Parse Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Conversation": {
+      "main": [
+        [
+          {
+            "node": "Save Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Case": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "bdd57e7a-a5a1-4c55-b6a1-b5e980bd7570",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,0 +1,126 @@
+{
+  "id": "nY6lHuHeFGg5MMoO",
+  "name": "SanitizeMemory",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId"
+            },
+            {
+              "name": "windowSize",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "1ac5a1be-0780-424f-b110-4671d2c53f05",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        96,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH params AS (\n  SELECT $1::text AS sid, GREATEST(COALESCE($2::int, 40), 1) AS win\n),\nordered AS (\n  SELECT m.id,\n         ROW_NUMBER() OVER (ORDER BY m.id DESC) AS rn_desc,\n         m.message AS msg\n  FROM public.memory m, params p\n  WHERE m.session_id = p.sid\n),\nwindowed AS (\n  SELECT o.id,\n         ROW_NUMBER() OVER (ORDER BY o.id ASC) AS rn,\n         COALESCE(o.msg->>'type', o.msg->>'role', o.msg->'kwargs'->>'type', '') AS msg_type,\n         o.msg\n  FROM ordered o, params p\n  WHERE o.rn_desc <= p.win\n),\norphans AS (\n  SELECT w.id, w.rn\n  FROM windowed w\n  WHERE lower(w.msg_type) IN ('tool', 'toolmessage')\n    AND NOT EXISTS (\n      SELECT 1 FROM windowed a\n      WHERE a.rn < w.rn\n        AND lower(COALESCE(a.msg->>'type', a.msg->>'role', a.msg->'kwargs'->>'type', '')) IN ('ai', 'aimessage')\n        AND EXISTS (\n          SELECT 1 FROM jsonb_array_elements(\n            CASE \n              WHEN jsonb_typeof(a.msg->'kwargs'->'tool_calls') = 'array' THEN a.msg->'kwargs'->'tool_calls'\n              WHEN jsonb_typeof(a.msg->'data'->'tool_calls') = 'array' THEN a.msg->'data'->'tool_calls'\n              WHEN jsonb_typeof(a.msg->'tool_calls') = 'array' THEN a.msg->'tool_calls'\n              WHEN jsonb_typeof(a.msg->'kwargs'->'additional_kwargs'->'tool_calls') = 'array' THEN a.msg->'kwargs'->'additional_kwargs'->'tool_calls'\n              ELSE '[]'::jsonb \n            END\n          ) tc\n          WHERE tc->>'id' = COALESCE(\n            w.msg->>'tool_call_id', \n            w.msg->'kwargs'->>'tool_call_id',\n            w.msg->'data'->>'tool_call_id',\n            ''\n          )\n        )\n    )\n),\ndeleted AS (\n  DELETE FROM public.memory m\n  USING orphans o\n  WHERE m.id = o.id\n  RETURNING m.id\n)\nSELECT (SELECT sid FROM params) AS session_id, COUNT(*)::int AS rows_deleted FROM deleted;",
+        "options": {
+          "queryReplacement": "={{ $json.sessionId }},={{ $json.windowSize ?? 40 }}"
+        }
+      },
+      "id": "94355343-4bec-4212-8953-bd5c7f3c623f",
+      "name": "Clean Orphaned Tool Messages",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        320,
+        224
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Darwin Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sid",
+              "name": "sessionId",
+              "value": "={{ $('Clean Orphaned Tool Messages').item.json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "deleted",
+              "name": "rowsDeleted",
+              "value": "={{ $json.rows_deleted ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "clean",
+              "name": "wasClean",
+              "value": "={{ ($json.rows_deleted ?? 0) === 0 }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ea4e45eb-25ab-43bc-b54d-d2fe490522d7",
+      "name": "Build Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        544,
+        224
+      ]
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Clean Orphaned Tool Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Orphaned Tool Messages": {
+      "main": [
+        [
+          {
+            "node": "Build Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "79b0d01c-d94e-45ce-a97b-eefd19cbf738",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

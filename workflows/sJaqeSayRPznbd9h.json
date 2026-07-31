@@ -1,0 +1,1456 @@
+{
+  "id": "sJaqeSayRPznbd9h",
+  "name": "GDriveToSupabase",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3056,
+        1088
+      ],
+      "id": "aa499368-910b-4857-bd5a-fd4187b30f63",
+      "name": "schedule"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1RK9ac5VNAPgHoYwbVl93B-f8n_FAFdf2",
+            "mode": "list",
+            "cachedResultName": "Research Recordings",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1RK9ac5VNAPgHoYwbVl93B-f8n_FAFdf2"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2784,
+        1088
+      ],
+      "id": "4bbc0f74-ceac-44be-b21d-531665348c8d",
+      "name": "projects",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -2528,
+        1088
+      ],
+      "id": "82fa414b-74eb-42cd-8c3b-794223625346",
+      "name": "project_loop"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "projectId"
+            },
+            {
+              "name": "googleId"
+            },
+            {
+              "name": "recorderName"
+            },
+            {
+              "name": "recorderEmail"
+            },
+            {
+              "name": "recorderAvatar"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1456,
+        944
+      ],
+      "id": "6fe07646-d2d5-4537-8c11-b3d67aaca48f",
+      "name": "sub"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('projects').item.json.id }}",
+            "mode": "id"
+          },
+          "whatToSearch": "files"
+        },
+        "options": {
+          "fields": [
+            "*"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2224,
+        944
+      ],
+      "id": "de2a9b8e-b5a4-4e02-9591-4fb181c7dfa0",
+      "name": "sessions",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "session",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "google_drive_id",
+              "fieldValue": "={{ $('sub').item.json.googleId }}"
+            },
+            {
+              "fieldId": "project_id",
+              "fieldValue": "={{ $('sub').item.json.projectId }}"
+            },
+            {
+              "fieldId": "recorder_name",
+              "fieldValue": "={{ $('sub').item.json.recorderName }}"
+            },
+            {
+              "fieldId": "recorder_email",
+              "fieldValue": "={{ $('sub').item.json.recorderEmail }}"
+            },
+            {
+              "fieldId": "recorder_avatar_url",
+              "fieldValue": "={{ $('sub').item.json.recorderAvatar }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        944
+      ],
+      "id": "018ca9db-8b68-48ac-b9e9-9139207aaf15",
+      "name": "create_session",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Darwin Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mux.com/video/v1/uploads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"new_asset_settings\":{\"playback_policy\":[\"signed\"],\"passthrough\":\"{{ $json.id }}\"},\"cors_origin\":\"*\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -992,
+        944
+      ],
+      "id": "32d58f08-5369-4d04-b472-720d6dde7d55",
+      "name": "create_mux_upload",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "5x6NsEhRpJiFmxHV",
+          "name": "Mux"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('sub').item.json.googleId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -752,
+        944
+      ],
+      "id": "49c4f405-624a-4de8-96f5-e06a7e69d33f",
+      "name": "from_drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "sJaqeSayRPznbd9h",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/sJaqeSayRPznbd9h",
+          "cachedResultName": "Darwin — GDriveToSupabase"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "googleId": "={{ $('item').item.json.id }}",
+            "projectId": "={{ $('set_state').item.json.project_id }}",
+            "recorderName": "={{ $('sessions').item.json.lastModifyingUser.displayName }}",
+            "recorderEmail": "={{ $('sessions').item.json.lastModifyingUser.emailAddress }}",
+            "recorderAvatar": "={{ $('sessions').item.json.lastModifyingUser.photoLink }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "projectId",
+              "displayName": "projectId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "googleId",
+              "displayName": "googleId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "recorderName",
+              "displayName": "recorderName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "recorderEmail",
+              "displayName": "recorderEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "recorderAvatar",
+              "displayName": "recorderAvatar",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -896,
+        1184
+      ],
+      "id": "ca283560-7af0-4c4a-8cda-3b9c379443ea",
+      "name": "call_sub"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "tzlHlDXi6x6rqJ5W",
+          "mode": "list",
+          "cachedResultName": "SessionsSyncState",
+          "cachedResultUrl": "/projects/vTvtXyrEbZhDJUli/datatables/tzlHlDXi6x6rqJ5W"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "drive_id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1568,
+        1184
+      ],
+      "id": "fefd8d70-aa31-4407-91cf-3b5e27a420a3",
+      "name": "check_session",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "tzlHlDXi6x6rqJ5W",
+          "mode": "list",
+          "cachedResultName": "SessionsSyncState",
+          "cachedResultUrl": "/projects/vTvtXyrEbZhDJUli/datatables/tzlHlDXi6x6rqJ5W"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "drive_id": "={{ $('item').item.json.id }}"
+          },
+          "matchingColumns": [
+            "drive_id"
+          ],
+          "schema": [
+            {
+              "id": "drive_id",
+              "displayName": "drive_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1104,
+        1216
+      ],
+      "id": "d415a737-6521-4cb3-82cb-ed469b86521a",
+      "name": "sync_session",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1968,
+        1072
+      ],
+      "id": "21121bd2-827b-4896-b6e5-a6350bcd1da4",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        1184
+      ],
+      "id": "501827c4-afb7-4bae-ae1c-7dda235db068",
+      "name": "item"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f1baf761-ffd0-49a8-9f8a-6e740af9ce6a",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1360,
+        1152
+      ],
+      "id": "e8a36818-50cc-437f-be26-d3e815b91e34",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('create_mux_upload').item.json.data.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "video/mp4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -400,
+        992
+      ],
+      "id": "922eded0-a1c4-41f6-a0b8-b340e90188d9",
+      "name": "upload_to_mux"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -144,
+        992
+      ],
+      "id": "544ee78e-93eb-4580-81f7-8184f1b37a74",
+      "name": "wait",
+      "webhookId": "mux-wait"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mux.com/video/v1/uploads/{{ $('create_mux_upload').first().json.data.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        64,
+        992
+      ],
+      "id": "34c2b16a-03f2-41ce-899d-62efc765ecfe",
+      "name": "get_uploade",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "5x6NsEhRpJiFmxHV",
+          "name": "Mux"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mux.com/video/v1/assets/{{ $json.data.asset_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        320,
+        992
+      ],
+      "id": "a87ac85d-df14-4c31-afd4-3add0daa35e5",
+      "name": "get_asset",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "5x6NsEhRpJiFmxHV",
+          "name": "Mux"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('create_session').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "mux_playback_id",
+              "fieldValue": "={{ $json.data.playback_ids[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        576,
+        992
+      ],
+      "id": "40987c07-efdf-476a-a2ed-21563be0076d",
+      "name": "update_playback_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Darwin Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "on6EE9ydzwMMcwUJ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/on6EE9ydzwMMcwUJ",
+          "cachedResultName": "Darwin — SessionAnalysis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "content": "={{ $json.transcript }}",
+            "id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        512,
+        1632
+      ],
+      "id": "594f02a7-593d-4f08-849b-bd48cc548fe7",
+      "name": "session_analysis"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('create_session').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "transcript",
+              "fieldValue": "={{ $json.results.channels[0].alternatives[0].paragraphs.transcript }}"
+            },
+            {
+              "fieldId": "transcript_object",
+              "fieldValue": "={{ $json.results.channels[0].alternatives[0].words }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        176,
+        1456
+      ],
+      "id": "0ef5fa66-5252-48a9-95d8-38bfaee2d9d5",
+      "name": "update",
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Darwin Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const paragraphs = $input.first().json.results.channels[0].alternatives[0].paragraphs.paragraphs;\n\nconst CHUNK_TOKENS = 1000;\nconst OVERLAP_TOKENS = 100;\n\nfunction estimateTokens(text) {\n  return Math.ceil(text.length / 4);\n}\n\nfunction getText(para) {\n  const text = para.sentences.map(s => s.text.trim()).join(' ');\n  return `Speaker ${para.speaker}: ${text}`;\n}\n\nconst paras = paragraphs.map(p => {\n  const text = getText(p);\n  return { text, tokens: estimateTokens(text), start: p.start, end: p.end, speaker: p.speaker };\n});\n\nconst chunks = [];\nlet i = 0;\n\nwhile (i < paras.length) {\n  let tokenCount = 0;\n  let j = i;\n\n  while (j < paras.length && tokenCount + paras[j].tokens <= CHUNK_TOKENS) {\n    tokenCount += paras[j].tokens;\n    j++;\n  }\n  if (j === i) j = i + 1;\n\n  const window = paras.slice(i, j);\n\n  chunks.push({\n    json: {\n      session_id: $('create_session').first().json.id,\n      index: chunks.length,\n      text: window.map(p => p.text).join('\\n'),\n      start: window[0].start,\n      end: window[window.length - 1].end,\n      speakers: [...new Set(window.map(p => p.speaker))],\n      duration_seconds: Math.round((window[window.length - 1].end - window[0].start) * 100) / 100,\n      token_estimate: tokenCount,\n    }\n  });\n\n  let overlapTokens = 0;\n  let nextStart = j;\n  while (nextStart > i + 1 && overlapTokens < OVERLAP_TOKENS) {\n    nextStart--;\n    overlapTokens += paras[nextStart].tokens;\n  }\n\n  i = Math.max(nextStart, i + 1);\n}\n\nreturn chunks;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        1728
+      ],
+      "id": "2781ad26-83a1-418a-91a6-4db5c81f610b",
+      "name": "chunks"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepgram.com/v1/listen",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "smart_format",
+              "value": "true"
+            },
+            {
+              "name": "language",
+              "value": "multi"
+            },
+            {
+              "name": "model",
+              "value": "nova-3"
+            },
+            {
+              "name": "diarize",
+              "value": "true"
+            },
+            {
+              "name": "keyterm",
+              "value": "n8n"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -400,
+        1200
+      ],
+      "id": "30e8e5b7-fd1d-444f-ac0b-a994708edfad",
+      "name": "deepgram",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "g6KGNlrfzk8z5GXd",
+          "name": "Header Auth account 85"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Uhazvt6z32s96WxZ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Uhazvt6z32s96WxZ",
+          "cachedResultName": "Darwin — SessionVectors"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "text": "={{ $json.text }}",
+            "session_id": "={{ $('create_session').item.json.id }}",
+            "start": "={{ $json.start }}",
+            "end": "={{ $json.end }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "start",
+              "displayName": "start",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "end",
+              "displayName": "end",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        1728
+      ],
+      "id": "9cd6acc9-9fb5-4d65-9c2b-a3076c4b063b",
+      "name": "sesh_vectors"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YdvhjUv0fqJKjTIF",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/YdvhjUv0fqJKjTIF",
+          "cachedResultName": "Darwin — JobAnalysis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        512,
+        1440
+      ],
+      "id": "18dba90d-1d1d-48a6-bd4a-05b5e075a821",
+      "name": "job_analysis"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "a8eKX2dbfq7VHHd7",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/a8eKX2dbfq7VHHd7",
+          "cachedResultName": "Darwin — OpportunityAnalysis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        512,
+        1248
+      ],
+      "id": "19ffbb3f-4000-495d-bfdb-b9fc44a1dde5",
+      "name": "opportunity_analysis"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a3e73abe-9a49-42c1-afdf-bfb8c84d9211",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1824,
+        1344
+      ],
+      "id": "3cf1519e-a42b-4b17-b02c-230d4e6617b7",
+      "name": "exists"
+    },
+    {
+      "parameters": {
+        "tableId": "project",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('projects').item.json.name }}"
+            },
+            {
+              "fieldId": "google_drive_id",
+              "fieldValue": "={{ $('projects').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1680,
+        1520
+      ],
+      "id": "b5e2d835-1545-4d41-85fa-a76184195091",
+      "name": "create",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Darwin Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e7d8f4ef-0f74-4d35-a29a-777fdeccd47c",
+              "name": "project_id",
+              "value": "={{ $json.supabase_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1232,
+        1504
+      ],
+      "id": "f2f61dbe-3692-4b6e-bd8e-e10b29b9eb01",
+      "name": "set_state"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "eTTy7a2k7jQdE6ts",
+          "mode": "list",
+          "cachedResultName": "ProjectsSyncState",
+          "cachedResultUrl": "/projects/vTvtXyrEbZhDJUli/datatables/eTTy7a2k7jQdE6ts"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "drive_id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -2000,
+        1344
+      ],
+      "id": "38472921-5786-408b-b8d2-331130f3fd03",
+      "name": "get_project",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -2176,
+        1344
+      ],
+      "id": "25ee7bb0-32c1-460b-9f0c-59f11181ba09",
+      "name": "state"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "eTTy7a2k7jQdE6ts",
+          "mode": "list",
+          "cachedResultName": "ProjectsSyncState",
+          "cachedResultUrl": "/projects/vTvtXyrEbZhDJUli/datatables/eTTy7a2k7jQdE6ts"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "drive_id": "={{ $('state').item.json.id }}",
+            "supabase_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "drive_id"
+          ],
+          "schema": [
+            {
+              "id": "drive_id",
+              "displayName": "drive_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "supabase_id",
+              "displayName": "supabase_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1520,
+        1520
+      ],
+      "id": "4c3e63f6-7af9-49ef-897f-89dcff54f3d2",
+      "name": "sync_project"
+    }
+  ],
+  "connections": {
+    "schedule": {
+      "main": [
+        [
+          {
+            "node": "projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "projects": {
+      "main": [
+        [
+          {
+            "node": "project_loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "project_loop": {
+      "main": [
+        [
+          {
+            "node": "sessions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sub": {
+      "main": [
+        [
+          {
+            "node": "create_session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sessions": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_session": {
+      "main": [
+        [
+          {
+            "node": "create_mux_upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_mux_upload": {
+      "main": [
+        [
+          {
+            "node": "from_drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "from_drive": {
+      "main": [
+        [
+          {
+            "node": "deepgram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "upload_to_mux",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "call_sub": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_session": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sync_session": {
+      "main": [
+        [
+          {
+            "node": "call_sub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "item": {
+      "main": [
+        [
+          {
+            "node": "check_session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "sync_session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upload_to_mux": {
+      "main": [
+        [
+          {
+            "node": "wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wait": {
+      "main": [
+        [
+          {
+            "node": "get_uploade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_uploade": {
+      "main": [
+        [
+          {
+            "node": "get_asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_asset": {
+      "main": [
+        [
+          {
+            "node": "update_playback_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update": {
+      "main": [
+        [
+          {
+            "node": "session_analysis",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "job_analysis",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "opportunity_analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chunks": {
+      "main": [
+        [
+          {
+            "node": "sesh_vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "deepgram": {
+      "main": [
+        [
+          {
+            "node": "chunks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "exists": {
+      "main": [
+        [
+          {
+            "node": "set_state",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create": {
+      "main": [
+        [
+          {
+            "node": "sync_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_state": {
+      "main": [
+        [
+          {
+            "node": "project_loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_project": {
+      "main": [
+        [
+          {
+            "node": "exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "state": {
+      "main": [
+        [
+          {
+            "node": "get_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sync_project": {
+      "main": [
+        [
+          {
+            "node": "set_state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "all"
+  },
+  "triggerCount": 0,
+  "versionId": "e93bb0c5-03c5-434d-b272-0f92b6842b8c",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}

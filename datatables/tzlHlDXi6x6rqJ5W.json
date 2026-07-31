@@ -1,0 +1,19 @@
+{
+  "id": "tzlHlDXi6x6rqJ5W",
+  "name": "Sync Session State",
+  "columns": [
+    {
+      "id": "gZSRu8UYQDnqPOJH",
+      "name": "drive_id",
+      "type": "string",
+      "index": 0
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-07-28T18:36:47.298Z",
+  "updatedAt": "2026-07-30T08:37:17.000Z"
+}
