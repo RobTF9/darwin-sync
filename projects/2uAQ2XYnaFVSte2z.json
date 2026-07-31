@@ -12,5 +12,12 @@
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
-  "variableStubs": []
+  "variableStubs": [
+    {
+      "id": "ijIjlWnsoeV6KSsv",
+      "key": "env",
+      "type": "string",
+      "value": ""
+    }
+  ]
 }

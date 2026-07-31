@@ -1,0 +1,388 @@
+{
+  "id": "v33yZBOdJuvyym7s",
+  "name": "JobAnalysis",
+  "nodes": [
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-opus-4-6",
+          "mode": "list",
+          "cachedResultName": "Claude Opus 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -496,
+        816
+      ],
+      "id": "4530d551-618d-469e-bb38-8dfd3d65967d",
+      "name": "model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"jobs\": {\n      \"type\": \"array\",\n      \"maxItems\": 3,\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"content\": {\n            \"type\": \"string\",\n            \"description\": \"Job statement in the format: When [situation], I want to [motivation], so I can [outcome]\"\n          },\n          \"theme\": {\n            \"type\": \"string\",\n            \"description\": \"2-3 word theme label, e.g. Personal leverage, Independence, Capability extension\"\n          },\n          \"clips\": {\n            \"type\": \"array\",\n            \"minItems\": 1,\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"quote\": {\n                  \"type\": \"string\",\n                  \"description\": \"Verbatim quote from the transcript\"\n                },\n                \"start_time\": {\n                  \"type\": \"number\",\n                  \"description\": \"Start time in seconds from nearest transcript timestamp marker\"\n                },\n                \"end_time\": {\n                  \"type\": \"number\",\n                  \"description\": \"End time in seconds from nearest transcript timestamp marker\"\n                }\n              },\n              \"required\": [\"quote\", \"start_time\", \"end_time\"]\n            }\n          }\n        },\n        \"required\": [\"content\", \"theme\", \"clips\"]\n      }\n    }\n  },\n  \"required\": [\"jobs\"]\n}\n",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -208,
+        656
+      ],
+      "id": "65dc03e1-1856-41ff-9630-48c2840c63a2",
+      "name": "output"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "content"
+            },
+            {
+              "name": "id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1216,
+        400
+      ],
+      "id": "5aa15ea5-48b1-4e92-8a0e-b30fcc9f4d52",
+      "name": "sub_trigger"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.transcript }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=# Role\n\nYou are a Jobs to Be Done analyst. Your task is to identify the fundamental reasons why someone has \"hired\" n8n—the high-level outcomes they're trying to achieve in their work or life.\n\n## What is a Job to Be Done?\n\nA \"job\" is the underlying progress a person is trying to make—the reason they bring a product into their life. Think of it as: **\"What did this person hire n8n to do for them?\"**\n\nWe're looking for **strategic jobs**, not tactical ones:\n\n| Level | Example | Right level? |\n|-------|---------|--------------|\n| Strategic | \"Extend my capabilities beyond what I can do alone\" | This is what we want |\n| Functional | \"Automate repetitive data entry\" | Getting warmer |\n| Tactical | \"Sync new Typeform responses to Airtable\" | Too specific |\n\n## Job Format\n\n> When [situation in their life/work], I want to [fundamental motivation], so I can [meaningful outcome]\n\n**Good examples:**\n- \"When I'm the only technical person on a small team, I want to build systems that work without me, so I can take time off without things breaking\"\n- \"When I have ideas that require capabilities I don't have, I want to connect tools and services myself, so I can build solutions without waiting for developers or buying expensive software\"\n- \"When my business depends on manual processes, I want to make them automatic and reliable, so I can scale without hiring proportionally\"\n\n**Too granular:**\n- \"When a webhook fails, I want to see the error message\" — This is a feature need, not a job\n- \"When I need to move data from Notion to Sheets\" — This is a task, not a job\n\n## Theme Labels\n\nAssign a 2-3 word theme to each job. Common themes include:\n- **Personal leverage** — doing more with less, multiplying their impact\n- **Independence** — not relying on developers, vendors, or other teams\n- **Reliability** — building systems they can trust\n- **Time freedom** — freeing up attention for higher-value work\n- **Capability extension** — doing things beyond their skill set\n- **Professional growth** — proving value, expanding their role\n- **Cost control** — avoiding expensive tools or hires\n\nUse these or create your own if the job doesn't fit.\n\n## Transcript Format\n\nThe transcript contains inline timestamp markers like `[12.50]` — these are seconds into the recording. Each speaker turn starts with `S0 [0.08]:` (speaker number and start time).\n\nWhen quoting evidence, use the nearest timestamp markers to define clip ranges. Each piece of evidence should be a clip with `quote`, `start_time`, and `end_time`. A job can have multiple supporting clips from different parts of the transcript.\n\n## Extraction Guidance\n\n1. **Ask yourself: Why does this person use n8n at all?** What would be missing from their work/life without it? That's the job.\n\n2. **Listen for identity and aspiration:**\n   - How do they describe themselves? (\"I'm not a developer, but...\")\n   - What do they wish they could be or do?\n   - What constraints are they working against?\n\n3. **Look past the workflows they describe.** The workflows are *solutions*. The job is what those workflows let them *become* or *achieve*.\n\n4. **Include verbatim evidence.** Quote the moments that reveal the deeper motivation—often found in *why* they built something, not *what* they built.\n\n## Rules\n\n1. **Maximum 3 jobs.** If you find more, you're going too granular—consolidate upward.\n2. Base jobs only on evidence in the transcript.\n3. Each job must have at least one supporting clip—a direct quote with timestamp range from the transcript.\n4. Jobs should be solution-agnostic (no n8n features in the job statement).\n\n## Example Output\n\n```json\n{\n  \"jobs\": [\n    {\n      \"content\": \"When I'm running a freelance automation business with limited time, I want to bridge gaps between platforms that don't integrate well, so I can deliver value to clients without building custom software\",\n      \"theme\": \"Capability extension\",\n      \"clips\": [\n        {\n          \"quote\": \"I essentially helped him with automizing various parts of their business as well as their just whole pipeline\",\n          \"start_time\": 45.20,\n          \"end_time\": 52.41\n        },\n        {\n          \"quote\": \"essentially problem solver on the high level using mostly n8n as well as any additional tooling\",\n          \"start_time\": 54.30,\n          \"end_time\": 58.73\n        }\n      ]\n    },\n    {\n      \"content\": \"When platforms have limitations that block my client's operations, I want to build workarounds myself, so I can solve problems without waiting for vendors to add features\",\n      \"theme\": \"Independence\",\n      \"clips\": [\n        {\n          \"quote\": \"This is example of platform limitations where Intercom has some limitations for how the webhook system works. So I implemented a solution for that\",\n          \"start_time\": 312.08,\n          \"end_time\": 325.44\n        }\n      ]\n    }\n  ]\n}\n```\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -416,
+        400
+      ],
+      "id": "f1a37929-1caa-4723-91ae-b94e77ef1356",
+      "name": "jobber",
+      "retryOnFail": true,
+      "maxTries": 5
+    },
+    {
+      "parameters": {
+        "tableId": "job",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        192,
+        400
+      ],
+      "id": "96d27e2f-b41f-4513-97e8-57df849a52d1",
+      "name": "create",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.jobs",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        400
+      ],
+      "id": "d9635f7e-0e47-4db4-b5b0-5aec2117b12c",
+      "name": "split"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "JaAnQVNWTIFEIHrq",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/JaAnQVNWTIFEIHrq",
+          "cachedResultName": "Darwin — JobVectors"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "content": "={{ $json.content }}",
+            "id": "={{ $json.id }}",
+            "evidence": "={{ $json.evidence }}",
+            "session_id": "={{ $('sub_trigger').item.json.id }}"
+          },
+          "matchingColumns": [
+            "content"
+          ],
+          "schema": [
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "evidence",
+              "displayName": "evidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        400
+      ],
+      "id": "926da76f-b32c-486b-8d14-aa709fb7c013",
+      "name": "job_vectors"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -928,
+        400
+      ],
+      "id": "5b367b43-620a-4181-b131-7e79ae0883be",
+      "name": "get",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "  const words = $input.first().json.transcript_object;\n  const MARKER_EVERY = 20; // timestamp marker every N words\n\n  const lines = [];\n  let currentSpeaker = null;\n  let wordCount = 0;\n  let lineWords = [];\n\n  for (const w of words) {\n    // New speaker turn\n    if (w.speaker !== currentSpeaker) {\n      if (lineWords.length) {\n        lines.push(lineWords.join(' '));\n      }\n      currentSpeaker = w.speaker;\n      wordCount = 0;\n      lineWords = [`\\nS${w.speaker} [${w.start.toFixed(2)}]:`];\n    }\n\n    // Insert timestamp marker every N words\n    if (wordCount > 0 && wordCount % MARKER_EVERY === 0) {\n      lineWords.push(`[${w.start.toFixed(2)}]`);\n    }\n\n    lineWords.push(w.punctuated_word);\n    wordCount++;\n  }\n\n  if (lineWords.length) {\n    lines.push(lineWords.join(' '));\n  }\n\n  // Also pass the last word's end time so the agent knows the total duration\n  const lastWord = words[words.length - 1];\n\n  return {\n    transcript: lines.join('').trim(),\n    duration: lastWord.end,\n  };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        400
+      ],
+      "id": "49ebdea0-93a0-498c-b344-a056006d102e",
+      "name": "prime"
+    },
+    {
+      "parameters": {
+        "tableId": "session_jobs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('get').item.json.id }}"
+            },
+            {
+              "fieldId": "job_id",
+              "fieldValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        400,
+        192
+      ],
+      "id": "ab7775e9-77ab-43b1-a810-34b5a768cdcc",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "output",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "jobber",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "output": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "jobber",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sub_trigger": {
+      "main": [
+        [
+          {
+            "node": "get",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "jobber": {
+      "main": [
+        [
+          {
+            "node": "split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create": {
+      "main": [
+        [
+          {
+            "node": "job_vectors",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split": {
+      "main": [
+        [
+          {
+            "node": "create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get": {
+      "main": [
+        [
+          {
+            "node": "prime",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prime": {
+      "main": [
+        [
+          {
+            "node": "jobber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "5a22264f-4c2a-49d6-9850-876429875112",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fKSSeYxcgwpceK78",
+  "isArchived": false,
+  "nodeGroups": []
+}

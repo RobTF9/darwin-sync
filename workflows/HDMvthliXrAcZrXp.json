@@ -1177,14 +1177,6 @@
       "name": "Call 'Darwin'"
     },
     {
-      "id": "bb5cb44e-439b-4c48-ab91-be05dff33a08",
-      "name": "run_integration_checks",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -2112,
-        576
-      ],
       "parameters": {
         "description": "Triggers the Integration test suite: calls every connected tool (Darwin's and Builder's) with canonical inputs and checks deterministic assertions. Results are stored in the Darwin Integration Results table and a summary is returned (optionally posted to the Slack thread). Use when asked to run integration checks/tests or verify tool health.",
         "workflowId": {
@@ -1219,21 +1211,18 @@
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
-        },
-        "options": {
-          "waitForSubWorkflow": true
         }
-      }
-    },
-    {
-      "id": "7bd4f9a5-8935-4823-9584-6f1eae24cb2a",
-      "name": "integration_read",
+      },
+      "id": "bb5cb44e-439b-4c48-ab91-be05dff33a08",
+      "name": "run_integration_checks",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1984,
+        -2096,
         576
-      ],
+      ]
+    },
+    {
       "parameters": {
         "description": "Reads Integration test cases or results. Parameters: table (required, \"cases\" or \"results\"), case_id (optional filter), run_id (optional filter).",
         "workflowId": {
@@ -1278,17 +1267,17 @@
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         }
-      }
-    },
-    {
-      "id": "9920e743-a402-4dad-9b87-549a4dc775c0",
-      "name": "integration_create",
+      },
+      "id": "7bd4f9a5-8935-4823-9584-6f1eae24cb2a",
+      "name": "integration_read",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1856,
+        -1936,
         576
-      ],
+      ]
+    },
+    {
       "parameters": {
         "description": "Adds an Integration test case (a deterministic check of one connected tool). Parameters: case_id (unique slug), target_type (\"workflow\" or \"sql\"), target (workflow name e.g. SessionSearch, or tool name for sql), agent (\"darwin\" or \"builder\"), description, inputs (JSON string of canonical inputs; for sql type: {\"sql\": \"...\"}), assertions (JSON string array, e.g. [{\"type\":\"row_count\",\"op\":\">=\",\"value\":1}], [{\"type\":\"exact\",\"path\":\"name\",\"value\":\"x\"}], [{\"type\":\"field_exists\",\"path\":\"id\"}], [{\"type\":\"contains\",\"value\":\"text\"}]).",
         "workflowId": {
@@ -1369,17 +1358,17 @@
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         }
-      }
-    },
-    {
-      "id": "822b6208-47cc-4d4c-9b05-459ce602e9ce",
-      "name": "run_unit_checks",
+      },
+      "id": "9920e743-a402-4dad-9b87-549a4dc775c0",
+      "name": "integration_create",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1728,
+        -1792,
         576
-      ],
+      ]
+    },
+    {
       "parameters": {
         "description": "Triggers the Unit test suite: deterministic checks of non-agent workflows (e.g. SlackMarkdown, SanitizeMemory). Results are stored in the Darwin Unit Results table and a summary is returned (optionally posted to the Slack thread). Use when asked to run unit checks/tests.",
         "workflowId": {
@@ -1414,21 +1403,18 @@
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
-        },
-        "options": {
-          "waitForSubWorkflow": true
         }
-      }
-    },
-    {
-      "id": "92fb77c8-fcd3-46ff-a2d2-a9167ee865a0",
-      "name": "unit_read",
+      },
+      "id": "822b6208-47cc-4d4c-9b05-459ce602e9ce",
+      "name": "run_unit_checks",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1600,
+        -1632,
         576
-      ],
+      ]
+    },
+    {
       "parameters": {
         "description": "Reads Unit test cases or results. Parameters: table (required, \"cases\" or \"results\"), case_id (optional filter), run_id (optional filter).",
         "workflowId": {
@@ -1473,17 +1459,17 @@
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         }
-      }
-    },
-    {
-      "id": "ff475278-ecd7-415c-9410-b76ebb6174f7",
-      "name": "unit_create",
+      },
+      "id": "92fb77c8-fcd3-46ff-a2d2-a9167ee865a0",
+      "name": "unit_read",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1472,
+        -1504,
         576
-      ],
+      ]
+    },
+    {
       "parameters": {
         "description": "Adds a Unit test case (deterministic check of a non-agent workflow). Parameters: case_id (unique slug), target (SlackMarkdown or SanitizeMemory), description, inputs (JSON string), assertions (JSON string array, e.g. [{\"type\":\"exact\",\"value\":{\"output\":\"...\"}}]).",
         "workflowId": {
@@ -1546,7 +1532,15 @@
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         }
-      }
+      },
+      "id": "ff475278-ecd7-415c-9410-b76ebb6174f7",
+      "name": "unit_create",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -1360,
+        576
+      ]
     }
   ],
   "connections": {
@@ -1952,7 +1946,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "f98f1c53-133e-4102-a1c3-d3c32d12b944",
+  "versionId": "3883be0c-8614-407b-9fe7-88b54580d3d6",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

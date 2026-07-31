@@ -1,0 +1,193 @@
+{
+  "id": "aiyPD50CSH3AEbI0",
+  "name": "SessionVectors",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "text"
+            },
+            {
+              "name": "session_id"
+            },
+            {
+              "name": "start",
+              "type": "number"
+            },
+            {
+              "name": "end",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        256,
+        176
+      ],
+      "id": "c9d390e6-139d-4aad-bf02-7f6770d2334b",
+      "name": "sub_trigger"
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        496,
+        400
+      ],
+      "id": "453d86ee-5543-4f41-85f9-e4b31abbbeae",
+      "name": "model",
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "session_id",
+                "value": "={{ $json.session_id }}"
+              },
+              {
+                "name": "start",
+                "value": "={{ $json.start }}"
+              },
+              {
+                "name": "end",
+                "value": "={{ $json.end }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        400
+      ],
+      "id": "337685b6-3aad-4f78-afcb-0118c3b8170e",
+      "name": "loader"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "session_vectors",
+          "mode": "list",
+          "cachedResultName": "session_vectors"
+        },
+        "options": {
+          "queryName": "match_session_vectors"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        528,
+        176
+      ],
+      "id": "1e4b409f-d0de-4cf9-8b45-513cfdd0e12c",
+      "name": "vector_store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chunkSize": 10000,
+        "chunkOverlap": 500,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        736,
+        608
+      ],
+      "id": "fa7544ed-efcb-4db9-9a84-ec18131dde6f",
+      "name": "Recursive Character Text Splitter"
+    }
+  ],
+  "connections": {
+    "sub_trigger": {
+      "main": [
+        [
+          {
+            "node": "vector_store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "model": {
+      "ai_embedding": [
+        [
+          {
+            "node": "vector_store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "loader": {
+      "ai_document": [
+        [
+          {
+            "node": "vector_store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "0350fcbe-95c9-436b-950c-d544f985d6a6",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fKSSeYxcgwpceK78",
+  "isArchived": false,
+  "nodeGroups": []
+}

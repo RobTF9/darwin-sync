@@ -1,10 +1,10 @@
 {
-  "id": "5x6NsEhRpJiFmxHV",
-  "name": "MUX",
-  "type": "httpBasicAuth",
+  "id": "FpZWv77fELD2tvF3",
+  "name": "Deepgram",
+  "type": "httpHeaderAuth",
   "data": {
-    "user": "",
-    "password": ""
+    "name": "",
+    "value": ""
   },
   "ownedBy": {
     "type": "team",

@@ -1,0 +1,498 @@
+{
+  "id": "gQ6Ee8PxLdU39nxh",
+  "name": "SessionAnalysis",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "id"
+            }
+          ]
+        }
+      },
+      "id": "f3d733af-ebb6-4beb-8dcd-92f7d7034fbf",
+      "name": "sub_trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        64,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "d1397f28-2831-433f-ba8c-049b54d4876c",
+      "name": "get_session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        272,
+        736
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "project",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.project_id }}"
+            }
+          ]
+        }
+      },
+      "id": "61429842-c14a-474c-a7a8-3b7b3f1700d0",
+      "name": "get_project",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        736
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Type\n{{ $json.type }}\n\n# Script\n{{ $json.script }}\n\n# Transcript\n{{ $(\"get_session\").item.json.transcript }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "# Role\n\nYou are a user research analyst for n8n. Extract structured participant and session information from interview transcripts.\n\n## Inputs\n\nYou will receive:\n- The interview transcript\n- The project type: `usability_test` or `discovery_interview`\n- (Optionally) The interview script used during the session\n\nUse the script to understand the interviewer's intent behind questions, distinguish planned topics from emergent ones, and identify areas the participant avoided or expanded on beyond what was asked.\n\n## Output Fields\n\n### title\n\nThe title for the session, the format is always 'FirstName, Role e.g. 'Rob, Product Designer\n\n### participant_name\n\nThe participant's name if mentioned. Use \"Unknown\" if not stated.\n\n### role\n\nTheir job title and primary responsibilities. Be specific: \"Freelance automation consultant\" not just \"Consultant\".\n\n### company_type\n\nClassify based on their **n8n usage context**, not just their employer:\n\n| Type               | Indicators                                                                       |\n| ------------------ | -------------------------------------------------------------------------------- |\n| **Enterprise**     | Large company, multiple departments, compliance requirements, thousands of users |\n| **SMB**            | Small/medium business, teams of 10-500, growth focus, resource constraints       |\n| **Education**      | Universities, schools, students, academic contexts                               |\n| **Freelance/solo** | One-person operation, independent consultant, solo business                      |\n| **Agency**         | Builds for multiple clients, service provider, consulting firm                   |\n| **Hobbyist**       | Personal projects, learning, non-commercial use                                  |\n| **Unknown**        | Insufficient information                                                         |\n\n### technical_ability\n\nDescribe their technical capability in 1-2 sentences. Include:\n\n- What they're comfortable with (languages, tools, concepts)\n- Where their limits are\n- How they approach technical problems\n\nExamples:\n\n- \"Strong with REST APIs, JavaScript, and relational databases. Comfortable writing custom queries and debugging integration issues independently.\"\n- \"Can follow along with code but doesn't write it. Relies on templates and pre-built nodes. Gets stuck when workflows break.\"\n- \"Non-technical. Uses n8n through templates only. Needs visual guidance for troubleshooting.\"\n\n### technical_ability_clips\n\nProvide 1-3 verbatim transcript clips that best support the technical_ability assessment. Each clip should be a direct quote showing the participant's technical capability, comfort level, or limitations. Use the nearest timestamp markers to define clip ranges.\n\n### ai_usage\n\nHow they use AI tools when building workflows:\n\n| Category                                 | Indicators                                                                            |\n| ---------------------------------------- | ------------------------------------------------------------------------------------- |\n| **Heavy reliance without understanding** | Copies AI output blindly, doesn't understand generated code, AI does the thinking     |\n| **Tool use with understanding**          | Uses AI for syntax help, reviews and modifies suggestions, demonstrates comprehension |\n| **Minimal or no AI use**                 | Rarely mentions AI, works independently                                               |\n| **Not mentioned**                        | AI usage not discussed                                                                |\n\n### ai_usage_evidence\n\nA brief quote or observation supporting the ai_usage classification.\n\n### using_n8n_for\n\nHow long they've been using n8n:\n\n- **Never used before** (first time in this session)\n- **< 6 months**\n- **6 months - 1.5 years**\n- **1.5 years - 2.5 years**\n- **> 2.5 years**\n- **Unknown**\n\nLook for: explicit timeframes, references to version changes, depth of knowledge, \"just started\" vs \"been using for years\".\n\n### profile_summary\n\n2-3 sentences describing:\n\n- Who they are and what they do\n- How they use n8n\n- Their technical context\n\n### profile_summary_clips\n\nProvide 1-3 verbatim transcript clips that best support the profile_summary. Each clip should be a direct quote where the participant describes who they are, what they do, or how they use n8n. Use the nearest timestamp markers to define clip ranges.\n\n### session_summary\n\n2-3 sentences. Adapt focus based on project type:\n\n- **usability_test**: Focus on task outcomes. What tasks were attempted, where the participant succeeded or struggled, and what blocked them.\n- **discovery_interview**: Focus on understanding the participant. Main topics discussed, key workflows or features explored, and the purpose of the conversation.\n\n## Transcript Format\n\nThe transcript contains inline timestamp markers like `[12.50]` — these are seconds into the recording. Each speaker turn starts with `S0 [0.08]:` (speaker number and start time).\n\nWhen quoting evidence for clips, use the nearest timestamp markers to define clip ranges. Each clip should have `quote`, `start_time`, and `end_time`.\n\n## Rules\n\n1. Base all classifications on evidence in the transcript only\n2. When uncertain, choose \"Unknown\" over guessing\n3. Be specific in summaries—avoid generic descriptions\n4. The ai_usage classification is critical for understanding technical capability\n5. company_type is about their n8n usage context, not just their employer\n6. Evidence clips must be verbatim quotes from the transcript with accurate timestamp ranges\n7. Each evidence clip array (technical_ability_clips, profile_summary_clips) should contain 1-3 clips\n\n## Example Output\n\n```json\n{\n  \"participant_name\": \"Belto\",\n  \"role\": \"Freelance automation consultant, ex-Atlassian senior support engineer\",\n  \"company_type\": \"Agency\",\n  \"technical_ability\": \"Strong with REST APIs, JavaScript, Python, and relational databases. Comfortable building complex webhook routing and data pipelines. Approaches problems systematically with debugging and custom HTTP requests when nodes don't exist.\",\n  \"ai_usage\": \"Tool use with understanding\",\n  \"ai_usage_evidence\": \"Uses the built-in AI assistant for help but demonstrates deep understanding of APIs, webhooks, and data transformations\",\n  \"using_n8n_for\": \"< 6 months\",\n  \"profile_summary\": \"Recently transitioned from senior support engineer at Atlassian to freelance automation consulting. Builds operational workflows for e-commerce clients, handling webhook routing, platform integrations, and data syncing. Strong technical background in REST APIs, JavaScript, Python, and databases.\",\n  \"session_summary\": \"Explored workflows built for an e-commerce client including webhook routing for Intercom, case review automation, and Shopify order monitoring. Discussed pain points around limited node coverage for Shopify/Intercom and frustrations with feature request visibility.\",\n  \"technical_ability_clips\": [\n    {\n      \"quote\": \"I usually just go straight to the HTTP Request node and build it myself, I'm comfortable with REST APIs\",\n      \"start_time\": 125.30,\n      \"end_time\": 132.10\n    },\n    {\n      \"quote\": \"I wrote a custom Python script to handle the webhook transformation before it hits n8n\",\n      \"start_time\": 345.50,\n      \"end_time\": 352.80\n    }\n  ],\n  \"profile_summary_clips\": [\n    {\n      \"quote\": \"I left Atlassian about six months ago and started doing automation consulting for e-commerce companies\",\n      \"start_time\": 45.20,\n      \"end_time\": 53.40\n    }\n  ]\n}\n```\n"
+        }
+      },
+      "id": "f24ca02d-7ee4-4eff-845d-fd5cec486ca5",
+      "name": "summarizer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        736,
+        736
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-opus-4-5-20251101",
+          "mode": "list",
+          "cachedResultName": "Claude Opus 4.5"
+        },
+        "options": {}
+      },
+      "id": "32e18586-c266-4ee9-9b0d-81c6481440aa",
+      "name": "model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        656,
+        1152
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"participant_name\":{\"type\":\"string\",\"description\":\"The participant's name if mentioned in the transcript\"},\"title\":{\"type\":\"string\",\"description\":\"The title for the session, format: 'FirstName, JobTitle'\"},\"role\":{\"type\":\"string\",\"description\":\"Job title or role description\"},\"company_type\":{\"type\":\"string\",\"enum\":[\"Enterprise\",\"SMB\",\"Education\",\"Freelance/solo\",\"Agency\",\"Hobbyist\",\"Unknown\"]},\"technical_ability\":{\"type\":\"string\",\"description\":\"Description of their technical skills, tools they're comfortable with, and where their limits are\"},\"ai_usage\":{\"type\":\"string\",\"enum\":[\"Heavy reliance without understanding\",\"Tool use with understanding\",\"Minimal or no AI use\",\"Not mentioned\"]},\"ai_usage_evidence\":{\"type\":\"string\",\"description\":\"Brief quote or description supporting the AI usage classification\"},\"using_n8n_for\":{\"type\":\"string\",\"enum\":[\"Never used before\",\"< 6 months\",\"6 months - 1.5 years\",\"1.5 years - 2.5 years\",\"> 2.5 years\",\"Unknown\"]},\"profile_summary\":{\"type\":\"string\",\"description\":\"2-3 sentence description of the user, their job, and n8n usage\"},\"session_summary\":{\"type\":\"string\",\"description\":\"2-3 sentence summary of what was discussed in the session\"},\"technical_ability_clips\":{\"type\":\"array\",\"description\":\"Verbatim transcript clips that support the technical_ability assessment\",\"items\":{\"type\":\"object\",\"properties\":{\"quote\":{\"type\":\"string\",\"description\":\"Verbatim quote from the transcript\"},\"start_time\":{\"type\":\"number\",\"description\":\"Start time in seconds\"},\"end_time\":{\"type\":\"number\",\"description\":\"End time in seconds\"}},\"required\":[\"quote\",\"start_time\",\"end_time\"]}},\"profile_summary_clips\":{\"type\":\"array\",\"description\":\"Verbatim transcript clips that support the profile_summary\",\"items\":{\"type\":\"object\",\"properties\":{\"quote\":{\"type\":\"string\",\"description\":\"Verbatim quote from the transcript\"},\"start_time\":{\"type\":\"number\",\"description\":\"Start time in seconds\"},\"end_time\":{\"type\":\"number\",\"description\":\"End time in seconds\"}},\"required\":[\"quote\",\"start_time\",\"end_time\"]}}},\"required\":[\"participant_name\",\"role\",\"company_type\",\"technical_ability\",\"ai_usage\",\"ai_usage_evidence\",\"using_n8n_for\",\"profile_summary\",\"session_summary\",\"technical_ability_clips\",\"profile_summary_clips\"]}",
+        "autoFix": true
+      },
+      "id": "b302426e-4600-47a9-aed7-32115b66f663",
+      "name": "output",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        944,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"sub_trigger\").item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "participant_name",
+              "fieldValue": "={{ $json.output.participant_name }}"
+            },
+            {
+              "fieldId": "role",
+              "fieldValue": "={{ $json.output.role }}"
+            },
+            {
+              "fieldId": "company_type",
+              "fieldValue": "={{ $json.output.company_type }}"
+            },
+            {
+              "fieldId": "technical_ability",
+              "fieldValue": "={{ $json.output.technical_ability }}"
+            },
+            {
+              "fieldId": "ai_usage",
+              "fieldValue": "={{ $json.output.ai_usage }}"
+            },
+            {
+              "fieldId": "ai_usage_evidence",
+              "fieldValue": "={{ $json.output.ai_usage_evidence }}"
+            },
+            {
+              "fieldId": "using_n8n_for",
+              "fieldValue": "={{ $json.output.using_n8n_for }}"
+            },
+            {
+              "fieldId": "profile_summary",
+              "fieldValue": "={{ $json.output.profile_summary }}"
+            },
+            {
+              "fieldId": "session_summary",
+              "fieldValue": "={{ $json.output.session_summary }}"
+            }
+          ]
+        }
+      },
+      "id": "1e1aba2e-3f0b-42ae-93da-16ac6b22ce7b",
+      "name": "update",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        656
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.google_drive_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "*"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a91e1b2a-a4a2-450b-858c-b3d83b5abe87",
+      "name": "find_file",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        656
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "={{ $(\"update\").item.json.google_drive_id }}"
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "7e8701fc-fea6-46c9-a300-b15136bdc89d",
+      "name": "get_user",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1552,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "={{ $vars.env === 'staging' ? 'robert' : $json.lastModifyingUser.emailAddress.split('@')[0] }}",
+          "mode": "username"
+        },
+        "text": "=<https://pidgeonhead.netlify.app/sessions/{{ $(\"update\").item.json.id }}|Session> with {{ $(\"update\").item.json.participant_name }} is ready for your review.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "db4e8b3b-f2d3-4ada-bc9a-bc4810ddd017",
+      "name": "send_draft",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1760,
+        656
+      ],
+      "webhookId": "bc3a67c6-76f4-41c7-b23a-2edabaf48f89",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $('summarizer').first().json.output;\nconst sessionId = $('sub_trigger').first().json.id;\nconst clips = [];\n\nif (output.technical_ability_clips && output.technical_ability_clips.length) {\n  for (const c of output.technical_ability_clips) {\n    clips.push({\n      session_id: sessionId,\n      text: c.quote,\n      start_time: c.start_time,\n      end_time: c.end_time,\n      evidence_field: 'technical_ability'\n    });\n  }\n}\n\nif (output.profile_summary_clips && output.profile_summary_clips.length) {\n  for (const c of output.profile_summary_clips) {\n    clips.push({\n      session_id: sessionId,\n      text: c.quote,\n      start_time: c.start_time,\n      end_time: c.end_time,\n      evidence_field: 'profile_summary'\n    });\n  }\n}\n\nif (!clips.length) return [];\nreturn clips.map(c => ({ json: c }));"
+      },
+      "id": "a703e333-2b2a-451a-b2a4-51d027cee830",
+      "name": "prepare_clips",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "clip",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.session_id }}"
+            },
+            {
+              "fieldId": "text",
+              "fieldValue": "={{ $json.text }}"
+            },
+            {
+              "fieldId": "start_time",
+              "fieldValue": "={{ $json.start_time }}"
+            },
+            {
+              "fieldId": "end_time",
+              "fieldValue": "={{ $json.end_time }}"
+            },
+            {
+              "fieldId": "evidence_field",
+              "fieldValue": "={{ $json.evidence_field }}"
+            }
+          ]
+        }
+      },
+      "id": "9eba895c-b558-46b0-abba-f89aa0174652",
+      "name": "create_clip",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1504,
+        832
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "sub_trigger": {
+      "main": [
+        [
+          {
+            "node": "get_session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_session": {
+      "main": [
+        [
+          {
+            "node": "get_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_project": {
+      "main": [
+        [
+          {
+            "node": "summarizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "summarizer": {
+      "main": [
+        [
+          {
+            "node": "update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "summarizer",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "output",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "output": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "summarizer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update": {
+      "main": [
+        [
+          {
+            "node": "find_file",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "prepare_clips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find_file": {
+      "main": [
+        [
+          {
+            "node": "get_user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_user": {
+      "main": [
+        [
+          {
+            "node": "send_draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_clips": {
+      "main": [
+        [
+          {
+            "node": "create_clip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "33321050-a95c-4a32-827c-601a4d15ff88",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fKSSeYxcgwpceK78",
+  "isArchived": false,
+  "nodeGroups": []
+}

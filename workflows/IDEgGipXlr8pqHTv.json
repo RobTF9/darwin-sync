@@ -1,0 +1,1131 @@
+{
+  "id": "IDEgGipXlr8pqHTv",
+  "name": "Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "projectId"
+            },
+            {
+              "name": "googleId"
+            },
+            {
+              "name": "recorderName"
+            },
+            {
+              "name": "recorderEmail"
+            },
+            {
+              "name": "recorderAvatar"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -528,
+        912
+      ],
+      "id": "f6bb1883-ef45-4db8-8f48-1a6d0a8e1d3c",
+      "name": "sub"
+    },
+    {
+      "parameters": {
+        "tableId": "session",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "google_drive_id",
+              "fieldValue": "={{ $('sub').item.json.googleId }}"
+            },
+            {
+              "fieldId": "project_id",
+              "fieldValue": "={{ $('sub').item.json.projectId }}"
+            },
+            {
+              "fieldId": "recorder_name",
+              "fieldValue": "={{ $('sub').item.json.recorderName }}"
+            },
+            {
+              "fieldId": "recorder_email",
+              "fieldValue": "={{ $('sub').item.json.recorderEmail }}"
+            },
+            {
+              "fieldId": "recorder_avatar_url",
+              "fieldValue": "={{ $('sub').item.json.recorderAvatar }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        912
+      ],
+      "id": "c48632dd-8faf-48da-b13d-58f9ecb67975",
+      "name": "create_session",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mux.com/video/v1/uploads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"new_asset_settings\":{\"playback_policy\":[\"signed\"],\"passthrough\":\"{{ $json.id }}\"},\"cors_origin\":\"*\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        176,
+        912
+      ],
+      "id": "94b62403-613d-479c-8df2-1783172a07e0",
+      "name": "create_mux_upload",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "5x6NsEhRpJiFmxHV",
+          "name": "MUX"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('sub').item.json.googleId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        416,
+        912
+      ],
+      "id": "c6f14c3f-19b0-4e2f-8423-7c178e96e642",
+      "name": "from_drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('create_mux_upload').item.json.data.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "video/mp4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        768,
+        864
+      ],
+      "id": "04ccbb0a-282a-4758-93f7-4dea308ec6ca",
+      "name": "upload_to_mux"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        864
+      ],
+      "id": "b5c7046c-e79e-4cde-9904-1e577e9b11ab",
+      "name": "wait",
+      "webhookId": "mux-wait"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mux.com/video/v1/uploads/{{ $('create_mux_upload').first().json.data.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1232,
+        864
+      ],
+      "id": "b8dbc71a-114d-48cb-8b64-0e58731a561b",
+      "name": "get_uploade",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "5x6NsEhRpJiFmxHV",
+          "name": "MUX"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mux.com/video/v1/assets/{{ $json.data.asset_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1488,
+        864
+      ],
+      "id": "8b0d86a1-88e7-42a0-af7f-5cd7d501c3c7",
+      "name": "get_asset",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "5x6NsEhRpJiFmxHV",
+          "name": "MUX"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('create_session').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "mux_playback_id",
+              "fieldValue": "={{ $json.data.playback_ids[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1744,
+        864
+      ],
+      "id": "b9089687-15ec-4c00-9ac7-2d25834f35be",
+      "name": "update_playback_id",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "googleId",
+              "value": "={{ $('sub').item.json.googleId }}"
+            },
+            {
+              "key": "sessionId",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        -64,
+        912
+      ],
+      "id": "518c1388-927a-4ab2-8c5b-c92d5613195e",
+      "name": "Execution Data"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        368,
+        272
+      ],
+      "id": "c44ed5ef-84b3-476f-a9ec-441851e4dddf",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $json.execution.id }}",
+        "options": {
+          "activeWorkflows": true
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        592,
+        272
+      ],
+      "id": "e9b52d48-b97a-4eac-a28a-643b52a23cef",
+      "name": "Get an execution",
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ZMyr5DWlrfXlhhKs",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ZMyr5DWlrfXlhhKs",
+          "cachedResultName": "Darwin — Builder"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "task": "={{ $('Build Error Summary').item.json.task }}",
+            "session_id": "=error-{{ $('Post Error to Slack').item.json.message.ts }}"
+          },
+          "schema": [
+            {
+              "id": "task",
+              "displayName": "task",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "removed": false
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ae698d31-dcbe-4abe-861e-4338c3dec1d1",
+      "name": "Call Builder Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1280,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1",
+              "name": "task",
+              "value": "=You are being asked to DIAGNOSE a failed n8n workflow execution. Do NOT make any changes — do NOT create, update, publish, or modify any workflow. Only inspect, diagnose the root cause, and suggest a concrete fix in your reply.\n\nFailure details:\n- Workflow name: {{ $json.workflowData?.name || $json.name || 'unknown' }}\n- Workflow ID: {{ $json.workflowId }}\n- Execution ID: {{ $json.id }}\n- Execution URL: https://internal.users.n8n.cloud/workflow/{{ $json.workflowId }}/executions/{{ $json.id }}\n- Error message: {{ $json.data?.resultData?.error?.message || 'n/a' }}\n- Failed node: {{ $json.data?.resultData?.lastNodeExecuted || 'n/a' }}\n- Error stack / details: {{ $json.data?.resultData?.error?.stack || $json.data?.resultData?.error?.description || 'n/a' }}\n\nPlease use the n8n MCP tools to inspect workflow {{ $json.workflowId }}, identify the root cause of this failure, and describe a specific suggested fix. Remember: DIAGNOSE ONLY — do not apply any changes.",
+              "type": "string"
+            },
+            {
+              "id": "d3",
+              "name": "wfName",
+              "value": "={{ $json.workflowData?.name || $json.name || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "d4",
+              "name": "wfId",
+              "value": "={{ $json.workflowId }}",
+              "type": "string"
+            },
+            {
+              "id": "d5",
+              "name": "execId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "d6",
+              "name": "execUrl",
+              "value": "=https://internal.users.n8n.cloud/workflow/{{ $json.workflowId }}/executions/{{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "d7",
+              "name": "errMsg",
+              "value": "={{ $json.data?.resultData?.error?.message || 'n/a' }}",
+              "type": "string"
+            },
+            {
+              "id": "d8",
+              "name": "failedNode",
+              "value": "={{ $json.data?.resultData?.lastNodeExecuted || 'n/a' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c25cc33b-f7c7-4cf8-a6e4-d2a879dbbe49",
+      "name": "Build Error Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09DRCJLQCE"
+        },
+        "text": "=🚨 <@U07S2V7RH6K> — Workflow failure detected.\n\n*Workflow:* {{ $json.wfName }} (`{{ $json.wfId }}`)\n*Execution:* {{ $json.execUrl }}\n*Failed node:* {{ $json.failedNode }}\n*Error:* {{ $json.errMsg }}",
+        "otherOptions": {
+          "link_names": true
+        }
+      },
+      "id": "22e6c2b7-d0d2-497a-aaa9-a4744bd04ee6",
+      "name": "Post Error to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1056,
+        272
+      ],
+      "webhookId": "f998f6b9-296d-48db-9aae-4bb933a49348",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09DRCJLQCE"
+        },
+        "text": "=*Builder diagnosis & suggested fix:*\n{{ $json.output }}\n\n_Reply in this thread to continue the conversation with the Builder._",
+        "otherOptions": {
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $('Post Error to Slack').item.json.message.ts }}"
+            }
+          }
+        }
+      },
+      "id": "78f1d701-594b-4c28-9bfa-9d26e4587495",
+      "name": "Post Diagnosis Reply",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1664,
+        272
+      ],
+      "webhookId": "f100246f-9799-4c79-bd48-caa334633f74",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "gQ6Ee8PxLdU39nxh",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/gQ6Ee8PxLdU39nxh",
+          "cachedResultName": "Darwin — SessionAnalysis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1680,
+        1712
+      ],
+      "id": "cd15e01d-462b-4a2f-b5ab-9bf8f2ebeb9a",
+      "name": "session_analysis"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('create_session').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "transcript",
+              "fieldValue": "={{ $json.results.channels[0].alternatives[0].paragraphs.transcript }}"
+            },
+            {
+              "fieldId": "transcript_object",
+              "fieldValue": "={{ $json.results.channels[0].alternatives[0].words }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        1536
+      ],
+      "id": "a811c04b-c108-4469-935c-6680b35987ce",
+      "name": "update",
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const paragraphs = $input.first().json.results.channels[0].alternatives[0].paragraphs.paragraphs;\n\nconst CHUNK_TOKENS = 1000;\nconst OVERLAP_TOKENS = 100;\n\nfunction estimateTokens(text) {\n  return Math.ceil(text.length / 4);\n}\n\nfunction getText(para) {\n  const text = para.sentences.map(s => s.text.trim()).join(' ');\n  return `Speaker ${para.speaker}: ${text}`;\n}\n\nconst paras = paragraphs.map(p => {\n  const text = getText(p);\n  return { text, tokens: estimateTokens(text), start: p.start, end: p.end, speaker: p.speaker };\n});\n\nconst chunks = [];\nlet i = 0;\n\nwhile (i < paras.length) {\n  let tokenCount = 0;\n  let j = i;\n\n  while (j < paras.length && tokenCount + paras[j].tokens <= CHUNK_TOKENS) {\n    tokenCount += paras[j].tokens;\n    j++;\n  }\n  if (j === i) j = i + 1;\n\n  const window = paras.slice(i, j);\n\n  chunks.push({\n    json: {\n      session_id: $('create_session').first().json.id,\n      index: chunks.length,\n      text: window.map(p => p.text).join('\\n'),\n      start: window[0].start,\n      end: window[window.length - 1].end,\n      speakers: [...new Set(window.map(p => p.speaker))],\n      duration_seconds: Math.round((window[window.length - 1].end - window[0].start) * 100) / 100,\n      token_estimate: tokenCount,\n    }\n  });\n\n  let overlapTokens = 0;\n  let nextStart = j;\n  while (nextStart > i + 1 && overlapTokens < OVERLAP_TOKENS) {\n    nextStart--;\n    overlapTokens += paras[nextStart].tokens;\n  }\n\n  i = Math.max(nextStart, i + 1);\n}\n\nreturn chunks;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        1808
+      ],
+      "id": "5dd54dc7-4eff-464a-bd50-91f4f240bf94",
+      "name": "chunks"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepgram.com/v1/listen",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "smart_format",
+              "value": "true"
+            },
+            {
+              "name": "language",
+              "value": "multi"
+            },
+            {
+              "name": "model",
+              "value": "nova-3"
+            },
+            {
+              "name": "diarize",
+              "value": "true"
+            },
+            {
+              "name": "keyterm",
+              "value": "n8n"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        768,
+        1280
+      ],
+      "id": "f9ca9285-eaed-407b-9581-a0ed47b66458",
+      "name": "deepgram",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FpZWv77fELD2tvF3",
+          "name": "Deepgram"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "aiyPD50CSH3AEbI0",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/aiyPD50CSH3AEbI0",
+          "cachedResultName": "Darwin — SessionVectors"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "text": "={{ $json.text }}",
+            "session_id": "={{ $('create_session').item.json.id }}",
+            "start": "={{ $json.start }}",
+            "end": "={{ $json.end }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "start",
+              "displayName": "start",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "end",
+              "displayName": "end",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1264,
+        1808
+      ],
+      "id": "fdece905-b51d-47d3-865a-02b8355d4d8c",
+      "name": "sesh_vectors"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "v33yZBOdJuvyym7s",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/v33yZBOdJuvyym7s",
+          "cachedResultName": "Darwin — JobAnalysis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1680,
+        1520
+      ],
+      "id": "41410801-02d2-4f50-9643-59f722b856dc",
+      "name": "job_analysis"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YgLLZRCPGssHQMny",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/YgLLZRCPGssHQMny",
+          "cachedResultName": "Darwin — OpportunityAnalysis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1680,
+        1328
+      ],
+      "id": "e59090f8-ee7c-4203-ad2f-b3af8b6d6430",
+      "name": "opportunity_analysis"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "1VtBcx3zHBLVXrec",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/1VtBcx3zHBLVXrec",
+          "cachedResultName": "Darwin — Slack Markdown"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "output": "={{ $json.output }}"
+          },
+          "matchingColumns": [
+            "output"
+          ],
+          "schema": [
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1472,
+        272
+      ],
+      "id": "57190cf4-a958-4489-93f2-f102b54f3ba6",
+      "name": "Call 'Slack Markdown'"
+    }
+  ],
+  "connections": {
+    "sub": {
+      "main": [
+        [
+          {
+            "node": "create_session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_session": {
+      "main": [
+        [
+          {
+            "node": "Execution Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_mux_upload": {
+      "main": [
+        [
+          {
+            "node": "from_drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "from_drive": {
+      "main": [
+        [
+          {
+            "node": "deepgram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "upload_to_mux",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upload_to_mux": {
+      "main": [
+        [
+          {
+            "node": "wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wait": {
+      "main": [
+        [
+          {
+            "node": "get_uploade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_uploade": {
+      "main": [
+        [
+          {
+            "node": "get_asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_asset": {
+      "main": [
+        [
+          {
+            "node": "update_playback_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execution Data": {
+      "main": [
+        [
+          {
+            "node": "create_mux_upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get an execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get an execution": {
+      "main": [
+        [
+          {
+            "node": "Build Error Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Builder Agent": {
+      "main": [
+        [
+          {
+            "node": "Call 'Slack Markdown'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Error Summary": {
+      "main": [
+        [
+          {
+            "node": "Post Error to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Error to Slack": {
+      "main": [
+        [
+          {
+            "node": "Call Builder Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update": {
+      "main": [
+        [
+          {
+            "node": "session_analysis",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "job_analysis",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "opportunity_analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chunks": {
+      "main": [
+        [
+          {
+            "node": "sesh_vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "deepgram": {
+      "main": [
+        [
+          {
+            "node": "chunks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Slack Markdown'": {
+      "main": [
+        [
+          {
+            "node": "Post Diagnosis Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "triggerCount": 0,
+  "versionId": "4626e029-7852-4786-81f8-dad159b9dc2e",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fKSSeYxcgwpceK78",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "e9f2c438-ee43-4f90-ac2b-cd0c52f25517",
+      "name": "Create playback ID",
+      "nodeIds": [
+        "04ccbb0a-282a-4758-93f7-4dea308ec6ca",
+        "b5c7046c-e79e-4cde-9904-1e577e9b11ab",
+        "b8dbc71a-114d-48cb-8b64-0e58731a561b",
+        "8b0d86a1-88e7-42a0-af7f-5cd7d501c3c7",
+        "b9089687-15ec-4c00-9ac7-2d25834f35be"
+      ]
+    },
+    {
+      "id": "733179cb-d75b-4def-afb4-ae22a16424f6",
+      "name": "Transcribe and analyse",
+      "nodeIds": [
+        "cd15e01d-462b-4a2f-b5ab-9bf8f2ebeb9a",
+        "a811c04b-c108-4469-935c-6680b35987ce",
+        "5dd54dc7-4eff-464a-bd50-91f4f240bf94",
+        "f9ca9285-eaed-407b-9581-a0ed47b66458",
+        "fdece905-b51d-47d3-865a-02b8355d4d8c",
+        "41410801-02d2-4f50-9643-59f722b856dc",
+        "e59090f8-ee7c-4203-ad2f-b3af8b6d6430"
+      ]
+    }
+  ]
+}

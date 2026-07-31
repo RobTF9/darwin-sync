@@ -1,6 +1,6 @@
 {
   "id": "sJaqeSayRPznbd9h",
-  "name": "GDriveToSupabase",
+  "name": "Schedule",
   "nodes": [
     {
       "parameters": {
@@ -16,10 +16,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -3056,
-        1088
+        -688,
+        1040
       ],
-      "id": "aa499368-910b-4857-bd5a-fd4187b30f63",
+      "id": "06afb659-9bd5-4249-b81c-9c64976a573d",
       "name": "schedule"
     },
     {
@@ -41,10 +41,10 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -2784,
-        1088
+        -416,
+        1040
       ],
-      "id": "4bbc0f74-ceac-44be-b21d-531665348c8d",
+      "id": "82f24e7e-37f9-43ea-ae7a-eb7be7bc355a",
       "name": "projects",
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -60,42 +60,11 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -2528,
-        1088
+        -160,
+        1040
       ],
-      "id": "82fa414b-74eb-42cd-8c3b-794223625346",
+      "id": "64622749-c11f-43b0-8f95-acce9099e0c9",
       "name": "project_loop"
-    },
-    {
-      "parameters": {
-        "workflowInputs": {
-          "values": [
-            {
-              "name": "projectId"
-            },
-            {
-              "name": "googleId"
-            },
-            {
-              "name": "recorderName"
-            },
-            {
-              "name": "recorderEmail"
-            },
-            {
-              "name": "recorderAvatar"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        -1456,
-        944
-      ],
-      "id": "6fe07646-d2d5-4537-8c11-b3d67aaca48f",
-      "name": "sub"
     },
     {
       "parameters": {
@@ -117,106 +86,11 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -2224,
-        944
+        144,
+        896
       ],
-      "id": "de2a9b8e-b5a4-4e02-9591-4fb181c7dfa0",
+      "id": "e405f13e-1e2f-44dc-89c6-6bde3bfa9d0d",
       "name": "sessions",
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "bXwaLvJM3XTPyBDr",
-          "name": "Google Drive"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "tableId": "session",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "google_drive_id",
-              "fieldValue": "={{ $('sub').item.json.googleId }}"
-            },
-            {
-              "fieldId": "project_id",
-              "fieldValue": "={{ $('sub').item.json.projectId }}"
-            },
-            {
-              "fieldId": "recorder_name",
-              "fieldValue": "={{ $('sub').item.json.recorderName }}"
-            },
-            {
-              "fieldId": "recorder_email",
-              "fieldValue": "={{ $('sub').item.json.recorderEmail }}"
-            },
-            {
-              "fieldId": "recorder_avatar_url",
-              "fieldValue": "={{ $('sub').item.json.recorderAvatar }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        -1216,
-        944
-      ],
-      "id": "018ca9db-8b68-48ac-b9e9-9139207aaf15",
-      "name": "create_session",
-      "credentials": {
-        "supabaseApi": {
-          "id": "gBIPPKjo4dshypxE",
-          "name": "Darwin Supabase"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.mux.com/video/v1/uploads",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={\"new_asset_settings\":{\"playback_policy\":[\"signed\"],\"passthrough\":\"{{ $json.id }}\"},\"cors_origin\":\"*\"}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        -992,
-        944
-      ],
-      "id": "32d58f08-5369-4d04-b472-720d6dde7d55",
-      "name": "create_mux_upload",
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "5x6NsEhRpJiFmxHV",
-          "name": "Mux"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "download",
-        "fileId": {
-          "__rl": true,
-          "value": "={{ $('sub').item.json.googleId }}",
-          "mode": "id"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        -752,
-        944
-      ],
-      "id": "49c4f405-624a-4de8-96f5-e06a7e69d33f",
-      "name": "from_drive",
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "bXwaLvJM3XTPyBDr",
@@ -228,19 +102,19 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "sJaqeSayRPznbd9h",
+          "value": "IDEgGipXlr8pqHTv",
           "mode": "list",
-          "cachedResultUrl": "/workflow/sJaqeSayRPznbd9h",
-          "cachedResultName": "Darwin — GDriveToSupabase"
+          "cachedResultUrl": "/workflow/IDEgGipXlr8pqHTv",
+          "cachedResultName": "Darwin — Analysis"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "googleId": "={{ $('item').item.json.id }}",
-            "projectId": "={{ $('set_state').item.json.project_id }}",
+            "googleId": "={{ $json.drive_id }}",
             "recorderName": "={{ $('sessions').item.json.lastModifyingUser.displayName }}",
             "recorderEmail": "={{ $('sessions').item.json.lastModifyingUser.emailAddress }}",
-            "recorderAvatar": "={{ $('sessions').item.json.lastModifyingUser.photoLink }}"
+            "recorderAvatar": "={{ $('sessions').item.json.lastModifyingUser.photoLink }}",
+            "projectId": "={{ $('project_loop').item.json.project_id }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -300,17 +174,18 @@
         },
         "mode": "each",
         "options": {
-          "waitForSubWorkflow": false
+          "waitForSubWorkflow": true
         }
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        -896,
-        1184
+        1632,
+        1008
       ],
-      "id": "ca283560-7af0-4c4a-8cda-3b9c379443ea",
-      "name": "call_sub"
+      "id": "0c40bc4e-717c-442d-86c3-463b6603d90e",
+      "name": "call_sub",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -319,8 +194,8 @@
           "__rl": true,
           "value": "tzlHlDXi6x6rqJ5W",
           "mode": "list",
-          "cachedResultName": "SessionsSyncState",
-          "cachedResultUrl": "/projects/vTvtXyrEbZhDJUli/datatables/tzlHlDXi6x6rqJ5W"
+          "cachedResultName": "Sync Session State",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/tzlHlDXi6x6rqJ5W"
         },
         "filters": {
           "conditions": [
@@ -334,10 +209,10 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        -1568,
-        1184
+        960,
+        1008
       ],
-      "id": "fefd8d70-aa31-4407-91cf-3b5e27a420a3",
+      "id": "95de4712-7cc6-4ca5-9861-6fcc827406c2",
       "name": "check_session",
       "alwaysOutputData": true
     },
@@ -347,8 +222,8 @@
           "__rl": true,
           "value": "tzlHlDXi6x6rqJ5W",
           "mode": "list",
-          "cachedResultName": "SessionsSyncState",
-          "cachedResultUrl": "/projects/vTvtXyrEbZhDJUli/datatables/tzlHlDXi6x6rqJ5W"
+          "cachedResultName": "Sync Session State",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/tzlHlDXi6x6rqJ5W"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -378,10 +253,10 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        -1104,
-        1216
+        1424,
+        1040
       ],
-      "id": "d415a737-6521-4cb3-82cb-ed469b86521a",
+      "id": "108fb0d6-3732-4535-88d0-749ad83b5a7c",
       "name": "sync_session",
       "alwaysOutputData": true
     },
@@ -392,10 +267,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -1968,
-        1072
+        560,
+        896
       ],
-      "id": "21121bd2-827b-4896-b6e5-a6350bcd1da4",
+      "id": "3219ad7f-9609-4db2-9265-d992cc7ed314",
       "name": "Loop Over Items"
     },
     {
@@ -403,10 +278,10 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -1776,
-        1184
+        752,
+        1008
       ],
-      "id": "501827c4-afb7-4bae-ae1c-7dda235db068",
+      "id": "4fea032f-d0d6-4838-a4d1-d0c628edabf3",
       "name": "item"
     },
     {
@@ -437,479 +312,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1360,
-        1152
+        1168,
+        976
       ],
-      "id": "e8a36818-50cc-437f-be26-d3e815b91e34",
+      "id": "76b1427d-3ae0-48ba-ad30-230c38e09943",
       "name": "If"
-    },
-    {
-      "parameters": {
-        "method": "PUT",
-        "url": "={{ $('create_mux_upload').item.json.data.url }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "video/mp4"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "binaryData",
-        "inputDataFieldName": "data",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        -400,
-        992
-      ],
-      "id": "922eded0-a1c4-41f6-a0b8-b340e90188d9",
-      "name": "upload_to_mux"
-    },
-    {
-      "parameters": {
-        "amount": 60
-      },
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        -144,
-        992
-      ],
-      "id": "544ee78e-93eb-4580-81f7-8184f1b37a74",
-      "name": "wait",
-      "webhookId": "mux-wait"
-    },
-    {
-      "parameters": {
-        "url": "=https://api.mux.com/video/v1/uploads/{{ $('create_mux_upload').first().json.data.id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        64,
-        992
-      ],
-      "id": "34c2b16a-03f2-41ce-899d-62efc765ecfe",
-      "name": "get_uploade",
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "5x6NsEhRpJiFmxHV",
-          "name": "Mux"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "url": "=https://api.mux.com/video/v1/assets/{{ $json.data.asset_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        320,
-        992
-      ],
-      "id": "a87ac85d-df14-4c31-afd4-3add0daa35e5",
-      "name": "get_asset",
-      "credentials": {
-        "httpBasicAuth": {
-          "id": "5x6NsEhRpJiFmxHV",
-          "name": "Mux"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "tableId": "session",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "id",
-              "condition": "eq",
-              "keyValue": "={{ $('create_session').item.json.id }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "mux_playback_id",
-              "fieldValue": "={{ $json.data.playback_ids[0].id }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        576,
-        992
-      ],
-      "id": "40987c07-efdf-476a-a2ed-21563be0076d",
-      "name": "update_playback_id",
-      "credentials": {
-        "supabaseApi": {
-          "id": "gBIPPKjo4dshypxE",
-          "name": "Darwin Supabase"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "on6EE9ydzwMMcwUJ",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/on6EE9ydzwMMcwUJ",
-          "cachedResultName": "Darwin — SessionAnalysis"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "content": "={{ $json.transcript }}",
-            "id": "={{ $json.id }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "content",
-              "displayName": "content",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {
-          "waitForSubWorkflow": false
-        }
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        512,
-        1632
-      ],
-      "id": "594f02a7-593d-4f08-849b-bd48cc548fe7",
-      "name": "session_analysis"
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "tableId": "session",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "id",
-              "condition": "eq",
-              "keyValue": "={{ $('create_session').item.json.id }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "transcript",
-              "fieldValue": "={{ $json.results.channels[0].alternatives[0].paragraphs.transcript }}"
-            },
-            {
-              "fieldId": "transcript_object",
-              "fieldValue": "={{ $json.results.channels[0].alternatives[0].words }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        176,
-        1456
-      ],
-      "id": "0ef5fa66-5252-48a9-95d8-38bfaee2d9d5",
-      "name": "update",
-      "executeOnce": true,
-      "credentials": {
-        "supabaseApi": {
-          "id": "gBIPPKjo4dshypxE",
-          "name": "Darwin Supabase"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const paragraphs = $input.first().json.results.channels[0].alternatives[0].paragraphs.paragraphs;\n\nconst CHUNK_TOKENS = 1000;\nconst OVERLAP_TOKENS = 100;\n\nfunction estimateTokens(text) {\n  return Math.ceil(text.length / 4);\n}\n\nfunction getText(para) {\n  const text = para.sentences.map(s => s.text.trim()).join(' ');\n  return `Speaker ${para.speaker}: ${text}`;\n}\n\nconst paras = paragraphs.map(p => {\n  const text = getText(p);\n  return { text, tokens: estimateTokens(text), start: p.start, end: p.end, speaker: p.speaker };\n});\n\nconst chunks = [];\nlet i = 0;\n\nwhile (i < paras.length) {\n  let tokenCount = 0;\n  let j = i;\n\n  while (j < paras.length && tokenCount + paras[j].tokens <= CHUNK_TOKENS) {\n    tokenCount += paras[j].tokens;\n    j++;\n  }\n  if (j === i) j = i + 1;\n\n  const window = paras.slice(i, j);\n\n  chunks.push({\n    json: {\n      session_id: $('create_session').first().json.id,\n      index: chunks.length,\n      text: window.map(p => p.text).join('\\n'),\n      start: window[0].start,\n      end: window[window.length - 1].end,\n      speakers: [...new Set(window.map(p => p.speaker))],\n      duration_seconds: Math.round((window[window.length - 1].end - window[0].start) * 100) / 100,\n      token_estimate: tokenCount,\n    }\n  });\n\n  let overlapTokens = 0;\n  let nextStart = j;\n  while (nextStart > i + 1 && overlapTokens < OVERLAP_TOKENS) {\n    nextStart--;\n    overlapTokens += paras[nextStart].tokens;\n  }\n\n  i = Math.max(nextStart, i + 1);\n}\n\nreturn chunks;"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -160,
-        1728
-      ],
-      "id": "2781ad26-83a1-418a-91a6-4db5c81f610b",
-      "name": "chunks"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.deepgram.com/v1/listen",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "smart_format",
-              "value": "true"
-            },
-            {
-              "name": "language",
-              "value": "multi"
-            },
-            {
-              "name": "model",
-              "value": "nova-3"
-            },
-            {
-              "name": "diarize",
-              "value": "true"
-            },
-            {
-              "name": "keyterm",
-              "value": "n8n"
-            }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": []
-        },
-        "sendBody": true,
-        "contentType": "binaryData",
-        "inputDataFieldName": "data",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        -400,
-        1200
-      ],
-      "id": "30e8e5b7-fd1d-444f-ac0b-a994708edfad",
-      "name": "deepgram",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "g6KGNlrfzk8z5GXd",
-          "name": "Header Auth account 85"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "Uhazvt6z32s96WxZ",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/Uhazvt6z32s96WxZ",
-          "cachedResultName": "Darwin — SessionVectors"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "text": "={{ $json.text }}",
-            "session_id": "={{ $('create_session').item.json.id }}",
-            "start": "={{ $json.start }}",
-            "end": "={{ $json.end }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "text",
-              "displayName": "text",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "session_id",
-              "displayName": "session_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "start",
-              "displayName": "start",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "number",
-              "removed": false
-            },
-            {
-              "id": "end",
-              "displayName": "end",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "number",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {
-          "waitForSubWorkflow": false
-        }
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        96,
-        1728
-      ],
-      "id": "9cd6acc9-9fb5-4d65-9c2b-a3076c4b063b",
-      "name": "sesh_vectors"
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "YdvhjUv0fqJKjTIF",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/YdvhjUv0fqJKjTIF",
-          "cachedResultName": "Darwin — JobAnalysis"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "id": "={{ $json.id }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "content",
-              "displayName": "content",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": true
-            },
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {
-          "waitForSubWorkflow": false
-        }
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        512,
-        1440
-      ],
-      "id": "18dba90d-1d1d-48a6-bd4a-05b5e075a821",
-      "name": "job_analysis"
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "a8eKX2dbfq7VHHd7",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/a8eKX2dbfq7VHHd7",
-          "cachedResultName": "Darwin — OpportunityAnalysis"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "id": "={{ $json.id }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "content",
-              "displayName": "content",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": true
-            },
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {
-          "waitForSubWorkflow": false
-        }
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        512,
-        1248
-      ],
-      "id": "19ffbb3f-4000-495d-bfdb-b9fc44a1dde5",
-      "name": "opportunity_analysis"
     },
     {
       "parameters": {
@@ -939,10 +346,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1824,
-        1344
+        896,
+        1616
       ],
-      "id": "3cf1519e-a42b-4b17-b02c-230d4e6617b7",
+      "id": "a6779f7a-7ba0-43c3-b84e-24dd22d1b621",
       "name": "exists"
     },
     {
@@ -964,15 +371,15 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -1680,
-        1520
+        1040,
+        1792
       ],
-      "id": "b5e2d835-1545-4d41-85fa-a76184195091",
+      "id": "04fb6ff8-8a52-4f1d-a5ba-d2174747c50b",
       "name": "create",
       "credentials": {
         "supabaseApi": {
           "id": "gBIPPKjo4dshypxE",
-          "name": "Darwin Supabase"
+          "name": "Supabase API"
         }
       }
     },
@@ -993,10 +400,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -1232,
-        1504
+        1488,
+        1776
       ],
-      "id": "f2f61dbe-3692-4b6e-bd8e-e10b29b9eb01",
+      "id": "004e7c5f-4964-44cd-a0b2-a09b9163f12b",
       "name": "set_state"
     },
     {
@@ -1006,8 +413,8 @@
           "__rl": true,
           "value": "eTTy7a2k7jQdE6ts",
           "mode": "list",
-          "cachedResultName": "ProjectsSyncState",
-          "cachedResultUrl": "/projects/vTvtXyrEbZhDJUli/datatables/eTTy7a2k7jQdE6ts"
+          "cachedResultName": "Sync Project State",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/eTTy7a2k7jQdE6ts"
         },
         "filters": {
           "conditions": [
@@ -1022,10 +429,10 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        -2000,
-        1344
+        720,
+        1616
       ],
-      "id": "38472921-5786-408b-b8d2-331130f3fd03",
+      "id": "f589021e-1d65-4b76-9acd-cef4525d4946",
       "name": "get_project",
       "alwaysOutputData": true
     },
@@ -1034,10 +441,10 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -2176,
-        1344
+        544,
+        1616
       ],
-      "id": "25ee7bb0-32c1-460b-9f0c-59f11181ba09",
+      "id": "cda86219-18c0-477a-8d92-9ebe8ae072da",
       "name": "state"
     },
     {
@@ -1046,8 +453,8 @@
           "__rl": true,
           "value": "eTTy7a2k7jQdE6ts",
           "mode": "list",
-          "cachedResultName": "ProjectsSyncState",
-          "cachedResultUrl": "/projects/vTvtXyrEbZhDJUli/datatables/eTTy7a2k7jQdE6ts"
+          "cachedResultName": "Sync Project State",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/eTTy7a2k7jQdE6ts"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -1088,11 +495,143 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        -1520,
-        1520
+        1200,
+        1792
       ],
-      "id": "4c3e63f6-7af9-49ef-897f-89dcff54f3d2",
+      "id": "c3e8574d-14a0-45f5-b3ad-cfec6e316b74",
       "name": "sync_project"
+    },
+    {
+      "parameters": {},
+      "id": "892cbf3d-66b5-444f-b21e-78386928a80e",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, google_drive_id, project_id, mux_playback_id FROM session WHERE (transcript IS NULL OR transcript = '') AND google_drive_id IS NOT NULL ORDER BY created_at",
+        "options": {}
+      },
+      "id": "48fdf1e9-ae68-4155-9559-a808b9bceb5a",
+      "name": "get_incomplete",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -448,
+        544
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "tzlHlDXi6x6rqJ5W",
+          "mode": "list",
+          "cachedResultName": "Sync Session State",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/tzlHlDXi6x6rqJ5W"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "drive_id",
+              "keyValue": "={{ $json.google_drive_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -224,
+        544
+      ],
+      "id": "bc4e64e9-6cb4-4410-8260-9ce52b1dbdfc",
+      "name": "Delete row(s)"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('get_incomplete').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        544
+      ],
+      "id": "657bbab5-3fc4-45e4-8d11-33ff99ae7157",
+      "name": "Delete a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.mimeType }}",
+              "rightValue": "video/",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              },
+              "id": "85804f5a-b513-4f45-95af-360d16f83b13"
+            },
+            {
+              "leftValue": "={{ Number($json.size) }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "id": "3a50ba25-dd18-43af-b3c3-4549c702bd24"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "09ef116f-83c3-4be3-bd2c-28fc49d45b5e",
+      "name": "filter_videos",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        320,
+        896
+      ]
     }
   ],
   "connections": {
@@ -1136,60 +675,11 @@
         ]
       ]
     },
-    "sub": {
-      "main": [
-        [
-          {
-            "node": "create_session",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "sessions": {
       "main": [
         [
           {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "create_session": {
-      "main": [
-        [
-          {
-            "node": "create_mux_upload",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "create_mux_upload": {
-      "main": [
-        [
-          {
-            "node": "from_drive",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "from_drive": {
-      "main": [
-        [
-          {
-            "node": "deepgram",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "upload_to_mux",
+            "node": "filter_videos",
             "type": "main",
             "index": 0
           }
@@ -1270,98 +760,6 @@
         ]
       ]
     },
-    "upload_to_mux": {
-      "main": [
-        [
-          {
-            "node": "wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "wait": {
-      "main": [
-        [
-          {
-            "node": "get_uploade",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "get_uploade": {
-      "main": [
-        [
-          {
-            "node": "get_asset",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "get_asset": {
-      "main": [
-        [
-          {
-            "node": "update_playback_id",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "update": {
-      "main": [
-        [
-          {
-            "node": "session_analysis",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "job_analysis",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "opportunity_analysis",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "chunks": {
-      "main": [
-        [
-          {
-            "node": "sesh_vectors",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "deepgram": {
-      "main": [
-        [
-          {
-            "node": "chunks",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "update",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "exists": {
       "main": [
         [
@@ -1434,6 +832,50 @@
           }
         ]
       ]
+    },
+    "Run": {
+      "main": [
+        [
+          {
+            "node": "get_incomplete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_incomplete": {
+      "main": [
+        [
+          {
+            "node": "Delete row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete row(s)": {
+      "main": [
+        [
+          {
+            "node": "Delete a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filter_videos": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1441,16 +883,42 @@
     "availableInMCP": true,
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner",
-    "saveDataSuccessExecution": "all"
+    "saveDataSuccessExecution": "all",
+    "binaryMode": "separate"
   },
-  "triggerCount": 0,
-  "versionId": "e93bb0c5-03c5-434d-b272-0f92b6842b8c",
+  "triggerCount": 1,
+  "versionId": "10658615-8cb4-4c30-bb60-cf0edb64891a",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
-  "parentFolderId": null,
+  "parentFolderId": "Y04SDqFk92B7CIGH",
   "isArchived": false,
-  "nodeGroups": []
+  "nodeGroups": [
+    {
+      "id": "fef8f3a8-4a9c-40dd-95f5-0e7126735889",
+      "name": "Sync sessions",
+      "nodeIds": [
+        "0c40bc4e-717c-442d-86c3-463b6603d90e",
+        "95de4712-7cc6-4ca5-9861-6fcc827406c2",
+        "108fb0d6-3732-4535-88d0-749ad83b5a7c",
+        "3219ad7f-9609-4db2-9265-d992cc7ed314",
+        "4fea032f-d0d6-4838-a4d1-d0c628edabf3",
+        "76b1427d-3ae0-48ba-ad30-230c38e09943"
+      ]
+    },
+    {
+      "id": "906ceeaa-2df3-4512-b9a2-e27ca397066d",
+      "name": "Project de-duplication",
+      "nodeIds": [
+        "a6779f7a-7ba0-43c3-b84e-24dd22d1b621",
+        "04fb6ff8-8a52-4f1d-a5ba-d2174747c50b",
+        "004e7c5f-4964-44cd-a0b2-a09b9163f12b",
+        "f589021e-1d65-4b76-9acd-cef4525d4946",
+        "cda86219-18c0-477a-8d92-9ebe8ae072da",
+        "c3e8574d-14a0-45f5-b3ad-cfec6e316b74"
+      ]
+    }
+  ]
 }
