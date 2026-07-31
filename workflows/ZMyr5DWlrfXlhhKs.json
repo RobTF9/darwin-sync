@@ -65,7 +65,7 @@
     },
     {
       "parameters": {
-        "endpointUrl": "https://darwin-staging.app.n8n.cloud/mcp-server/http",
+        "endpointUrl": "={{ $vars.mcp_url }}",
         "authentication": "bearerAuth",
         "options": {}
       },
@@ -286,7 +286,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "b3b5ae71-2c08-4ac8-9ff3-4b9bc03a7c05",
+  "versionId": "71c2b8d2-16da-44c5-ad84-acd15fe2a04f",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

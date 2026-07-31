@@ -18,6 +18,12 @@
       "key": "env",
       "type": "string",
       "value": ""
+    },
+    {
+      "id": "ICJYO4AY80JikMgF",
+      "key": "mcp_url",
+      "type": "string",
+      "value": ""
     }
   ]
 }
