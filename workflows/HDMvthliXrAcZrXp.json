@@ -247,7 +247,7 @@
         "descriptionType": "manual",
         "toolDescription": "Retrieves opportunities linked to sessions with clips.\n\nParameters (all optional):\n- session_id, project_id, limit (default 20)",
         "operation": "executeQuery",
-        "query": "SELECT o.id, o.content, o.parent_id, o.clips, s.id AS session_id, s.participant_name FROM opportunity o JOIN session_opportunities so ON so.opportunity_id = o.id JOIN session s ON s.id = so.session_id WHERE o.deleted IS NOT TRUE AND ('{{ $fromAI(\"session_id\") }}' = '' OR so.session_id::text = '{{ $fromAI(\"session_id\") }}') AND ('{{ $fromAI(\"project_id\") }}' = '' OR s.project_id::text = '{{ $fromAI(\"project_id\") }}') ORDER BY o.created_at DESC",
+        "query": "SELECT o.id, o.content, o.clips, s.id AS session_id, s.participant_name FROM opportunity o JOIN session_opportunities so ON so.opportunity_id = o.id JOIN session s ON s.id = so.session_id WHERE o.deleted IS NOT TRUE AND ('{{ $fromAI(\"session_id\") }}' = '' OR so.session_id::text = '{{ $fromAI(\"session_id\") }}') AND ('{{ $fromAI(\"project_id\") }}' = '' OR s.project_id::text = '{{ $fromAI(\"project_id\") }}') ORDER BY o.created_at DESC",
         "options": {}
       },
       "id": "88080670-3874-4bfd-bddd-c095cf781cc1",
@@ -1946,7 +1946,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "3883be0c-8614-407b-9fe7-88b54580d3d6",
+  "versionId": "30e828a8-e6ca-411c-b76d-84a8fa2e1917",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
