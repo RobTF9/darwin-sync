@@ -30,7 +30,7 @@
     {
       "parameters": {
         "schemaType": "manual",
-        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"opportunities\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"content\": {\n            \"type\": \"string\",\n            \"description\": \"The opportunity statement, framed from the customer's perspective as a need, pain point, or desire\"\n          },\n          \"parent_content\": {\n            \"type\": [\"string\", \"null\"],\n            \"description\": \"If this is a child opportunity, the exact content string of its parent opportunity. Null for top-level opportunities.\"\n          },\n          \"clips\": {\n            \"type\": \"array\",\n            \"minItems\": 1,\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"quote\": {\n                  \"type\": \"string\",\n                  \"description\": \"Verbatim quote from the transcript\"\n                },\n                \"start_time\": {\n                  \"type\": \"number\",\n                  \"description\": \"Start time in seconds from nearest transcript timestamp marker\"\n                },\n                \"end_time\": {\n                  \"type\": \"number\",\n                  \"description\": \"End time in seconds from nearest transcript timestamp marker\"\n                }\n              },\n              \"required\": [\"quote\", \"start_time\", \"end_time\"]\n            }\n          }\n        },\n        \"required\": [\"content\", \"parent_content\", \"clips\"]\n      }\n    }\n  },\n  \"required\": [\"opportunities\"]\n}\n",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"opportunities\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"content\": {\n            \"type\": \"string\",\n            \"description\": \"The opportunity statement, framed from the customer's perspective as a need, pain point, or desire\"\n          },\n          \"clips\": {\n            \"type\": \"array\",\n            \"minItems\": 1,\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"quote\": {\n                  \"type\": \"string\",\n                  \"description\": \"Verbatim quote from the transcript\"\n                },\n                \"start_time\": {\n                  \"type\": \"number\",\n                  \"description\": \"Start time in seconds from nearest transcript timestamp marker\"\n                },\n                \"end_time\": {\n                  \"type\": \"number\",\n                  \"description\": \"End time in seconds from nearest transcript timestamp marker\"\n                }\n              },\n              \"required\": [\"quote\", \"start_time\", \"end_time\"]\n            }\n          }\n        },\n        \"required\": [\"content\", \"clips\"]\n      }\n    }\n  },\n  \"required\": [\"opportunities\"]\n}\n",
         "autoFix": true
       },
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
@@ -111,7 +111,7 @@
         "text": "={{ $json.transcript }}",
         "hasOutputParser": true,
         "options": {
-          "systemMessage": "# Role\n\nYou are a user research analyst specialising in the Opportunity Solution Tree (OST) framework by Teresa Torres. Your task is to identify **opportunities** — unmet needs, pain points, and desires expressed by the participant during a user research interview.\n\n**Your role is strictly observational.** You are documenting what the participant said and experienced — not interpreting, editorialising, or inferring what they *might* have meant. If the participant didn't say it, don't write it.\n\n## What is an Opportunity?\n\nIn the OST framework, opportunities are:\n- Customer needs, pain points, or desires discovered through research\n- **Observations, not interpretations** — describe the problem the participant articulated, using their language and framing. Do not add your own analysis, opinion, or inferred meaning\n- Written in the **third person** (e.g. \"She struggles to...\" not \"I struggle to...\")\n- **Contextual and specific** — reference the specific features, services, or external components the participant mentioned so the opportunity reads as a grounded observation, not a generic statement\n- Expressed as struggles, goals, or gaps between current and desired state\n- Specific enough to be actionable, but not so narrow they prescribe a solution\n- **Concise** — aim for one sentence, roughly 15-25 words. Enough to capture the problem and its context, but not a paragraph\n\n| Level | Example | Right level? |\n|-------|---------|--------------|\n| Good | \"She spends ~30 mins each morning manually checking Slack and Postgres to verify her data sync workflows ran\" | Concise with context |\n| Too verbose | \"She wastes approximately 30 minutes each morning manually checking both Slack notifications and her Postgres database to verify that her nightly data sync workflows actually ran correctly, because there's no built-in way to confirm execution status\" | Reads like a paragraph |\n| Too generic | \"I waste time checking if automations ran\" | No context, first person |\n| Solution | \"Add a monitoring dashboard\" | Too prescriptive |\n\n**Good examples** (concise, contextual, third-person):\n- \"He manually copies HubSpot campaign data into Sheets because the HTTP Request node can't map nested fields\"\n- \"She can't verify her Airtable-to-Mailchimp onboarding workflow completed without logging into both tools\"\n- \"He needs to hand off lead-routing workflows to colleagues who don't understand expressions or the IF node\"\n- \"She's afraid to edit her Shopify order workflow after breaking the webhook trigger and losing a day of orders\"\n\n**Bad examples:**\n- \"He spends 2+ hours/week manually copying campaign data from HubSpot into Google Sheets because his n8n workflow using the HTTP Request node can't handle the nested field mapping structure he needs for his marketing reports\" — too verbose\n- \"I waste time manually copying data between tools\" — first person, no context\n- \"Add a dashboard\" — this is a solution\n\n## Contextualising Opportunities\n\nEvery opportunity should feel like a research insight someone could read and immediately understand the problem and why it matters. Use **problem context** from the transcript to ground each opportunity:\n\n- **Use third-person pronouns** (he/she/they). Never use \"I\" or the participant's name.\n- **Name the specific features or functionality** they mention (e.g. \"the HTTP Request node\", \"expressions\", \"the IF node\", \"error handling\", \"webhook triggers\").\n- **Name external services and components** they interact with (e.g. \"Postgres database\", \"Shopify API\", \"HubSpot\", \"their React frontend\", \"S3 bucket\").\n- **Quantify where possible.** If they mention frequency, time spent, or scale, include it (e.g. \"~30 mins/day\", \"3 times a week\", \"across 15 workflows\").\n- **Capture the consequence.** What happens because of this unmet need? (e.g. \"so orders get missed\", \"which delays delivery by a day\").\n- **Do NOT include generic profile information** like company name, company size, job title, or team structure — that's captured elsewhere.\n\n## Opportunity Structure\n\nOpportunities can be **nested**. A parent opportunity represents a broad need, and child opportunities break it into more specific facets. For example:\n\n- Parent: \"She can't trust that her Salesforce/Slack/Postgres workflows run reliably across 15 active workflows\"\n  - Child: \"She only discovers failed executions when a client complains, sometimes days later\"\n  - Child: \"There's no execution history to audit whether her Salesforce sync actually ran\"\n  - Child: \"Error messages don't show which node failed or what the API response was\"\n\nLimit nesting to **two levels** (parent + children). Not every opportunity needs children — only add them where the parent genuinely breaks into distinct sub-needs.\n\n## Transcript Format\n\nThe transcript contains inline timestamp markers like `[12.50]` — these are seconds into the recording. Each speaker turn starts with `S0 [0.08]:` (speaker number and start time).\n\nWhen quoting evidence, use the nearest timestamp markers to define clip ranges. Each piece of evidence should be a clip with `quote`, `start_time`, and `end_time`. An opportunity can have multiple supporting clips from different parts of the transcript.\n\n## Extraction Guidance\n\n1. **Listen for friction and frustration.** Where does the participant struggle, work around limitations, or express dissatisfaction?\n\n2. **Listen for unmet goals.** What are they trying to achieve that they can't do easily today?\n\n3. **Listen for workarounds.** When someone builds a manual process to compensate for missing functionality, that's an opportunity.\n\n4. **Listen for emotional signals.** Phrases like \"I wish...\", \"It's annoying that...\", \"I spend too much time...\", \"I'm afraid to...\" reveal opportunities.\n\n5. **Look past the workflows they describe.** The workflows are *solutions*. The opportunity is the underlying need that drove them to build the workaround.\n\n6. **Include verbatim evidence.** Quote the exact moments that reveal the need — often found in *why* they do something, not *what* they do.\n\n7. **Gather problem context early.** Note the specific features, services, databases, APIs, and external tools they mention — you'll need these to write contextual opportunities.\n\n8. **Stay faithful to the participant's words.** Write opportunities that the participant would recognise as their own problem. Do not exaggerate, generalise beyond what they said, or reframe their experience through your own lens. If they said something is \"a bit annoying\", don't write that it's a critical blocker.\n\n## Rules\n\n1. **3-8 top-level opportunities per session.** Focus on quality over quantity.\n2. Base opportunities only on evidence in the transcript.\n3. Each opportunity must have at least one supporting clip — a direct quote with timestamp range.\n4. Opportunities should be solution-agnostic (no product features in the statement).\n5. **Use third-person pronouns** (he/she/they), never \"I\" or the participant's name.\n6. **Include problem context** (specific features, external services, components, scale) drawn from the transcript. Do NOT include generic profile info (company, job title, team size).\n7. Do NOT identify opportunities that are:\n   - Generic complaints with no substance\n   - About the research process itself rather than the product\n   - Duplicates of each other phrased differently\n   - Your own interpretation or opinion about what the participant *probably* meant or *should* care about\n   - Inferred problems the participant never actually described or alluded to\n\n## Example Output\n\n```json\n{\n  \"opportunities\": [\n    {\n      \"content\": \"She can't trust that her Salesforce/Slack/Postgres workflows run reliably across 15 active workflows\",\n      \"parent_content\": null,\n      \"clips\": [\n        {\n          \"quote\": \"I always have this nagging feeling like, did it actually run? I end up checking manually anyway\",\n          \"start_time\": 245.30,\n          \"end_time\": 252.10\n        }\n      ]\n    },\n    {\n      \"content\": \"She only discovers failed executions when a client complains, sometimes days later\",\n      \"parent_content\": \"She can't trust that her Salesforce/Slack/Postgres workflows run reliably across 15 active workflows\",\n      \"clips\": [\n        {\n          \"quote\": \"sometimes things just silently fail and I only find out days later when someone complains\",\n          \"start_time\": 310.50,\n          \"end_time\": 318.20\n        }\n      ]\n    },\n    {\n      \"content\": \"Her non-technical teammates can't safely update email templates without risking breaking the workflows\",\n      \"parent_content\": null,\n      \"clips\": [\n        {\n          \"quote\": \"my colleague needs to be able to change the email template but I don't want her accidentally breaking the whole thing\",\n          \"start_time\": 485.60,\n          \"end_time\": 495.80\n        },\n        {\n          \"quote\": \"I basically built it but now I'm the bottleneck because only I can maintain it\",\n          \"start_time\": 512.30,\n          \"end_time\": 519.40\n        }\n      ]\n    }\n  ]\n}\n```\n"
+          "systemMessage": "# Role\n\nYou are a user research analyst specialising in the Opportunity Solution Tree (OST) framework by Teresa Torres. Your task is to identify **opportunities** — unmet needs, pain points, and desires expressed by the participant during a user research interview.\n\n**Your role is strictly observational.** You are documenting what the participant said and experienced — not interpreting, editorialising, or inferring what they *might* have meant. If the participant didn't say it, don't write it.\n\n## What is an Opportunity?\n\nIn the OST framework, opportunities are:\n- Customer needs, pain points, or desires discovered through research\n- **Observations, not interpretations** — describe the problem the participant articulated, using their language and framing. Do not add your own analysis, opinion, or inferred meaning\n- Written in the **third person** (e.g. \"She struggles to...\" not \"I struggle to...\")\n- **Contextual and specific** — reference the specific features, services, or external components the participant mentioned so the opportunity reads as a grounded observation, not a generic statement\n- Expressed as struggles, goals, or gaps between current and desired state\n- Specific enough to be actionable, but not so narrow they prescribe a solution\n- **Concise** — aim for one sentence, roughly 15-25 words. Enough to capture the problem and its context, but not a paragraph\n\n| Level | Example | Right level? |\n|-------|---------|--------------|\n| Good | \"She spends ~30 mins each morning manually checking Slack and Postgres to verify her data sync workflows ran\" | Concise with context |\n| Too verbose | \"She wastes approximately 30 minutes each morning manually checking both Slack notifications and her Postgres database to verify that her nightly data sync workflows actually ran correctly, because there's no built-in way to confirm execution status\" | Reads like a paragraph |\n| Too generic | \"I waste time checking if automations ran\" | No context, first person |\n| Solution | \"Add a monitoring dashboard\" | Too prescriptive |\n\n**Good examples** (concise, contextual, third-person):\n- \"He manually copies HubSpot campaign data into Sheets because the HTTP Request node can't map nested fields\"\n- \"She can't verify her Airtable-to-Mailchimp onboarding workflow completed without logging into both tools\"\n- \"He needs to hand off lead-routing workflows to colleagues who don't understand expressions or the IF node\"\n- \"She's afraid to edit her Shopify order workflow after breaking the webhook trigger and losing a day of orders\"\n\n**Bad examples:**\n- \"He spends 2+ hours/week manually copying campaign data from HubSpot into Google Sheets because his n8n workflow using the HTTP Request node can't handle the nested field mapping structure he needs for his marketing reports\" — too verbose\n- \"I waste time manually copying data between tools\" — first person, no context\n- \"Add a dashboard\" — this is a solution\n\n## Contextualising Opportunities\n\nEvery opportunity should feel like a research insight someone could read and immediately understand the problem and why it matters. Use **problem context** from the transcript to ground each opportunity:\n\n- **Use third-person pronouns** (he/she/they). Never use \"I\" or the participant's name.\n- **Name the specific features or functionality** they mention (e.g. \"the HTTP Request node\", \"expressions\", \"the IF node\", \"error handling\", \"webhook triggers\").\n- **Name external services and components** they interact with (e.g. \"Postgres database\", \"Shopify API\", \"HubSpot\", \"their React frontend\", \"S3 bucket\").\n- **Quantify where possible.** If they mention frequency, time spent, or scale, include it (e.g. \"~30 mins/day\", \"3 times a week\", \"across 15 workflows\").\n- **Capture the consequence.** What happens because of this unmet need? (e.g. \"so orders get missed\", \"which delays delivery by a day\").\n- **Do NOT include generic profile information** like company name, company size, job title, or team structure — that's captured elsewhere.\n\n\n## Transcript Format\n\nThe transcript contains inline timestamp markers like `[12.50]` — these are seconds into the recording. Each speaker turn starts with `S0 [0.08]:` (speaker number and start time).\n\nWhen quoting evidence, use the nearest timestamp markers to define clip ranges. Each piece of evidence should be a clip with `quote`, `start_time`, and `end_time`. An opportunity can have multiple supporting clips from different parts of the transcript.\n\n## Extraction Guidance\n\n1. **Listen for friction and frustration.** Where does the participant struggle, work around limitations, or express dissatisfaction?\n\n2. **Listen for unmet goals.** What are they trying to achieve that they can't do easily today?\n\n3. **Listen for workarounds.** When someone builds a manual process to compensate for missing functionality, that's an opportunity.\n\n4. **Listen for emotional signals.** Phrases like \"I wish...\", \"It's annoying that...\", \"I spend too much time...\", \"I'm afraid to...\" reveal opportunities.\n\n5. **Look past the workflows they describe.** The workflows are *solutions*. The opportunity is the underlying need that drove them to build the workaround.\n\n6. **Include verbatim evidence.** Quote the exact moments that reveal the need — often found in *why* they do something, not *what* they do.\n\n7. **Gather problem context early.** Note the specific features, services, databases, APIs, and external tools they mention — you'll need these to write contextual opportunities.\n\n8. **Stay faithful to the participant's words.** Write opportunities that the participant would recognise as their own problem. Do not exaggerate, generalise beyond what they said, or reframe their experience through your own lens. If they said something is \"a bit annoying\", don't write that it's a critical blocker.\n\n## Rules\n\n1. **3-8 top-level opportunities per session.** Focus on quality over quantity.\n2. Base opportunities only on evidence in the transcript.\n3. Each opportunity must have at least one supporting clip — a direct quote with timestamp range.\n4. Opportunities should be solution-agnostic (no product features in the statement).\n5. **Use third-person pronouns** (he/she/they), never \"I\" or the participant's name.\n6. **Include problem context** (specific features, external services, components, scale) drawn from the transcript. Do NOT include generic profile info (company, job title, team size).\n7. Do NOT identify opportunities that are:\n   - Generic complaints with no substance\n   - About the research process itself rather than the product\n   - Duplicates of each other phrased differently\n   - Your own interpretation or opinion about what the participant *probably* meant or *should* care about\n   - Inferred problems the participant never actually described or alluded to\n\n## Example Output\n\n```json\n{\n  \"opportunities\": [\n    {\n      \"content\": \"She can't trust that her Salesforce/Slack/Postgres workflows run reliably across 15 active workflows\",\n      \"clips\": [\n        {\n          \"quote\": \"I always have this nagging feeling like, did it actually run? I end up checking manually anyway\",\n          \"start_time\": 245.30,\n          \"end_time\": 252.10\n        }\n      ]\n    },\n    {\n      \"content\": \"She only discovers failed executions when a client complains, sometimes days later\",\n      \"clips\": [\n        {\n          \"quote\": \"sometimes things just silently fail and I only find out days later when someone complains\",\n          \"start_time\": 310.50,\n          \"end_time\": 318.20\n        }\n      ]\n    },\n    {\n      \"content\": \"Her non-technical teammates can't safely update email templates without risking breaking the workflows\",\n      \"clips\": [\n        {\n          \"quote\": \"my colleague needs to be able to change the email template but I don't want her accidentally breaking the whole thing\",\n          \"start_time\": 485.60,\n          \"end_time\": 495.80\n        },\n        {\n          \"quote\": \"I basically built it but now I'm the bottleneck because only I can maintain it\",\n          \"start_time\": 512.30,\n          \"end_time\": 519.40\n        }\n      ]\n    }\n  ]\n}\n```\n"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -127,186 +127,79 @@
     },
     {
       "parameters": {
-        "jsCode": "const ops = $input.first().json.output.opportunities\n\nconst parents = ops.filter(op => op.parent_content === null)\nconst children = ops.filter(op => op.parent_content !== null)\n\nreturn [{\n  parents,\n  children,\n}]"
+        "tableId": "opportunity",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "content",
+              "fieldValue": "={{ $json.content }}"
+            },
+            {
+              "fieldId": "clips",
+              "fieldValue": "={{ $json.clips }}"
+            }
+          ]
+        }
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1648,
+        1072
+      ],
+      "id": "7c415607-a56f-4a6a-8bd7-ede0fd25bf49",
+      "name": "create",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "session_opportunities",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('get').item.json.id }}"
+            },
+            {
+              "fieldId": "opportunity_id",
+              "fieldValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1872,
+        1072
+      ],
+      "id": "fe8c3e3b-96d1-49af-8a0e-5a353e96f231",
+      "name": "create_opp_session",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.opportunities",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
       "position": [
         1424,
         1072
       ],
-      "id": "5e3976c5-77cb-4e99-83ec-ece7b1fa2c15",
-      "name": "parse"
-    },
-    {
-      "parameters": {
-        "fieldToSplitOut": "parents",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
-      "position": [
-        1664,
-        1072
-      ],
-      "id": "9ec627ec-393f-42b2-8448-8e6032bbd28a",
-      "name": "split_parents"
-    },
-    {
-      "parameters": {
-        "tableId": "opportunity",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "content",
-              "fieldValue": "={{ $json.content }}"
-            },
-            {
-              "fieldId": "clips",
-              "fieldValue": "={{ $json.clips }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        1888,
-        1072
-      ],
-      "id": "7c415607-a56f-4a6a-8bd7-ede0fd25bf49",
-      "name": "create_parents",
-      "credentials": {
-        "supabaseApi": {
-          "id": "gBIPPKjo4dshypxE",
-          "name": "Supabase API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const children = $('parse').item.json.children.filter(child => child.parent_content === $json.content).map(c => ({\n  ...c,\n  parent_id: $json.id\n}));\n\nreturn {children}\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2112,
-        1072
-      ],
-      "id": "c2387d85-4a5d-41ad-b915-1c5182c51b14",
-      "name": "parse_children"
-    },
-    {
-      "parameters": {
-        "fieldToSplitOut": "children",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
-      "position": [
-        2320,
-        1072
-      ],
-      "id": "ae057a7b-a23d-491c-833f-2de4790af973",
-      "name": "split_children"
-    },
-    {
-      "parameters": {
-        "tableId": "opportunity",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "content",
-              "fieldValue": "={{ $json.content }}"
-            },
-            {
-              "fieldId": "clips",
-              "fieldValue": "={{ $json.clips }}"
-            },
-            {
-              "fieldId": "parent_id",
-              "fieldValue": "={{ $json.parent_id }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        2544,
-        1072
-      ],
-      "id": "d6507627-6f6d-4adf-999b-d4ba85d7f8dd",
-      "name": "create_children",
-      "credentials": {
-        "supabaseApi": {
-          "id": "gBIPPKjo4dshypxE",
-          "name": "Supabase API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "tableId": "session_opportunities",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "session_id",
-              "fieldValue": "={{ $('get').item.json.id }}"
-            },
-            {
-              "fieldId": "opportunity_id",
-              "fieldValue": "={{ $json.id }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        2112,
-        848
-      ],
-      "id": "fe8c3e3b-96d1-49af-8a0e-5a353e96f231",
-      "name": "create_parent_session",
-      "credentials": {
-        "supabaseApi": {
-          "id": "gBIPPKjo4dshypxE",
-          "name": "Supabase API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "tableId": "session_opportunities",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "session_id",
-              "fieldValue": "={{ $('get').item.json.id }}"
-            },
-            {
-              "fieldId": "opportunity_id",
-              "fieldValue": "={{ $json.id }}"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        2752,
-        1072
-      ],
-      "id": "5a9c9cb6-89f3-4c3e-a42b-60038de7c7b5",
-      "name": "create_child_session",
-      "credentials": {
-        "supabaseApi": {
-          "id": "gBIPPKjo4dshypxE",
-          "name": "Supabase API"
-        }
-      }
+      "id": "bee603b6-2741-4fe0-b4aa-10e34122bac8",
+      "name": "Split Out"
     }
   ],
   "connections": {
@@ -374,78 +267,29 @@
       "main": [
         [
           {
-            "node": "parse",
+            "node": "Split Out",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "parse": {
+    "create": {
       "main": [
         [
           {
-            "node": "split_parents",
+            "node": "create_opp_session",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "split_parents": {
+    "Split Out": {
       "main": [
         [
           {
-            "node": "create_parents",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "create_parents": {
-      "main": [
-        [
-          {
-            "node": "parse_children",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "create_parent_session",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "parse_children": {
-      "main": [
-        [
-          {
-            "node": "split_children",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "split_children": {
-      "main": [
-        [
-          {
-            "node": "create_children",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "create_children": {
-      "main": [
-        [
-          {
-            "node": "create_child_session",
+            "node": "create",
             "type": "main",
             "index": 0
           }
@@ -459,7 +303,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "e8bea64a-c5d5-463f-ba7a-44cd257e7393",
+  "versionId": "56dbe01a-05f0-44ab-b27a-a62a2b389107",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
