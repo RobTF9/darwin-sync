@@ -26,7 +26,7 @@
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const c = $json;\nlet inputs = {}; let assertions = [];\ntry { inputs = JSON.parse(c.inputs || '{}'); } catch (e) { inputs = {}; }\ntry { assertions = JSON.parse(c.assertions || '[]'); } catch (e) { assertions = []; }\nconst targetType = c.target_type || 'workflow';\nreturn { json: { run_id: c.run_id || '', case_id: c.case_id, target_type: targetType, target: c.target, agent: c.agent || '', description: c.description || '', inputs, assertions, target_key: targetType === 'sql' ? 'sql' : c.target } };"
+        "jsCode": "const c = $json;\nlet inputs = {}; let assertions = [];\nif (typeof c.inputs === 'object') { inputs = c.inputs; } else { try { inputs = JSON.parse(c.inputs || '{}'); } catch (e) { inputs = {}; } }\nif (Array.isArray(c.assertions)) { assertions = c.assertions; } else { try { assertions = JSON.parse(c.assertions || '[]'); } catch (e) { assertions = []; } }\nreturn { json: { run_id: c.run_id || '', test_case_id: c.id || '', case_id: c.case_id, target: c.target, agent: c.agent || '', description: c.description || '', inputs, assertions } };"
       }
     },
     {
@@ -41,192 +41,6 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "const caseData = $('Parse Case').first().json;\nconst rows = $input.all().map((i) => i.json);\nconst details = [];\nlet status = 'pass';\nfunction getPath(obj, path) { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }\nif (rows.length === 0) {\n  status = 'error';\n  details.push({ assertion: 'execution', pass: false, detail: 'Target returned no output items' });\n} else if (rows[0] && rows[0].error) {\n  status = 'error';\n  details.push({ assertion: 'execution', pass: false, detail: JSON.stringify(rows[0].error).slice(0, 600) });\n} else {\n  for (const a of caseData.assertions) {\n    let pass = false; let got;\n    try {\n      if (a.type === 'row_count') {\n        got = rows.length;\n        const v = Number(a.value);\n        pass = a.op === '>=' ? got >= v : a.op === '<=' ? got <= v : got === v;\n      } else if (a.type === 'field_exists') {\n        got = getPath(rows[0], a.path);\n        pass = got !== undefined && got !== null;\n      } else if (a.type === 'contains') {\n        got = '(substring search)';\n        pass = JSON.stringify(rows).includes(a.value);\n      } else if (a.type === 'exact') {\n        got = a.path ? getPath(rows[0], a.path) : (rows.length === 1 ? rows[0] : rows);\n        pass = JSON.stringify(got) === JSON.stringify(a.value);\n      } else if (a.type === 'tool_called') {\n        got = rows[0].tools_used || [];\n        pass = got.includes(a.value);\n      } else {\n        status = 'fail';\n        details.push({ assertion: String(a.type), pass: false, detail: 'unknown assertion type' });\n        continue;\n      }\n    } catch (e) {\n      status = 'fail';\n      details.push({ assertion: String(a.type), pass: false, detail: String(e).slice(0, 300) });\n      continue;\n    }\n    if (!pass) status = 'fail';\n    details.push({ assertion: a.type + (a.path ? ' ' + a.path : ''), pass, expected: a.value, got: typeof got === 'string' ? got.slice(0, 200) : got });\n  }\n}\nreturn [{ json: { run_id: caseData.run_id || '', case_id: caseData.case_id, target: caseData.target, status, actual_output: JSON.stringify(rows).slice(0, 3500), assertion_detail: JSON.stringify(details).slice(0, 3500) } }];"
-      }
-    },
-    {
-      "id": "641caf1a-d0a7-46d3-8bc3-3a8e2083e889",
-      "name": "Save Result",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        660,
-        300
-      ],
-      "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "Ky7fj4ueDOdTHyG9"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "result_id": "={{ $execution.id + '-' + $json.case_id }}",
-            "run_id": "={{ $json.run_id }}",
-            "case_id": "={{ $json.case_id }}",
-            "target": "={{ $json.target }}",
-            "status": "={{ $json.status }}",
-            "actual_output": "={{ $json.actual_output }}",
-            "assertion_detail": "={{ $json.assertion_detail }}",
-            "run_date": "={{ $now.toISO() }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "result_id",
-              "displayName": "result_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "run_id",
-              "displayName": "run_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "target",
-              "displayName": "target",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "actual_output",
-              "displayName": "actual_output",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "assertion_detail",
-              "displayName": "assertion_detail",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "run_date",
-              "displayName": "run_date",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "adb53a3b-9f69-4693-a8ff-e95d55767461",
-      "name": "Update Case",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        880,
-        300
-      ],
-      "parameters": {
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "yZf7RKAPLc3ZiO5E"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "case_id",
-              "keyValue": "={{ $('Evaluate Assertions').first().json.case_id }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "last_status": "={{ $('Evaluate Assertions').first().json.status }}",
-            "last_run_at": "={{ $now.toISO() }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_status",
-              "displayName": "last_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_run_at",
-              "displayName": "last_run_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
       }
     },
     {
@@ -331,6 +145,68 @@
         "mode": "runOnceForEachItem",
         "jsCode": "const d = $json;\nconst answer = (d.output ?? d.text ?? d.response ?? '').toString();\nconst steps = Array.isArray(d.intermediateSteps) ? d.intermediateSteps : [];\nconst tools = [...new Set(steps.map((s) => s && s.action && s.action.tool).filter(Boolean))];\nreturn { json: { answer, tools_used: tools } };"
       }
+    },
+    {
+      "id": "44010087-6ba4-4427-ab9a-0b9f175d45e1",
+      "name": "Save Result",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "test_results",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "test_case_id",
+              "fieldValue": "={{ $('Parse Case').item.json.test_case_id }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $('Parse Case').item.json.case_id }}"
+            },
+            {
+              "fieldId": "target",
+              "fieldValue": "={{ $('Parse Case').item.json.target }}"
+            },
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $('Evaluate Assertions').first().json.run_id }}"
+            },
+            {
+              "fieldId": "instance",
+              "fieldValue": "={{ $vars.env }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $('Evaluate Assertions').first().json.status }}"
+            },
+            {
+              "fieldId": "output",
+              "fieldValue": "={{ JSON.stringify($('Evaluate Assertions').first().json) }}"
+            },
+            {
+              "fieldId": "assertion_detail",
+              "fieldValue": "={{ $('Evaluate Assertions').first().json.assertion_detail }}"
+            },
+            {
+              "fieldId": "run_date",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     }
   ],
   "connections": {
@@ -339,39 +215,6 @@
         [
           {
             "node": "Parse Case",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Evaluate Assertions": {
-      "main": [
-        [
-          {
-            "node": "Save Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save Result": {
-      "main": [
-        [
-          {
-            "node": "Update Case",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Case": {
-      "main": [
-        [
-          {
-            "node": "Done",
             "type": "main",
             "index": 0
           }
@@ -410,6 +253,28 @@
           }
         ]
       ]
+    },
+    "Evaluate Assertions": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Result": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -417,7 +282,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "ed9d7093-111f-4c22-b759-bf6be935c044",
+  "versionId": "fe4e5da9-2075-436e-a58d-8d4fe6bd1d76",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

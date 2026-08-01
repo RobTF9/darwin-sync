@@ -4,25 +4,6 @@
   "nodes": [
     {
       "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "yZf7RKAPLc3ZiO5E"
-        },
-        "returnAll": true
-      },
-      "id": "7b8f1941-17c5-4db5-9e9b-5991e01233f5",
-      "name": "Load Cases",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        -368,
-        304
-      ]
-    },
-    {
-      "parameters": {
         "workflowInputs": {
           "values": [
             {
@@ -40,7 +21,7 @@
       "typeVersion": 1.2,
       "position": [
         -608,
-        432
+        304
       ]
     },
     {
@@ -137,33 +118,41 @@
               "id": "run_id",
               "displayName": "run_id",
               "required": false,
+              "defaultMatch": false,
               "display": true,
               "canBeUsedToMatch": true,
-              "type": "string"
+              "type": "string",
+              "removed": false
             },
             {
               "id": "expected_count",
               "displayName": "expected_count",
               "required": false,
+              "defaultMatch": false,
               "display": true,
               "canBeUsedToMatch": true,
-              "type": "string"
+              "type": "string",
+              "removed": false
             },
             {
               "id": "slack_channel",
               "displayName": "slack_channel",
               "required": false,
+              "defaultMatch": false,
               "display": true,
               "canBeUsedToMatch": true,
-              "type": "string"
+              "type": "string",
+              "removed": false
             },
             {
               "id": "slack_thread_ts",
               "displayName": "slack_thread_ts",
               "required": false,
+              "defaultMatch": false,
               "display": true,
               "canBeUsedToMatch": true,
-              "type": "string"
+              "type": "string",
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -206,31 +195,40 @@
         1040,
         304
       ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "test_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "suite",
+              "condition": "eq",
+              "keyValue": "integration"
+            }
+          ]
+        }
+      },
+      "id": "1ce9a6c2-9878-457c-93c5-343ca163735f",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        304
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     }
   ],
   "connections": {
-    "Load Cases": {
-      "main": [
-        [
-          {
-            "node": "Format Cases",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Manual Input": {
-      "main": [
-        [
-          {
-            "node": "Load Cases",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Format Cases": {
       "main": [
         [
@@ -292,6 +290,28 @@
           }
         ]
       ]
+    },
+    "Manual Input": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Format Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -300,8 +320,8 @@
     "timezone": "Europe/London",
     "binaryMode": "separate"
   },
-  "triggerCount": 1,
-  "versionId": "dc02f3ce-b755-44fc-840e-aacd2dfb5277",
+  "triggerCount": 0,
+  "versionId": "33799ec1-4591-402b-ba83-ccc2e6dfce3c",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

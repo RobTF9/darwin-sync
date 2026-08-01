@@ -26,7 +26,7 @@
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const c = $json;\nlet inputs = {}; let assertions = [];\ntry { inputs = JSON.parse(c.inputs || '{}'); } catch (e) { inputs = {}; }\ntry { assertions = JSON.parse(c.assertions || '[]'); } catch (e) { assertions = []; }\nreturn { json: { run_id: c.run_id || '', case_id: c.case_id, target: c.target, description: c.description || '', inputs, assertions } };"
+        "jsCode": "const c = $json;\nlet inputs = {}; let assertions = [];\nif (typeof c.inputs === 'object') { inputs = c.inputs; } else { try { inputs = JSON.parse(c.inputs || '{}'); } catch (e) { inputs = {}; } }\nif (Array.isArray(c.assertions)) { assertions = c.assertions; } else { try { assertions = JSON.parse(c.assertions || '[]'); } catch (e) { assertions = []; } }\nreturn { json: { run_id: c.run_id || '', test_case_id: c.id || c.test_case_id || '', case_id: c.case_id, target: c.target, description: c.description || '', inputs, assertions } };"
       }
     },
     {
@@ -215,192 +215,6 @@
       }
     },
     {
-      "id": "c077ae2b-3dc7-4e1e-9a79-70e90f4a388d",
-      "name": "Save Result",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        660,
-        300
-      ],
-      "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "AYj3ouAaGTX0dThE"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "result_id": "={{ $execution.id + '-' + $json.case_id }}",
-            "run_id": "={{ $json.run_id }}",
-            "case_id": "={{ $json.case_id }}",
-            "target": "={{ $json.target }}",
-            "status": "={{ $json.status }}",
-            "actual_output": "={{ $json.actual_output }}",
-            "assertion_detail": "={{ $json.assertion_detail }}",
-            "run_date": "={{ $now.toISO() }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "result_id",
-              "displayName": "result_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "run_id",
-              "displayName": "run_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "target",
-              "displayName": "target",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "actual_output",
-              "displayName": "actual_output",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "assertion_detail",
-              "displayName": "assertion_detail",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "run_date",
-              "displayName": "run_date",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "579d9fd1-2d9f-4f96-b0cc-49ab3d0426d9",
-      "name": "Update Case",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        880,
-        300
-      ],
-      "parameters": {
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "njlfan4ReESe4VAZ"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "case_id",
-              "keyValue": "={{ $('Evaluate Assertions').first().json.case_id }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "last_status": "={{ $('Evaluate Assertions').first().json.status }}",
-            "last_run_at": "={{ $now.toISO() }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_status",
-              "displayName": "last_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_run_at",
-              "displayName": "last_run_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "edc1c61a-66a4-4802-a96b-13d17e183467",
       "name": "Done",
       "type": "n8n-nodes-base.code",
@@ -412,6 +226,68 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "const r = $('Evaluate Assertions').first().json;\nreturn [{ json: { case_id: r.case_id, target: r.target, status: r.status, assertion_detail: r.assertion_detail } }];"
+      }
+    },
+    {
+      "id": "dfd9dbcb-3f7e-4647-8871-1104837925c1",
+      "name": "Save Result",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "test_results",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "test_case_id",
+              "fieldValue": "={{ $('Parse Case').item.json.test_case_id }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $('Parse Case').item.json.case_id }}"
+            },
+            {
+              "fieldId": "target",
+              "fieldValue": "={{ $('Parse Case').item.json.target }}"
+            },
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $('Evaluate Assertions').first().json.run_id }}"
+            },
+            {
+              "fieldId": "instance",
+              "fieldValue": "={{ $vars.env }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $('Evaluate Assertions').first().json.status }}"
+            },
+            {
+              "fieldId": "output",
+              "fieldValue": "={{ JSON.stringify($('Evaluate Assertions').first().json) }}"
+            },
+            {
+              "fieldId": "assertion_detail",
+              "fieldValue": "={{ $('Evaluate Assertions').first().json.assertion_detail }}"
+            },
+            {
+              "fieldId": "run_date",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
       }
     }
   ],
@@ -474,17 +350,6 @@
         ]
       ]
     },
-    "Evaluate Assertions": {
-      "main": [
-        [
-          {
-            "node": "Save Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Call SanitizeMemory": {
       "main": [
         [
@@ -507,18 +372,18 @@
         ]
       ]
     },
-    "Save Result": {
+    "Evaluate Assertions": {
       "main": [
         [
           {
-            "node": "Update Case",
+            "node": "Save Result",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Update Case": {
+    "Save Result": {
       "main": [
         [
           {
@@ -535,7 +400,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "e1078761-38e3-4e05-ac00-1184a362a519",
+  "versionId": "0889775e-b731-445d-ab2b-2e1c0b115766",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

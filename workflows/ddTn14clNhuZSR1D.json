@@ -40,38 +40,10 @@
         300
       ],
       "parameters": {
-        "amount": 1
+        "amount": 30,
+        "unit": "seconds"
       },
       "webhookId": "a1ce2516-5c31-4985-a083-cf8a627f5b68"
-    },
-    {
-      "id": "84688a6a-d96d-4d30-bda1-55109025bed8",
-      "name": "Check Results",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        440,
-        220
-      ],
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "Ky7fj4ueDOdTHyG9"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "run_id",
-              "keyValue": "={{ $json.run_id }}"
-            }
-          ]
-        },
-        "returnAll": true
-      },
-      "executeOnce": true,
-      "alwaysOutputData": true
     },
     {
       "id": "3a47f269-2b59-4e65-997e-e9fecdbff27d",
@@ -84,7 +56,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const runId = $('Input').first().json.run_id;\nconst expectedCount = parseInt($('Input').first().json.expected_count, 10) || 0;\nconst pollCount = ($runIndex || 0) + 1;\nconst matching = $input.all().map((i) => i.json).filter((r) => String(r.run_id) === String(runId));\nreturn [{ json: { run_id: runId, expected_count: expectedCount, count: matching.length, poll_count: pollCount, complete: matching.length >= expectedCount, timeout: pollCount >= 15, results: matching, slack_channel: $('Input').first().json.slack_channel, slack_thread_ts: $('Input').first().json.slack_thread_ts } }];"
+        "jsCode": "const runId = $('Input').first().json.run_id;\nconst expectedCount = parseInt($('Input').first().json.expected_count, 10) || 0;\nconst pollCount = ($runIndex || 0) + 1;\nconst rows = $input.all().map(i => i.json);\nconst matching = rows.filter(r => String(r.run_id) === String(runId));\nconst count = matching.length;\nconst complete = count >= expectedCount;\nconst timeout = pollCount >= 20;\nreturn [{ json: {\n  run_id: runId,\n  expected_count: expectedCount,\n  count: count,\n  poll_count: pollCount,\n  complete: complete,\n  timeout: timeout,\n  results: matching,\n  slack_channel: $('Input').first().json.slack_channel,\n  slack_thread_ts: $('Input').first().json.slack_thread_ts,\n} }];"
       }
     },
     {
@@ -179,6 +151,39 @@
       },
       "executeOnce": true,
       "webhookId": "db4e8030-5b1b-47e2-b2c8-5097ff37692e"
+    },
+    {
+      "id": "6694ea69-dc67-42db-8816-f858416aab16",
+      "name": "Check Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        220
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "test_results",
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.run_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     }
   ],
   "connections": {
@@ -187,28 +192,6 @@
         [
           {
             "node": "Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait": {
-      "main": [
-        [
-          {
-            "node": "Check Results",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Results": {
-      "main": [
-        [
-          {
-            "node": "Count Results",
             "type": "main",
             "index": 0
           }
@@ -254,6 +237,28 @@
           }
         ]
       ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Results": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -261,7 +266,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "b9f7fba6-3f20-4782-90ad-0caf95c081b2",
+  "versionId": "4c3fb2b2-7985-43f7-8d2c-98f17ee7a675",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

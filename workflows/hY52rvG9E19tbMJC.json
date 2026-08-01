@@ -3,25 +3,6 @@
   "name": "UnitRun",
   "nodes": [
     {
-      "id": "31a9b34f-e9a8-41d1-8c7a-f6c22abb59d8",
-      "name": "Load Cases",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        -360,
-        300
-      ],
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "njlfan4ReESe4VAZ"
-        },
-        "returnAll": true
-      }
-    },
-    {
       "id": "9ac7dfcd-9e97-4fdd-979a-de9f0cca0da3",
       "name": "Manual Input",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
@@ -250,31 +231,42 @@
         "mode": "runOnceForAllItems",
         "jsCode": "const s = $('Summarize').first().json;\nreturn [{ json: s }];"
       }
+    },
+    {
+      "id": "0a4a5a1e-37ff-48bf-b31f-8846015b62eb",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "test_cases",
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "suite",
+              "condition": "eq",
+              "keyValue": "unit"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     }
   ],
   "connections": {
-    "Load Cases": {
-      "main": [
-        [
-          {
-            "node": "Format Cases",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Manual Input": {
-      "main": [
-        [
-          {
-            "node": "Load Cases",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Format Cases": {
       "main": [
         [
@@ -325,6 +317,28 @@
           }
         ]
       ]
+    },
+    "Manual Input": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Format Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -332,8 +346,8 @@
     "availableInMCP": true,
     "timezone": "Europe/London"
   },
-  "triggerCount": 1,
-  "versionId": "0b55c7a2-5743-4289-9fbd-e1a7294b98ab",
+  "triggerCount": 0,
+  "versionId": "d4684cf1-3d00-4173-a4f4-de4331b75be1",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

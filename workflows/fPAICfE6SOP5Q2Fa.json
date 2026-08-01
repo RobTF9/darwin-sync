@@ -37,36 +37,56 @@
             {
               "id": "chatInput",
               "displayName": "chatInput",
-              "type": "string",
               "required": false,
+              "defaultMatch": false,
               "display": true,
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
             },
             {
               "id": "sessionId",
               "displayName": "sessionId",
-              "type": "string",
               "required": false,
+              "defaultMatch": false,
               "display": true,
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
             },
             {
               "id": "channel",
               "displayName": "channel",
-              "type": "string",
               "required": false,
+              "defaultMatch": false,
               "display": true,
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "baseline",
+              "displayName": "baseline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
             },
             {
               "id": "env",
               "displayName": "env",
-              "type": "string",
               "required": false,
+              "defaultMatch": false,
               "display": true,
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
             }
-          ]
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
         },
         "options": {
           "waitForSubWorkflow": true
@@ -191,288 +211,61 @@
     },
     {
       "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "value": "bVLPI1lsi9GsAaQc",
-          "mode": "list",
-          "cachedResultName": "Darwin Eval Results",
-          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/bVLPI1lsi9GsAaQc"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "case_id": "={{ $json.case_id }}",
-            "tools_called": "={{ $json.tools_called }}",
-            "citation_validity": "={{ $json.citation_validity }}",
-            "completeness": "={{ $json.completeness }}",
-            "faithfulness": "={{ $json.faithfulness }}",
-            "format": "={{ $json.format }}",
-            "relevance": "={{ $json.relevance }}",
-            "response": "={{ $json.response }}",
-            "result_id": "={{ $json.result_id }}",
-            "run_date": "={{ $json.run_date }}",
-            "run_id": "={{ $json.run_id }}",
-            "source_routing": "={{ $json.source_routing }}",
-            "verdict": "={{ $json.verdict }}"
-          },
-          "matchingColumns": [],
-          "schema": [
+        "tableId": "test_results",
+        "fieldsUi": {
+          "fieldValues": [
             {
-              "id": "input",
-              "displayName": "input",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "test_case_id",
+              "fieldValue": "={{ $('Case Input').item.json.test_case_id }}"
             },
             {
-              "id": "last_response",
-              "displayName": "last_response",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
             },
             {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "target"
             },
             {
-              "id": "source_thread",
-              "displayName": "source_thread",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
             },
             {
-              "id": "tools_called",
-              "displayName": "tools_called",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "instance",
+              "fieldValue": "={{ $vars.env }}"
             },
             {
-              "id": "prohibited_tools",
-              "displayName": "prohibited_tools",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "status",
+              "fieldValue": "={{ $json.verdict }}"
             },
             {
-              "id": "expected_tools",
-              "displayName": "expected_tools",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "output",
+              "fieldValue": "={{ JSON.stringify($json) }}"
             },
             {
-              "id": "expected_response",
-              "displayName": "expected_response",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "score",
+              "fieldValue": "={{ JSON.stringify({ faithfulness: $json.faithfulness, citation_validity: $json.citation_validity, source_routing: $json.source_routing, completeness: $json.completeness, relevance: $json.relevance, format: $json.format, verdict: $json.verdict }) }}"
             },
             {
-              "id": "context_messages",
-              "displayName": "context_messages",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
+              "fieldId": "run_date",
+              "fieldValue": "={{ $json.run_date }}"
             }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
+          ]
+        }
       },
-      "id": "ea886e24-c4ca-4d28-aba1-75d4f67af446",
+      "id": "5d9a3acf-422e-410f-a32d-47bea90ce396",
       "name": "Save Result",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
       "position": [
         1440,
         112
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "value": "G3P55vPsJtpt1pk5",
-          "mode": "list",
-          "cachedResultName": "Darwin Evals",
-          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/G3P55vPsJtpt1pk5"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "case_id",
-              "keyValue": "={{ $('Map to Data Table').item.json.case_id }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "last_response": "={{ $('Map to Data Table').item.json.response }}",
-            "tools_called": "={{ $('Map to Data Table').item.json.tools_called }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "input",
-              "displayName": "input",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "last_response",
-              "displayName": "last_response",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "source_thread",
-              "displayName": "source_thread",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "tools_called",
-              "displayName": "tools_called",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "prohibited_tools",
-              "displayName": "prohibited_tools",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "expected_tools",
-              "displayName": "expected_tools",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "expected_response",
-              "displayName": "expected_response",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "context_messages",
-              "displayName": "context_messages",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "id": "f9e04333-c3ad-4084-b4bc-2076a950d662",
-      "name": "Update Case",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        1648,
-        112
-      ]
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     }
   ],
   "connections": {
@@ -563,17 +356,6 @@
           }
         ]
       ]
-    },
-    "Save Result": {
-      "main": [
-        [
-          {
-            "node": "Update Case",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "settings": {
@@ -582,7 +364,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "332a1fbe-041d-4600-9479-8d7966629024",
+  "versionId": "c1b72d57-c0a5-4178-8f7a-bf413b320b7f",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

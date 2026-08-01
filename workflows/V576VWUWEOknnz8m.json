@@ -3,6 +3,7 @@
   "name": "ErrorRun",
   "nodes": [
     {
+      "parameters": {},
       "id": "91597843-0ac1-4c56-a62f-2237a4e226a0",
       "name": "Run Chaos Tests",
       "type": "n8n-nodes-base.manualTrigger",
@@ -10,10 +11,12 @@
       "position": [
         0,
         0
-      ],
-      "parameters": {}
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const now = new Date();\nreturn [{ json: { runStartedAt: now.toISOString(), testChannelName: 'darwin-testing' } }];"
+      },
       "id": "34aa946e-2bfc-4560-818c-033db428eba0",
       "name": "Init Run Context",
       "type": "n8n-nodes-base.code",
@@ -21,13 +24,17 @@
       "position": [
         224,
         96
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const now = new Date();\nreturn [{ json: { runStartedAt: now.toISOString(), testChannelName: 'darwin-testing' } }];"
-      }
+      ]
     },
     {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chaos-error-run",
+        "options": {
+          "noResponseBody": true,
+          "onlyRunIf": "={{ $json.body && $json.body.token === 'darwin-chaos' }}"
+        }
+      },
       "id": "677df541-30c8-4a78-9c49-f8f009cb3635",
       "name": "Chaos Run Webhook",
       "type": "n8n-nodes-base.webhook",
@@ -36,26 +43,9 @@
         0,
         192
       ],
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "chaos-error-run",
-        "responseMode": "onReceived",
-        "options": {
-          "noResponseBody": true,
-          "onlyRunIf": "={{ $json.body && $json.body.token === 'darwin-chaos' }}"
-        }
-      },
       "webhookId": "a9b66bd7-ae22-4571-b8f8-ee90e55b9c39"
     },
     {
-      "id": "6d360404-d685-4c0d-a28f-6a98ed690c8b",
-      "name": "List Channels",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.5,
-      "position": [
-        448,
-        96
-      ],
       "parameters": {
         "resource": "channel",
         "operation": "getAll",
@@ -64,16 +54,27 @@
           "excludeArchived": true
         }
       },
+      "id": "6d360404-d685-4c0d-a28f-6a98ed690c8b",
+      "name": "List Channels",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        448,
+        96
+      ],
+      "executeOnce": true,
+      "webhookId": "cc0aaac2-fc7c-47e8-9356-dfc18aea45be",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
-      },
-      "executeOnce": true,
-      "webhookId": "cc0aaac2-fc7c-47e8-9356-dfc18aea45be"
+      }
     },
     {
+      "parameters": {
+        "jsCode": "const channels = $input.all().map(i => i.json);\nconst found = channels.find(c => c.name === 'darwin-triage');\nreturn [{ json: { channelId: found ? found.id : null } }];"
+      },
       "id": "a14c0ce1-a09d-4fcb-855b-f3137ad7fabc",
       "name": "Find Test Channel",
       "type": "n8n-nodes-base.code",
@@ -81,27 +82,16 @@
       "position": [
         672,
         96
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const channels = $input.all().map(i => i.json);\nconst found = channels.find(c => c.name === 'darwin-testing');\nreturn [{ json: { channelId: found ? found.id : null } }];"
-      }
+      ]
     },
     {
-      "id": "ce65a51a-a9fb-4cef-8477-dc80ddc062d2",
-      "name": "Channel Exists?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        896,
-        96
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "loose",
+            "version": 1
           },
           "conditions": [
             {
@@ -113,10 +103,31 @@
             }
           ],
           "combinator": "and"
-        }
-      }
+        },
+        "options": {}
+      },
+      "id": "ce65a51a-a9fb-4cef-8477-dc80ddc062d2",
+      "name": "Channel Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        96
+      ]
     },
     {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.channelId }}"
+        },
+        "text": "=🧪 Chaos harness run {{ $('Init Run Context').item.json.runStartedAt }} — automated error-handler checks, please ignore.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
       "id": "b68b463a-98fb-49f0-aef8-643d32027c1f",
       "name": "Post Parent Message",
       "type": "n8n-nodes-base.slack",
@@ -125,31 +136,20 @@
         1568,
         96
       ],
-      "parameters": {
-        "resource": "message",
-        "operation": "post",
-        "select": "channel",
-        "channelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $json.channelId }}"
-        },
-        "messageType": "text",
-        "text": "=🧪 Chaos harness run {{ $('Init Run Context').item.json.runStartedAt }} — automated error-handler checks, please ignore.",
-        "otherOptions": {
-          "includeLinkToWorkflow": false
-        }
-      },
+      "executeOnce": true,
+      "webhookId": "dad2f4fd-e785-438d-8fa1-ea294693c09f",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
-      },
-      "executeOnce": true,
-      "webhookId": "dad2f4fd-e785-438d-8fa1-ea294693c09f"
+      }
     },
     {
+      "parameters": {
+        "resource": "channel",
+        "channelId": "darwin-testing"
+      },
       "id": "a69676e1-7bc2-45e2-bb35-bcc562e175ef",
       "name": "Create Test Channel",
       "type": "n8n-nodes-base.slack",
@@ -158,31 +158,16 @@
         1120,
         176
       ],
-      "parameters": {
-        "resource": "channel",
-        "operation": "create",
-        "channelId": "darwin-testing",
-        "channelVisibility": "public"
-      },
+      "webhookId": "b1e2eba9-3395-4cf3-addd-5e54bd6210ea",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
-      },
-      "webhookId": "b1e2eba9-3395-4cf3-addd-5e54bd6210ea"
+      }
     },
     {
-      "id": "6fccc60e-8444-4ffa-8e26-cfc109e8550c",
-      "name": "Use New Channel",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1344,
-        176
-      ],
       "parameters": {
-        "mode": "manual",
         "assignments": {
           "assignments": [
             {
@@ -194,27 +179,24 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "6fccc60e-8444-4ffa-8e26-cfc109e8550c",
+      "name": "Use New Channel",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        176
+      ]
     },
     {
-      "id": "2e0fe35a-93d1-4587-a649-1e47be9352b5",
-      "name": "Post Target Message",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.5,
-      "position": [
-        1792,
-        96
-      ],
       "parameters": {
-        "resource": "message",
-        "operation": "post",
         "select": "channel",
         "channelId": {
           "__rl": true,
           "mode": "id",
           "value": "={{ $('Post Parent Message').item.json.channel }}"
         },
-        "messageType": "text",
         "text": "🧪 Chaos target — Slack Error should swap :loading: for :x: on this message; both handlers reply in this thread.",
         "otherOptions": {
           "includeLinkToWorkflow": false,
@@ -225,26 +207,25 @@
           }
         }
       },
+      "id": "2e0fe35a-93d1-4587-a649-1e47be9352b5",
+      "name": "Post Target Message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1792,
+        96
+      ],
+      "webhookId": "6fb3a765-0480-42a8-890c-3edea6ce48e6",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
-      },
-      "webhookId": "6fb3a765-0480-42a8-890c-3edea6ce48e6"
+      }
     },
     {
-      "id": "0e129c00-90ef-4869-a614-18a835b6616b",
-      "name": "Add Loading Reaction",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.5,
-      "position": [
-        2016,
-        96
-      ],
       "parameters": {
         "resource": "reaction",
-        "operation": "add",
         "channelId": {
           "__rl": true,
           "mode": "id",
@@ -253,23 +234,23 @@
         "timestamp": "={{ $('Post Target Message').item.json.message.ts }}",
         "name": "loading"
       },
+      "id": "0e129c00-90ef-4869-a614-18a835b6616b",
+      "name": "Add Loading Reaction",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        2016,
+        96
+      ],
+      "webhookId": "e3770072-e1c2-4abd-8f0c-793db522bb30",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
-      },
-      "webhookId": "e3770072-e1c2-4abd-8f0c-793db522bb30"
+      }
     },
     {
-      "id": "2b438df3-15ea-468e-80dd-51e55dc9d196",
-      "name": "Trigger Slack Harness",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        2240,
-        96
-      ],
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -324,17 +305,17 @@
           "waitForSubWorkflow": false
         }
       },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "13871d8e-f356-47cc-81dd-57d88d5e51e7",
-      "name": "Trigger Global Harness",
+      "id": "2b438df3-15ea-468e-80dd-51e55dc9d196",
+      "name": "Trigger Slack Harness",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        2464,
+        2240,
         96
       ],
+      "onError": "continueRegularOutput"
+    },
+    {
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -378,9 +359,20 @@
           "waitForSubWorkflow": false
         }
       },
+      "id": "13871d8e-f356-47cc-81dd-57d88d5e51e7",
+      "name": "Trigger Global Harness",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2464,
+        96
+      ],
       "onError": "continueRegularOutput"
     },
     {
+      "parameters": {
+        "amount": 20
+      },
       "id": "dc060874-e351-4316-a300-4eac23b371b7",
       "name": "Wait For Handlers",
       "type": "n8n-nodes-base.wait",
@@ -389,25 +381,11 @@
         2688,
         96
       ],
-      "parameters": {
-        "resume": "timeInterval",
-        "amount": 20,
-        "unit": "seconds"
-      },
       "webhookId": "e8004055-dca3-4b9e-af4d-fca7b7590cb9"
     },
     {
-      "id": "13568446-c80a-4841-8415-9c5a148a37d4",
-      "name": "Slack Error Executions",
-      "type": "n8n-nodes-base.n8n",
-      "typeVersion": 1,
-      "position": [
-        2912,
-        96
-      ],
       "parameters": {
         "resource": "execution",
-        "operation": "getAll",
         "limit": 10,
         "filters": {
           "workflowId": {
@@ -416,8 +394,18 @@
             "value": "MLxaOYbzMS9DFoIv",
             "cachedResultName": "Slack Error"
           }
-        }
+        },
+        "options": {},
+        "requestOptions": {}
       },
+      "id": "13568446-c80a-4841-8415-9c5a148a37d4",
+      "name": "Slack Error Executions",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        2912,
+        96
+      ],
       "credentials": {
         "n8nApi": {
           "id": "3v9sCEKD7Zp28oE8",
@@ -426,17 +414,8 @@
       }
     },
     {
-      "id": "2c7acc21-0d76-4896-a492-55495ceb42dd",
-      "name": "Global Error Executions",
-      "type": "n8n-nodes-base.n8n",
-      "typeVersion": 1,
-      "position": [
-        3136,
-        96
-      ],
       "parameters": {
         "resource": "execution",
-        "operation": "getAll",
         "limit": 10,
         "filters": {
           "workflowId": {
@@ -445,25 +424,27 @@
             "value": "iDcm070UekOYt0f1",
             "cachedResultName": "Error"
           }
-        }
+        },
+        "options": {},
+        "requestOptions": {}
       },
+      "id": "2c7acc21-0d76-4896-a492-55495ceb42dd",
+      "name": "Global Error Executions",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        3136,
+        96
+      ],
+      "executeOnce": true,
       "credentials": {
         "n8nApi": {
           "id": "3v9sCEKD7Zp28oE8",
           "name": "n8n account"
         }
-      },
-      "executeOnce": true
+      }
     },
     {
-      "id": "d18eeecc-e400-4e39-9f57-dae8951cd813",
-      "name": "Read Thread Replies",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.5,
-      "position": [
-        3360,
-        96
-      ],
       "parameters": {
         "resource": "channel",
         "operation": "replies",
@@ -473,26 +454,26 @@
           "value": "={{ $('Post Parent Message').first().json.channel }}"
         },
         "ts": "={{ $('Post Parent Message').first().json.message.ts }}",
-        "limit": 50
+        "filters": {}
       },
+      "id": "d18eeecc-e400-4e39-9f57-dae8951cd813",
+      "name": "Read Thread Replies",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        3360,
+        96
+      ],
+      "executeOnce": true,
+      "webhookId": "1847c358-0687-4cc9-88f2-e6682ab40b96",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
-      },
-      "executeOnce": true,
-      "webhookId": "1847c358-0687-4cc9-88f2-e6682ab40b96"
+      }
     },
     {
-      "id": "f669291e-6486-4bae-a1c3-59edec485652",
-      "name": "Read Target Reactions",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.5,
-      "position": [
-        3584,
-        96
-      ],
       "parameters": {
         "resource": "reaction",
         "operation": "get",
@@ -503,17 +484,28 @@
         },
         "timestamp": "={{ $('Post Target Message').first().json.message.ts }}"
       },
+      "id": "f669291e-6486-4bae-a1c3-59edec485652",
+      "name": "Read Target Reactions",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        3584,
+        96
+      ],
+      "executeOnce": true,
+      "webhookId": "81355893-bbf9-4003-ab2e-54a26a7a3102",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
       },
-      "executeOnce": true,
-      "onError": "continueRegularOutput",
-      "webhookId": "81355893-bbf9-4003-ab2e-54a26a7a3102"
+      "onError": "continueRegularOutput"
     },
     {
+      "parameters": {
+        "jsCode": "const runStart = Date.parse($('Init Run Context').first().json.runStartedAt) - 15000;\nconst slackExecs = $('Slack Error Executions').all().map(i => i.json);\nconst globalExecs = $('Global Error Executions').all().map(i => i.json);\nconst replies = $('Read Thread Replies').all().map(i => i.json.text || '').join(' || ');\nconst reactionsJson = $('Read Target Reactions').first().json;\nconst reactions = ((reactionsJson.message && reactionsJson.message.reactions) || []).map(r => r.name);\nconst ran = (list) => list.some(e => e.startedAt && Date.parse(e.startedAt) >= runStart);\nconst checks = [\n  { name: 'slack_error_handler_ran', pass: ran(slackExecs) },\n  { name: 'global_error_handler_ran', pass: ran(globalExecs) },\n  { name: 'slack_error_reply_posted', pass: replies.indexOf('Sorry — this execution failed') !== -1 },\n  { name: 'global_error_reply_posted', pass: replies.indexOf('Execution failed:') !== -1 },\n  { name: 'x_reaction_added', pass: reactions.indexOf('x') !== -1 },\n  { name: 'loading_reaction_removed', pass: reactions.indexOf('loading') === -1 }\n];\nconst passed = checks.filter(c => c.pass).length;\nconst lines = checks.map(c => (c.pass ? '✅' : '❌') + ' ' + c.name);\nconst postText = '🧪 Chaos harness results: ' + passed + '/' + checks.length + ' passed' + String.fromCharCode(10) + lines.join(String.fromCharCode(10));\nreturn [{ json: { passed, failed: checks.length - passed, total: checks.length, ok: passed === checks.length, checks, summary: lines.join(' | '), postText } }];"
+      },
       "id": "ab93be2d-eee9-4a45-b3ca-c7b7c838b9cc",
       "name": "Evaluate Results",
       "type": "n8n-nodes-base.code",
@@ -521,31 +513,16 @@
       "position": [
         3808,
         96
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const runStart = Date.parse($('Init Run Context').first().json.runStartedAt) - 15000;\nconst slackExecs = $('Slack Error Executions').all().map(i => i.json);\nconst globalExecs = $('Global Error Executions').all().map(i => i.json);\nconst replies = $('Read Thread Replies').all().map(i => i.json.text || '').join(' || ');\nconst reactionsJson = $('Read Target Reactions').first().json;\nconst reactions = ((reactionsJson.message && reactionsJson.message.reactions) || []).map(r => r.name);\nconst ran = (list) => list.some(e => e.startedAt && Date.parse(e.startedAt) >= runStart);\nconst checks = [\n  { name: 'slack_error_handler_ran', pass: ran(slackExecs) },\n  { name: 'global_error_handler_ran', pass: ran(globalExecs) },\n  { name: 'slack_error_reply_posted', pass: replies.indexOf('Sorry — this execution failed') !== -1 },\n  { name: 'global_error_reply_posted', pass: replies.indexOf('Execution failed:') !== -1 },\n  { name: 'x_reaction_added', pass: reactions.indexOf('x') !== -1 },\n  { name: 'loading_reaction_removed', pass: reactions.indexOf('loading') === -1 }\n];\nconst passed = checks.filter(c => c.pass).length;\nconst lines = checks.map(c => (c.pass ? '✅' : '❌') + ' ' + c.name);\nconst postText = '🧪 Chaos harness results: ' + passed + '/' + checks.length + ' passed' + String.fromCharCode(10) + lines.join(String.fromCharCode(10));\nreturn [{ json: { passed, failed: checks.length - passed, total: checks.length, ok: passed === checks.length, checks, summary: lines.join(' | '), postText } }];"
-      }
+      ]
     },
     {
-      "id": "a173e10e-45ff-4044-9c42-9f64e6a6b281",
-      "name": "Post Summary",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.5,
-      "position": [
-        4032,
-        96
-      ],
       "parameters": {
-        "resource": "message",
-        "operation": "post",
         "select": "channel",
         "channelId": {
           "__rl": true,
           "mode": "id",
           "value": "={{ $('Post Parent Message').first().json.channel }}"
         },
-        "messageType": "text",
         "text": "={{ $json.postText }}",
         "otherOptions": {
           "includeLinkToWorkflow": false,
@@ -556,24 +533,24 @@
           }
         }
       },
+      "id": "a173e10e-45ff-4044-9c42-9f64e6a6b281",
+      "name": "Post Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        4032,
+        96
+      ],
+      "executeOnce": true,
+      "webhookId": "9c2f98ad-364d-415d-aae8-78f2e7be4033",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
-      },
-      "executeOnce": true,
-      "webhookId": "9c2f98ad-364d-415d-aae8-78f2e7be4033"
+      }
     },
     {
-      "id": "78cbabf2-8ddc-4557-81ba-5fe19e4e984e",
-      "name": "Sub-workflow Input",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        96
-      ],
       "parameters": {
         "workflowInputs": {
           "values": [
@@ -582,9 +559,20 @@
             }
           ]
         }
-      }
+      },
+      "id": "78cbabf2-8ddc-4557-81ba-5fe19e4e984e",
+      "name": "Sub-workflow Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        96
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const r = $('Evaluate Results').first().json;\nreturn [{ json: { chaos_passed: r.passed, chaos_failed: r.failed, chaos_total: r.total, chaos_ok: r.ok, chaos_checks: r.checks, chaos_summary: r.summary, chaos_postText: r.postText } }];"
+      },
       "id": "c94c50dd-13b0-402f-88bb-4e54c451f84b",
       "name": "Return Results",
       "type": "n8n-nodes-base.code",
@@ -592,11 +580,7 @@
       "position": [
         4256,
         96
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const r = $('Evaluate Results').first().json;\nreturn [{ json: { chaos_passed: r.passed, chaos_failed: r.failed, chaos_total: r.total, chaos_ok: r.ok, chaos_checks: r.checks, chaos_summary: r.summary, chaos_postText: r.postText } }];"
-      }
+      ]
     }
   ],
   "connections": {
@@ -841,10 +825,11 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "20db7263-b058-4ddb-be1c-c9b21268381a",
+  "versionId": "b6b9dcb9-e56b-40b9-829a-995f2fa0400f",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

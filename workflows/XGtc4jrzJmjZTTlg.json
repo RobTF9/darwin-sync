@@ -3,6 +3,15 @@
   "name": "ResultsDigest",
   "nodes": [
     {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
       "id": "c633b21d-6ff9-44d5-8409-c30d8e0fefd6",
       "name": "Daily 06:00",
       "type": "n8n-nodes-base.scheduleTrigger",
@@ -10,29 +19,9 @@
       "position": [
         0,
         80
-      ],
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "days",
-              "triggerAtHour": 6,
-              "triggerAtMinute": 0
-            }
-          ],
-          "timezone": "Europe/London"
-        }
-      }
+      ]
     },
     {
-      "id": "67408f09-4e88-465b-a158-dd0c5722910b",
-      "name": "Run Unit Suite",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        224,
-        80
-      ],
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -72,17 +61,17 @@
         "options": {
           "waitForSubWorkflow": true
         }
-      }
-    },
-    {
-      "id": "3ddd393c-28d5-4359-94d5-537b1b6ab72e",
-      "name": "Run Eval Suite",
+      },
+      "id": "67408f09-4e88-465b-a158-dd0c5722910b",
+      "name": "Run Unit Suite",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        448,
+        224,
         80
-      ],
+      ]
+    },
+    {
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -122,9 +111,21 @@
         "options": {
           "waitForSubWorkflow": true
         }
-      }
+      },
+      "id": "3ddd393c-28d5-4359-94d5-537b1b6ab72e",
+      "name": "Run Eval Suite",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        80
+      ],
+      "alwaysOutputData": false
     },
     {
+      "parameters": {
+        "amount": 30
+      },
       "id": "ffa47dd7-8b1c-41ed-a37a-38936a61cd42",
       "name": "Wait Eval 30s",
       "type": "n8n-nodes-base.wait",
@@ -133,42 +134,12 @@
         672,
         80
       ],
-      "parameters": {
-        "amount": 30,
-        "unit": "seconds"
-      },
       "webhookId": "756ca087-df63-4ea5-9ca0-9d309aa32214"
     },
     {
-      "id": "05e5005b-b45d-4265-8604-bea2705d80a1",
-      "name": "Poll Eval Results",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        896,
-        0
-      ],
       "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "bVLPI1lsi9GsAaQc"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "run_id",
-              "keyValue": "={{ $(\"Run Eval Suite\").first().json.run_id }}"
-            }
-          ]
-        },
-        "returnAll": true
+        "jsCode": "var evalRunId = String($(\"Run Eval Suite\").first().json.run_id || \"\");\nvar evalExpected = parseInt($(\"Run Eval Suite\").first().json.case_count, 10) || 0;\nvar pollCount = ($runIndex || 0) + 1;\nvar evalRows = $(\"Poll Eval Results\").all().map(function(i) { return i.json; });\nvar evalMatching = evalRows.filter(function(r) { return String(r.run_id) === evalRunId; });\nvar evalCount = evalMatching.length;\nvar evalComplete = evalCount >= evalExpected;\nvar timeout = pollCount >= 20;\nreturn [{ json: { eval_run_id: evalRunId, eval_expected: evalExpected, eval_count: evalCount, eval_complete: evalComplete, all_complete: evalComplete, timeout: timeout, timed_out: timeout && !evalComplete } }];"
       },
-      "executeOnce": true,
-      "alwaysOutputData": true
-    },
-    {
       "id": "df3ab93c-7956-4fb4-8a2a-5eb8606b05ad",
       "name": "Check Eval Complete",
       "type": "n8n-nodes-base.code",
@@ -176,27 +147,16 @@
       "position": [
         1120,
         0
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "var evalRunId = String($(\"Run Eval Suite\").first().json.run_id || \"\");\nvar evalExpected = parseInt($(\"Run Eval Suite\").first().json.case_count, 10) || 0;\nvar pollCount = ($runIndex || 0) + 1;\nvar evalRows = $(\"Poll Eval Results\").all().map(function(i) { return i.json; });\nvar evalMatching = evalRows.filter(function(r) { return String(r.run_id) === evalRunId; });\nvar evalCount = evalMatching.length;\nvar evalComplete = evalCount >= evalExpected;\nvar timeout = pollCount >= 20;\nreturn [{ json: { eval_run_id: evalRunId, eval_expected: evalExpected, eval_count: evalCount, eval_complete: evalComplete, all_complete: evalComplete, timeout: timeout, timed_out: timeout && !evalComplete } }];"
-      }
+      ]
     },
     {
-      "id": "d8b390d3-3e8d-4a20-8b42-4ba389781d5a",
-      "name": "Eval Done?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        1344,
-        80
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "loose",
+            "version": 1
           },
           "combinator": "or",
           "conditions": [
@@ -219,18 +179,19 @@
               "rightValue": true
             }
           ]
-        }
-      }
+        },
+        "options": {}
+      },
+      "id": "d8b390d3-3e8d-4a20-8b42-4ba389781d5a",
+      "name": "Eval Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        80
+      ]
     },
     {
-      "id": "8b6e80d2-7316-4de1-8be7-5d46d7a1a997",
-      "name": "Run Integration Suite",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        1568,
-        80
-      ],
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -270,9 +231,20 @@
         "options": {
           "waitForSubWorkflow": true
         }
-      }
+      },
+      "id": "8b6e80d2-7316-4de1-8be7-5d46d7a1a997",
+      "name": "Run Integration Suite",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        80
+      ]
     },
     {
+      "parameters": {
+        "amount": 30
+      },
       "id": "97c27012-2e53-4d7d-aba7-cdb25c0bdb61",
       "name": "Wait Integ 30s",
       "type": "n8n-nodes-base.wait",
@@ -281,42 +253,12 @@
         1792,
         80
       ],
-      "parameters": {
-        "amount": 30,
-        "unit": "seconds"
-      },
       "webhookId": "03d05b3a-1f58-43c3-b235-6df7e470c6c8"
     },
     {
-      "id": "64e853fb-f3d2-473d-a6ff-836f84cf6aac",
-      "name": "Poll Integration Results",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        2016,
-        0
-      ],
       "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "Ky7fj4ueDOdTHyG9"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "run_id",
-              "keyValue": "={{ $(\"Run Integration Suite\").first().json.run_id }}"
-            }
-          ]
-        },
-        "returnAll": true
+        "jsCode": "var integRunId = String($(\"Run Integration Suite\").first().json.run_id || \"\");\nvar integExpected = parseInt($(\"Run Integration Suite\").first().json.case_count, 10) || 0;\nvar pollCount = ($runIndex || 0) + 1;\nvar integRows = $(\"Poll Integration Results\").all().map(function(i) { return i.json; });\nvar integMatching = integRows.filter(function(r) { return String(r.run_id) === integRunId; });\nvar integCount = integMatching.length;\nvar integComplete = integCount >= integExpected;\nvar timeout = pollCount >= 20;\nreturn [{ json: { integ_run_id: integRunId, integ_expected: integExpected, integ_count: integCount, integ_complete: integComplete, all_complete: integComplete, timeout: timeout, timed_out: timeout && !integComplete } }];"
       },
-      "executeOnce": true,
-      "alwaysOutputData": true
-    },
-    {
       "id": "46ea0bac-e80a-456c-94bc-041afa764006",
       "name": "Check Integ Complete",
       "type": "n8n-nodes-base.code",
@@ -324,27 +266,16 @@
       "position": [
         2240,
         0
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "var integRunId = String($(\"Run Integration Suite\").first().json.run_id || \"\");\nvar integExpected = parseInt($(\"Run Integration Suite\").first().json.case_count, 10) || 0;\nvar pollCount = ($runIndex || 0) + 1;\nvar integRows = $(\"Poll Integration Results\").all().map(function(i) { return i.json; });\nvar integMatching = integRows.filter(function(r) { return String(r.run_id) === integRunId; });\nvar integCount = integMatching.length;\nvar integComplete = integCount >= integExpected;\nvar timeout = pollCount >= 20;\nreturn [{ json: { integ_run_id: integRunId, integ_expected: integExpected, integ_count: integCount, integ_complete: integComplete, all_complete: integComplete, timeout: timeout, timed_out: timeout && !integComplete } }];"
-      }
+      ]
     },
     {
-      "id": "2ae4ace5-349b-42b0-be0c-a46d3c1048f0",
-      "name": "Integ Done?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        2464,
-        80
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "loose",
+            "version": 1
           },
           "combinator": "or",
           "conditions": [
@@ -367,18 +298,19 @@
               "rightValue": true
             }
           ]
-        }
-      }
+        },
+        "options": {}
+      },
+      "id": "2ae4ace5-349b-42b0-be0c-a46d3c1048f0",
+      "name": "Integ Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2464,
+        80
+      ]
     },
     {
-      "id": "02554217-8713-46dc-8100-90a4e309acee",
-      "name": "Run Chaos Tests",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        2688,
-        80
-      ],
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -408,93 +340,21 @@
         "options": {
           "waitForSubWorkflow": true
         }
-      }
-    },
-    {
-      "id": "fa7f6128-6a6e-46e4-9824-1f126e26b0ef",
-      "name": "Fetch Unit Results",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        2912,
-        80
-      ],
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "AYj3ouAaGTX0dThE"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "run_id",
-              "keyValue": "={{ $(\"Run Unit Suite\").first().json.run_id }}"
-            }
-          ]
-        },
-        "returnAll": true
       },
-      "executeOnce": true
-    },
-    {
-      "id": "d6a57203-b0a1-4790-9574-ff6981c7c61c",
-      "name": "Fetch Integration Results",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
+      "id": "02554217-8713-46dc-8100-90a4e309acee",
+      "name": "Run Chaos Tests",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
       "position": [
-        3136,
+        2688,
         80
-      ],
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "Ky7fj4ueDOdTHyG9"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "run_id",
-              "keyValue": "={{ $(\"Run Integration Suite\").first().json.run_id }}"
-            }
-          ]
-        },
-        "returnAll": true
-      },
-      "executeOnce": true
+      ]
     },
     {
-      "id": "b0f1f763-a916-48f2-8364-e40a3613d062",
-      "name": "Fetch Eval Results",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        3360,
-        80
-      ],
       "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "bVLPI1lsi9GsAaQc"
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "run_id",
-              "keyValue": "={{ $(\"Run Eval Suite\").first().json.run_id }}"
-            }
-          ]
-        },
-        "returnAll": true
+        "jsCode": "var unitRows = $(\"Fetch Unit Results\").all().map(function(i) { return i.json; });\nvar unitPass = unitRows.filter(function(r) { return r.status === \"pass\"; }).length;\nvar unitFail = unitRows.filter(function(r) { return r.status !== \"pass\"; });\nvar integRows = $(\"Fetch Integration Results\").all().map(function(i) { return i.json; });\nvar integPass = integRows.filter(function(r) { return r.status === \"pass\"; }).length;\nvar integFail = integRows.filter(function(r) { return r.status !== \"pass\"; });\nvar evalRows = $(\"Fetch Eval Results\").all().map(function(i) { return i.json; });\nvar evalPass = evalRows.filter(function(r) { return r.status === \"pass\"; }).length;\nvar evalBorderline = evalRows.filter(function(r) { return r.status === \"borderline\"; }).length;\nvar evalFail = evalRows.filter(function(r) { return r.status === \"fail\"; });\nvar evalTotal = evalRows.length;\nfunction parseScore(r) {\n  try {\n    var s = typeof r.score === 'string' ? JSON.parse(r.score) : (r.score || {});\n    var dims = Object.keys(s).filter(function(k) { return k !== 'verdict'; });\n    if (!dims.length) return { avg: null, dims: {} };\n    var sum = 0;\n    for (var i = 0; i < dims.length; i++) { sum += Number(s[dims[i]]) || 0; }\n    return { avg: sum / dims.length, dims: s };\n  } catch (e) { return { avg: null, dims: {} }; }\n}\nvar chaosOk = false, chaosTotal = 0, chaosPass = 0, chaosSummary = \"\";\ntry { var c = $(\"Run Chaos Tests\").first().json; chaosOk = c.chaos_ok === true; chaosTotal = Number(c.chaos_total) || 0; chaosPass = Number(c.chaos_passed) || 0; chaosSummary = String(c.chaos_summary || \"\"); } catch (e) { chaosSummary = \"Error reading chaos results\"; }\nvar lines = [];\nlines.push(\"*Darwin nightly checks* \\u2014 \" + new Date().toISOString().slice(0, 10));\nlines.push(\"\");\nif (unitRows.length) { var icon = unitFail.length === 0 ? \"\\u2705\" : \"\\u274c\"; lines.push(\"*Unit:* \" + icon + \" \" + unitPass + \"/\" + unitRows.length + \" passed\"); } else { lines.push(\"*Unit:* \\u26a0\\ufe0f no results\"); }\nvar integTotal = integRows.length;\nif (integTotal) { var icon2 = integFail.length === 0 ? \"\\u2705\" : \"\\u274c\"; lines.push(\"*Integration:* \" + icon2 + \" \" + integPass + \"/\" + integTotal + \" passed\"); } else { lines.push(\"*Integration:* \\u26a0\\ufe0f no results\"); }\nif (evalTotal) { var evalIcon = evalFail.length === 0 && evalBorderline === 0 ? \"\\u2705\" : \"\\u274c\"; lines.push(\"*Evals:* \" + evalIcon + \" \" + evalPass + \" pass / \" + evalBorderline + \" borderline / \" + evalFail.length + \" fail (\" + evalTotal + \" total)\"); } else { lines.push(\"*Evals:* \\u26a0\\ufe0f no results\"); }\nif (chaosTotal) { var chaosIcon = chaosOk ? \"\\u2705\" : \"\\u274c\"; lines.push(\"*Chaos (error handlers):* \" + chaosIcon + \" \" + chaosPass + \"/\" + chaosTotal + \" passed\"); } else { lines.push(\"*Chaos (error handlers):* \\u26a0\\ufe0f skipped or errored\"); }\nvar failures = [];\nfor (var i = 0; i < unitFail.length; i++) { var r = unitFail[i]; failures.push(\"\\u2022 [unit] \" + r.case_id + \" (\" + r.target + \"): \" + r.status + \" \\u2014 \" + String(r.assertion_detail || \"\").slice(0, 200)); }\nfor (var i = 0; i < integFail.length; i++) { var r = integFail[i]; failures.push(\"\\u2022 [integration] \" + r.case_id + \" (\" + r.target + \"): \" + r.status + \" \\u2014 \" + String(r.assertion_detail || \"\").slice(0, 200)); }\nfor (var i = 0; i < evalFail.length; i++) { var r = evalFail[i]; var label = r.case_id || \"unknown\"; var ps = parseScore(r); var scoreText = ps.avg !== null ? \" (avg \" + ps.avg.toFixed(2) + \")\" : \"\"; failures.push(\"\\u2022 [eval] \" + label + \": \" + r.status + scoreText); }\nif (!chaosOk && chaosTotal) { failures.push(\"\\u2022 [chaos] \" + chaosSummary); }\nif (failures.length) { lines.push(\"\"); lines.push(\"*Failures*\"); for (var i = 0; i < failures.length; i++) lines.push(failures[i]); }\nreturn [{ json: { message: lines.join(\"\\n\"), failure_count: failures.length } }];",
+        "mode": "runOnceForAllItems"
       },
-      "executeOnce": true
-    },
-    {
       "id": "e166efc0-a782-4469-8e99-e76d8074b665",
       "name": "Build Message",
       "type": "n8n-nodes-base.code",
@@ -503,13 +363,22 @@
         3584,
         80
       ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "var unitRows = $(\"Fetch Unit Results\").all().map(function(i) { return i.json; });\nvar unitPass = unitRows.filter(function(r) { return r.status === \"pass\"; }).length;\nvar unitFail = unitRows.filter(function(r) { return r.status !== \"pass\"; });\nvar integRows = $(\"Fetch Integration Results\").all().map(function(i) { return i.json; });\nvar integPass = integRows.filter(function(r) { return r.status === \"pass\"; }).length;\nvar integFail = integRows.filter(function(r) { return r.status !== \"pass\"; });\nvar evalRows = $(\"Fetch Eval Results\").all().map(function(i) { return i.json; });\nvar evalPass = evalRows.filter(function(r) { return (r.verdict || r.status || \"\") === \"pass\"; }).length;\nvar evalFail = evalRows.filter(function(r) { return (r.verdict || r.status || \"\") === \"fail\"; });\nvar evalTotal = evalRows.length;\nvar chaosOk = false, chaosTotal = 0, chaosPass = 0, chaosSummary = \"\";\ntry {\n  var c = $(\"Run Chaos Tests\").first().json;\n  chaosOk = c.chaos_ok === true;\n  chaosTotal = Number(c.chaos_total) || 0;\n  chaosPass = Number(c.chaos_passed) || 0;\n  chaosSummary = String(c.chaos_summary || \"\");\n} catch (e) { chaosSummary = \"Error reading chaos results\"; }\nvar lines = [];\nlines.push(\"*Darwin nightly checks* — \" + new Date().toISOString().slice(0, 10));\nlines.push(\"\");\nif (unitRows.length) {\n  var icon = unitFail.length === 0 ? \"✅\" : \"❌\";\n  lines.push(\"*Unit:* \" + icon + \" \" + unitPass + \"/\" + unitRows.length + \" passed\");\n} else {\n  lines.push(\"*Unit:* ⚠️ no results\");\n}\nvar integTotal = integRows.length;\nif (integTotal) {\n  var icon2 = integFail.length === 0 ? \"✅\" : \"❌\";\n  lines.push(\"*Integration:* \" + icon2 + \" \" + integPass + \"/\" + integTotal + \" passed\");\n} else {\n  lines.push(\"*Integration:* ⚠️ no results\");\n}\nif (evalTotal) {\n  var evalIcon = evalFail.length === 0 ? \"✅\" : \"❌\";\n  lines.push(\"*Evals:* \" + evalIcon + \" \" + evalPass + \"/\" + evalTotal + \" passed\");\n} else {\n  lines.push(\"*Evals:* ⚠️ no results\");\n}\nif (chaosTotal) {\n  var chaosIcon = chaosOk ? \"✅\" : \"❌\";\n  lines.push(\"*Chaos (error handlers):* \" + chaosIcon + \" \" + chaosPass + \"/\" + chaosTotal + \" passed\");\n} else {\n  lines.push(\"*Chaos (error handlers):* ⚠️ skipped or errored\");\n}\nvar failures = [];\nfor (var i = 0; i < unitFail.length; i++) {\n  var r = unitFail[i];\n  failures.push(\"• [unit] \" + r.case_id + \" (\" + r.target + \"): \" + r.status + \" — \" + String(r.assertion_detail || \"\").slice(0, 200));\n}\nfor (var i = 0; i < integFail.length; i++) {\n  var r = integFail[i];\n  failures.push(\"• [integration] \" + r.case_id + \" (\" + r.target + \"): \" + r.status + \" — \" + String(r.assertion_detail || \"\").slice(0, 200));\n}\nfor (var i = 0; i < evalFail.length; i++) {\n  var r = evalFail[i];\n  var label = r.case_id || r.case || r.name || \"unknown\";\n  var score = r.score || r.overall_score || \"\";\n  failures.push(\"• [eval] \" + label + (score ? \" (score \" + Number(score).toFixed(2) + \")\" : \"\"));\n}\nif (!chaosOk && chaosTotal) {\n  failures.push(\"• [chaos] \" + chaosSummary);\n}\nif (failures.length) {\n  lines.push(\"\");\n  lines.push(\"*Failures*\");\n  for (var i = 0; i < failures.length; i++) lines.push(failures[i]);\n}\nreturn [{ json: { message: lines.join(\"\\n\"), failure_count: failures.length } }];"
-      },
       "executeOnce": true
     },
     {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09QJ4T5T61"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
       "id": "fe14bc10-d3d2-4ec2-8b12-8ec7f8350b02",
       "name": "Post to Slack",
       "type": "n8n-nodes-base.slack",
@@ -518,31 +387,176 @@
         3808,
         80
       ],
-      "parameters": {
-        "resource": "message",
-        "operation": "post",
-        "authentication": "accessToken",
-        "select": "channel",
-        "channelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "C09QJ4T5T61"
-        },
-        "messageType": "text",
-        "text": "={{ $json.message }}",
-        "otherOptions": {
-          "includeLinkToWorkflow": false,
-          "mrkdwn": true
-        }
-      },
+      "executeOnce": true,
+      "webhookId": "a52ad415-db8b-4922-803e-3d3dfc0f9078",
       "credentials": {
         "slackApi": {
           "id": "BBkWcmrv3sWmNe1t",
           "name": "Slack Bot"
         }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "test_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Run Eval Suite\").first().json.run_id }}"
+            }
+          ]
+        }
       },
+      "id": "baceac81-8753-4378-8945-58ebc787ae99",
+      "name": "Poll Eval Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
       "executeOnce": true,
-      "webhookId": "a52ad415-db8b-4922-803e-3d3dfc0f9078"
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "test_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Run Integration Suite\").first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "id": "60366a0e-97f8-4e38-8c66-cfde89aa298a",
+      "name": "Poll Integration Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        0
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "test_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Run Unit Suite\").first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "id": "1e98a905-4757-4bcf-b602-b2c0a0b1ff11",
+      "name": "Fetch Unit Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2912,
+        80
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "test_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Run Integration Suite\").first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "id": "9193942f-be79-4def-a863-124e9a86f863",
+      "name": "Fetch Integration Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3136,
+        80
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "test_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $(\"Run Eval Suite\").first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "id": "d4bd8e81-b98e-4ba7-bd84-69b5f1a6b02c",
+      "name": "Fetch Eval Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        80
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     }
   ],
   "connections": {
@@ -573,28 +587,6 @@
         [
           {
             "node": "Wait Eval 30s",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait Eval 30s": {
-      "main": [
-        [
-          {
-            "node": "Poll Eval Results",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Poll Eval Results": {
-      "main": [
-        [
-          {
-            "node": "Check Eval Complete",
             "type": "main",
             "index": 0
           }
@@ -641,28 +633,6 @@
         ]
       ]
     },
-    "Wait Integ 30s": {
-      "main": [
-        [
-          {
-            "node": "Poll Integration Results",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Poll Integration Results": {
-      "main": [
-        [
-          {
-            "node": "Check Integ Complete",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Check Integ Complete": {
       "main": [
         [
@@ -686,6 +656,61 @@
         [
           {
             "node": "Wait Integ 30s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Message": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Eval 30s": {
+      "main": [
+        [
+          {
+            "node": "Poll Eval Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Eval Results": {
+      "main": [
+        [
+          {
+            "node": "Check Eval Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Integ 30s": {
+      "main": [
+        [
+          {
+            "node": "Poll Integration Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Integration Results": {
+      "main": [
+        [
+          {
+            "node": "Check Integ Complete",
             "type": "main",
             "index": 0
           }
@@ -735,25 +760,15 @@
           }
         ]
       ]
-    },
-    "Build Message": {
-      "main": [
-        [
-          {
-            "node": "Post to Slack",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "1cba4ac4-b22a-4ca3-a868-8d3ebbebda22",
+  "versionId": "d1c46b38-5c4d-4fd8-bc79-7a60d33c8b40",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
