@@ -30,6 +30,12 @@
       "key": "mcp_url",
       "type": "string",
       "value": ""
+    },
+    {
+      "id": "meUZAonDR79vZkro",
+      "key": "pidgeon_head_url",
+      "type": "string",
+      "value": ""
     }
   ]
 }

@@ -79,7 +79,7 @@
               "id": "d1",
               "name": "task",
               "type": "string",
-              "value": "=You are being asked to DIAGNOSE a failed n8n workflow execution. Do NOT make any changes — do NOT create, update, publish, or modify any workflow. Only inspect, diagnose the root cause, and suggest a concrete fix in your reply.\n\nFailure details:\n- Workflow name: {{ $json.workflowData?.name || $json.name || 'unknown' }}\n- Workflow ID: {{ $json.workflowId }}\n- Execution ID: {{ $json.id }}\n- Execution URL: https://darwin-staging.app.n8n.cloud/workflow/{{ $json.workflowId }}/executions/{{ $json.id }}\n- Error message: {{ $json.data?.resultData?.error?.message || 'n/a' }}\n- Failed node: {{ $json.data?.resultData?.lastNodeExecuted || 'n/a' }}\n- Error stack / details: {{ $json.data?.resultData?.error?.stack || $json.data?.resultData?.error?.description || 'n/a' }}\n\nPlease use the n8n MCP tools to inspect workflow {{ $json.workflowId }}, identify the root cause of this failure, and describe a specific suggested fix. Remember: DIAGNOSE ONLY — do not apply any changes."
+              "value": "=You are being asked to DIAGNOSE a failed n8n workflow execution. Do NOT make any changes — do NOT create, update, publish, or modify any workflow. Only inspect, diagnose the root cause, and suggest a concrete fix in your reply.\n\nFailure details:\n- Workflow name: {{ $json.workflowData?.name || $json.name || 'unknown' }}\n- Workflow ID: {{ $json.workflowId }}\n- Execution ID: {{ $json.id }}\n- Execution URL: {{ $vars.instance_url }}workflow/{{ $json.workflowId }}/executions/{{ $json.id }}\n- Error message: {{ $json.data?.resultData?.error?.message || 'n/a' }}\n- Failed node: {{ $json.data?.resultData?.lastNodeExecuted || 'n/a' }}\n- Error stack / details: {{ $json.data?.resultData?.error?.stack || $json.data?.resultData?.error?.description || 'n/a' }}\n\nPlease use the n8n MCP tools to inspect workflow {{ $json.workflowId }}, identify the root cause of this failure, and describe a specific suggested fix. Remember: DIAGNOSE ONLY — do not apply any changes."
             },
             {
               "id": "d3",
@@ -414,7 +414,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "21935a42-0965-4072-9079-2ec0d3f846f2",
+  "versionId": "ec02aece-ccc9-49a2-a832-de975b43ca3a",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

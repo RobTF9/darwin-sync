@@ -1,0 +1,808 @@
+{
+  "id": "11x03oQ6sJljEhc1",
+  "name": "ApprovalFlow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "d2209f69-21b0-49ad-bf2b-159564a1c155",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1648,
+        64
+      ],
+      "id": "3271ff7e-22e4-4f7e-8957-4de3f88aeb38",
+      "name": "approve",
+      "webhookId": "d2209f69-21b0-49ad-bf2b-159564a1c155",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code Node: Format session approval as Slack-compatible mrkdwn\n// Input: expects a single item with session data, jobs, opportunities, and base_url\n// base_url should be the app URL, e.g. \"https://pidgeon-head.example.com\"\n\nconst session = $(\"get_session\").first().json;\nconst project = $(\"get_project\").first().json;\n\nconst participantName = session.participant_name || \"Unknown\";\nconst usingFor = session.using_n8n_for || \"\";\nconst profileSummary = session.profile_summary || \"\";\nconst sessionSummary = session.session_summary || \"\";\nconst technicalAbility = session.technical_ability || \"\";\nconst projectType = project.type || \"discovery_interview\";\nconst jobs =\n  $(\"get_jobs\")\n    .all()\n    .map((o) => o.json) || [];\nconst opportunities =\n  $(\"get_opps\")\n    .all()\n    .map((o) => o.json) || [];\nconst baseUrl = session.base_url || \"https://pidgeonhead.netlify.app\";\nconst sessionUrl = `${baseUrl}/sessions/${session.id}`;\nconst scriptUrl = `${baseUrl}/projects/${project.id}/script`;\nconst created = new Date($(\"find_file\").first().json.createdTime);\n\nconst formattedDate = `${String(created.getDate()).padStart(2, \"0\")}/${String(created.getMonth() + 1).padStart(2, \"0\")}/${String(created.getFullYear()).slice(-2)}`;\n\nconst lines = [];\n\nfunction capitalizeFirstLetter(val) {\n  return String(val).charAt(0).toUpperCase() + String(val).slice(1);\n}\n\n// Profile\nlines.push(\n  `*${participantName} (${usingFor === \"Never used before\" ? \"Never used n8n before\" : `Using n8n for ${usingFor}`})*`,\n);\nlines.push(\n  `${capitalizeFirstLetter(project.name)} – ${formattedDate}`,\n);\nlines.push(\"\");\n\n// Key takeaway placeholder\nlines.push(\"*Key Takeaway*\");\nlines.push(\"_Add your key takeaway here..._\");\nlines.push(\"\");\n\nif (profileSummary) {\n  lines.push(`*Profile*`);\n  lines.push(profileSummary);\n  lines.push(\"\");\n}\n\n// Technical ability\nif (technicalAbility) {\n  lines.push(`*Technical Ability*`);\n  lines.push(technicalAbility);\n  lines.push(\"\");\n}\n\nif (projectType === \"usability_test\") {\n  // Usability test: Script link → Session summary → Opportunities (no Jobs)\n  lines.push(`<${scriptUrl}|*Script*>`);\n  lines.push(\"\");\n\n  if (sessionSummary) {\n    lines.push(`*Session Summary*`);\n    lines.push(sessionSummary);\n    lines.push(\"\");\n  }\n\n  if (opportunities.length) {\n    lines.push(\n      `<${sessionUrl}?tab=opportunities|*Opportunities*> (${opportunities.length})`,\n    );\n    for (const opp of opportunities) {\n      lines.push(`• ${opp.content}`);\n    }\n    lines.push(\"\");\n  }\n} else {\n  // Discovery interview: Jobs → Opportunities\n  if (jobs.length) {\n    lines.push(`<${sessionUrl}?tab=jtbd|*Jobs to be Done*> (${jobs.length})`);\n    for (const job of jobs) {\n      lines.push(`• _${job.content}_`);\n    }\n    lines.push(\"\");\n  }\n\n  if (opportunities.length) {\n    lines.push(\n      `<${sessionUrl}?tab=opportunities|*Opportunities*> (${opportunities.length})`,\n    );\n    for (const opp of opportunities) {\n      lines.push(`• ${opp.content}`);\n    }\n    lines.push(\"\");\n  }\n}\n\nlet text = lines.join(\"\\n\");\n\n// Extract the interview technique review from the technique_review agent as a separate field\nlet techniqueReview = \"\";\ntry {\n  techniqueReview = $(\"technique_review\").first().json.output || \"\";\n} catch (e) {\n  techniqueReview = \"\";\n}\n\nreturn [{ json: { text, techniqueReview } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        128
+      ],
+      "id": "31f3da91-fef0-48b3-b18f-65b2084604fd",
+      "name": "code"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.body.session_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1456,
+        64
+      ],
+      "id": "19d076da-5813-438e-a043-b8cdf9690366",
+      "name": "get_session",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "session_jobs",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.session_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        -48
+      ],
+      "id": "283f938d-1916-4f0d-8857-f4b5cfbe44ac",
+      "name": "get_job_relations",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "job",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.job_id }}"
+            },
+            {
+              "keyName": "deleted",
+              "keyValue": "false"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -48
+      ],
+      "id": "b0e77cee-b1df-4b03-be62-b5e96d9a3e4c",
+      "name": "get_jobs",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "session_opportunities",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $json.session_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        192
+      ],
+      "id": "79df6796-304b-4dc3-a3cc-2b06f6c7b6be",
+      "name": "get_opp_relations",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "opportunity",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.opportunity_id }}"
+            },
+            {
+              "keyName": "deleted",
+              "keyValue": "false"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        192
+      ],
+      "id": "227c0ac3-9031-4c93-ac76-57ab95673af8",
+      "name": "get_opps",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6e26ad85-2075-40b1-b67b-c85650549246",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "={{ $('get_session').item.json.google_drive_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -1072,
+        64
+      ],
+      "id": "484f297d-b896-4a08-956b-31862d44c78c",
+      "name": "get_user"
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "={{ $('get_user').item.json.lastModifyingUser.emailAddress.split('@')[0] }}",
+          "mode": "username"
+        },
+        "text": "={{ $('code').item.json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1120,
+        224
+      ],
+      "id": "4af12727-874c-412e-a44f-a71c3c80d10b",
+      "name": "send_draft",
+      "webhookId": "71f83f69-a6c7-4a6f-ab74-9427cc27faa3",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "project",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('get_session').item.json.project_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -864,
+        64
+      ],
+      "id": "722591bb-ff1d-4e64-915d-368c18c629a8",
+      "name": "get_project",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $('get_session').item.json.google_drive_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "*"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1264,
+        64
+      ],
+      "id": "878f7663-40c8-4c06-91e2-d0119e9cda4e",
+      "name": "find_file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5d2c988f-0399-43dc-b6f7-981ffd5bad6e",
+              "name": "project_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "0f25f341-b963-4a62-9b2b-a8bc7cfff9f6",
+              "name": "session_id",
+              "value": "={{ $('get_session').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "52287327-a600-465e-8dc7-351727f8434d",
+              "name": "project_type",
+              "value": "={{ $json.type }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -656,
+        64
+      ],
+      "id": "cf8e9618-73a8-46b0-89b8-9e4cf7e75ad8",
+      "name": "set_ids"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        256,
+        128
+      ],
+      "id": "8f1b59cd-3892-4a5a-99f2-4152299b7895",
+      "name": "merge"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "jUXyju77iBG3FGUz",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/jUXyju77iBG3FGUz",
+          "cachedResultName": "Darwin — SessionTranscript"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.session_id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "28ac2e3e-2062-4ab1-9e08-8fa8ed6def70",
+      "name": "get_transcript",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -256,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {
+          "maxTokensToSample": 4096
+        }
+      },
+      "id": "ec0a2884-6ee9-40e4-9c05-ad971b8f7aeb",
+      "name": "technique_model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        -32,
+        576
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Please review the following interview transcript and provide feedback on the interviewer's technique:\n\n{{ JSON.stringify($json) }}",
+        "options": {
+          "systemMessage": "You are an interview technique coach for UX researchers. You review research session transcripts and provide constructive, encouraging feedback on interviewing skills.\n\nYour review should be concise and formatted for Slack (use bullet points, no markdown headings). Structure your feedback as:\n\n*What went well:*\n• Highlight 2-3 specific moments where the interviewer used good technique (with brief quotes or timestamps if visible)\n\n*Areas for growth:*\n• Identify 2-3 specific moments where technique could improve, with concrete suggestions for alternative approaches\n\n*Overall:*\n• One sentence summary of the interviewing style and one key thing to focus on next time\n\nUse the following two frameworks to guide your evaluation:\n\n---\n\nFRAMEWORK 1: THE ART OF OPEN-ENDED QUESTIONS\n\nOpen-ended questions are the backbone of qualitative user research. Unlike closed questions that limit participants to predetermined responses, open-ended questions:\n- Allow participants to answer in their own words\n- Encourage exploration and discovery\n- Reveal unexpected insights and mental models\n- Uncover the \"why\" behind behaviors\n\nThe Transformation Framework — From Closed to Open:\n\nBasic Transformations:\n- \"Was this feature easy to use?\" → \"How would you describe your experience using this feature?\"\n- \"Do you like the design?\" → \"What was your experience with the design?\"\n- \"Did you encounter any problems?\" → \"What was your experience? What went well or didn't go well?\"\n- \"Are you satisfied with the product?\" → \"Tell me about your overall experience with the product.\"\n\nAdvanced Transformations (Leading → Neutral):\n- \"Don't you think this feature is great?\" → \"Tell me about your experience with this feature.\"\n- \"What features would you like us to add?\" → \"What problems are you looking to solve?\"\n- \"How easy was the checkout process?\" → \"Walk me through your checkout experience.\"\n- \"What did you like about the website?\" → \"Tell me about your experience using the website.\"\n\nEssential Question Starters — The Big Five:\n1. \"Tell me about...\" (e.g., the last time you used [product/feature], a typical day in your role)\n2. \"Walk me through...\" (e.g., how you currently handle [task], what happened when you tried to [action])\n3. \"What's it like when...\" (e.g., you need to [complete task], this system doesn't work as expected)\n4. \"How do you...\" (e.g., currently manage [process], decide which [tool/method] to use)\n5. \"Can you describe...\" (e.g., what happened next, the process you follow)\n\nContext-Specific Starters:\nFor Understanding Process: \"Take me back to...\", \"Starting from the beginning...\", \"What happens after...\"\nFor Exploring Problems: \"What's challenging about...\", \"Where do things typically go wrong when...\", \"What gets in the way of...\"\nFor Uncovering Motivations: \"What made you decide to...\", \"What were you hoping would happen when...\", \"What's important to you about...\"\n\nThe Follow-Up Arsenal:\nUniversal Probes: \"Tell me more about that...\", \"Can you give me an example?\", \"What do you mean by [term they used]?\", \"Help me understand...\", \"What else?\"\nThe Echo Technique: Repeat the last 2-3 words with a questioning tone.\nSpecificity Probes: \"You mentioned [X]. Can you elaborate?\", \"When you say [term], what does that mean to you?\", \"What specifically about [X] makes it [adjective they used]?\"\nEmotional Probes: \"How did that make you feel?\", \"What was going through your mind when...\", \"What was that experience like for you?\"\n\nThe SPECIFIC Framework for Crafting Questions:\nS - Start broad: Begin with general context before narrowing focus\nP - Past-focused: Ask about specific past experiences, not hypotheticals\nE - Exploratory language: Use \"how\" and \"what\" instead of \"did\" or \"do\"\nC - Context-rich: Include enough context so participants understand what you're asking\nI - Invitation to share: Frame questions as invitations, not interrogations\nF - Free from assumptions: Remove bias and judgment from your wording\nI - Individual perspective: Focus on their personal experience\nC - Clear and simple: Use everyday language, avoid jargon\n\nCommon Pitfalls:\n1. The Assumption Trap: \"When you were struggling with the task...\" → \"Tell me about your experience completing that task.\"\n2. The Multiple Question Mistake: \"How satisfied are you with the navigation and did you find what you needed?\" → Break into separate questions\n3. The Yes/No Dead End: \"Do you think this would be useful?\" → \"How might you see yourself using something like this?\"\n4. The Leading Language: \"How much did you enjoy using the new feature?\" → \"What was your experience with the new feature?\"\n\nBuilding Your Question Flow:\nThe Funnel Technique: Start broad → Narrow focus → Get specific → Probe deeper\nThe Diamond Approach: Start focused → Expand context → Zoom back in\n\n---\n\nFRAMEWORK 2: COGNITIVE BIASES IN USER RESEARCH\n\nBiases Primarily Affecting Participants:\n\nSocial Desirability Bias: Participants provide socially acceptable answers rather than truthful ones. Watch for: users claiming ideal behaviors, overstating purchase intentions, avoiding admitting negative behaviors.\n\nHawthorne Effect: People change behavior when observed. Watch for: participants being unusually careful, persistent, or attentive during sessions.\n\nAcquiescence Bias: Participants tend to agree with statements regardless of content. Watch for: inflated agreement, false validation of design decisions.\n\nAnchoring Bias: First information encountered disproportionately influences subsequent judgments. Watch for: initial options receiving undue preference, early framing shaping all later responses.\n\nResponse Bias: Question wording influences answers (framing effects), participants misremember past experiences (recall bias), context shapes responses systematically.\n\nBiases Primarily Affecting Researchers:\n\nConfirmation Bias: Unconsciously seeking information that confirms existing beliefs while ignoring contradictory evidence. Watch for: leading questions, selective follow-ups, ignoring surprising responses.\n\nObserver Bias: Seeing what you expect rather than what happens. Watch for: interpreting pauses as confusion, labeling neutral expressions based on assumptions.\n\nSelection Bias: Participants don't represent actual user population. Note if the interviewer acknowledges or accounts for this.\n\nSurvivorship Bias: Analyzing only successful cases while ignoring failures.\n\nAvailability Heuristic: Overweighting recent or vivid experiences.\n\nPrimacy and Recency Effects: Remembering first and last items better than middle items.\n\n---\n\nFRAMEWORK 3 — Eliciting Real Stories Over Hypothetical Answers\n\nThis is a critical skill. The best interview data comes from real, lived experiences — not hypothetical or generic responses. When reviewing, pay special attention to:\n\n- Story elicitation: Did the interviewer actively prompt participants to share specific, real examples from their past experience? Look for prompts like \"Can you tell me about a specific time when…\", \"Walk me through the last time you…\", \"What happened exactly?\"\n- Catching hypotheticals: When a participant gives a generic or hypothetical answer (e.g. \"I would probably…\", \"Usually I think…\", \"In general…\"), did the interviewer redirect them toward a concrete instance? Good redirects include: \"Has that actually happened to you?\", \"Can you think of a specific time?\", \"Tell me about the most recent time that came up.\"\n- Depth over breadth: Did the interviewer dig into the details of a real story (who, what, when, where, why, how it felt) rather than moving on after a surface-level answer?\n- Recognizing thin data: Generic responses like \"It's fine\", \"It works well\", or \"I like it\" are not actionable research data. The interviewer should probe further: \"What makes you say that?\", \"Can you give me an example?\", \"Tell me about a time it worked particularly well — or didn't.\"\n- Past behavior over future intent: Questions about what someone \"would do\" or \"plans to do\" yield unreliable data. The interviewer should anchor in past behavior: \"What did you actually do last time?\" rather than \"What would you do?\"\n\n---\n\nWhen reviewing, focus on:\n1. Question quality: Are questions open-ended? Do they avoid leading language? Are follow-ups used effectively?\n2. Bias awareness: Are there moments where bias may have influenced the conversation? Did the interviewer inadvertently lead the participant?\n3. Flow and structure: Does the conversation follow a logical progression? Is there good use of the funnel or diamond technique?\n4. Listening and probing: Does the interviewer pick up on interesting threads? Do they probe deeper when participants give surface-level answers?\n5. Rapport: Does the interviewer create a comfortable space for honest sharing?\n6. Story elicitation and grounding in real examples — flag any moments where the interviewer accepted hypothetical or generic answers without probing for specific, real experiences.\n\nKeep feedback actionable and specific — reference actual moments from the transcript. Be encouraging — the goal is growth, not criticism."
+        }
+      },
+      "id": "390af182-3eb2-40d6-82fa-120847ce86c2",
+      "name": "technique_review",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -32,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "robert",
+          "mode": "username"
+        },
+        "text": "={{ $('code').item.json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1120,
+        32
+      ],
+      "id": "422027e3-707f-418b-92b3-1099e38f9aac",
+      "name": "send_to_me",
+      "webhookId": "71f83f69-a6c7-4a6f-ab74-9427cc27faa3",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "={{ $('get_user').item.json.lastModifyingUser.emailAddress.split('@')[0] }}",
+          "mode": "username"
+        },
+        "text": "={{ \"🎙️ *Interview Technique Review*\\n\\n\" + $('code').item.json.techniqueReview }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "1d6c83a5-2538-4d42-96b8-44c5bd66f193",
+      "name": "send_technique_review",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1344,
+        224
+      ],
+      "webhookId": "480742c8-34c6-4ebc-9be8-e73504dc47ad",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "robert",
+          "mode": "username"
+        },
+        "text": "={{ \"🎙️ *Interview Technique Review*\\n\\n\" + $('code').item.json.techniqueReview }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "82730dcb-e26f-49bc-b7bc-f955f2f176f9",
+      "name": "send_technique_to_me",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1344,
+        32
+      ],
+      "webhookId": "ec425cb9-e78a-42af-9609-0e21d09e470d",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "094f0535-8330-44b7-ba08-a17266894c29",
+              "leftValue": "={{ $vars.env }}",
+              "rightValue": "staging",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        720,
+        128
+      ],
+      "id": "12f821c1-22d4-4d4b-9cee-ef8f2755e7bf",
+      "name": "staging?"
+    }
+  ],
+  "connections": {
+    "approve": {
+      "main": [
+        [
+          {
+            "node": "get_session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "code": {
+      "main": [
+        [
+          {
+            "node": "staging?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_session": {
+      "main": [
+        [
+          {
+            "node": "find_file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_job_relations": {
+      "main": [
+        [
+          {
+            "node": "get_jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_jobs": {
+      "main": [
+        [
+          {
+            "node": "merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_opp_relations": {
+      "main": [
+        [
+          {
+            "node": "get_opps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_opps": {
+      "main": [
+        [
+          {
+            "node": "merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "get_user": {
+      "main": [
+        [
+          {
+            "node": "get_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_draft": {
+      "main": [
+        [
+          {
+            "node": "send_technique_review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_project": {
+      "main": [
+        [
+          {
+            "node": "set_ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find_file": {
+      "main": [
+        [
+          {
+            "node": "get_user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_ids": {
+      "main": [
+        [
+          {
+            "node": "get_job_relations",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "get_opp_relations",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "get_transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge": {
+      "main": [
+        [
+          {
+            "node": "code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_transcript": {
+      "main": [
+        [
+          {
+            "node": "technique_review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "technique_model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "technique_review",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "technique_review": {
+      "main": [
+        [
+          {
+            "node": "merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "send_to_me": {
+      "main": [
+        [
+          {
+            "node": "send_technique_to_me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "staging?": {
+      "main": [
+        [
+          {
+            "node": "send_to_me",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send_draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "triggerCount": 1,
+  "versionId": "cbe73404-d356-46fe-ac58-d78586b8f6d0",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "RKV5ONpbyyQkPOeH",
+  "isArchived": false,
+  "nodeGroups": []
+}
