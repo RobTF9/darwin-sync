@@ -82,12 +82,7 @@
           "app_mention"
         ],
         "watchWorkspace": true,
-        "options": {
-          "userIds": [
-            "U09Q22R53T6",
-            "U0BLRFB0FJR"
-          ]
-        }
+        "options": {}
       },
       "type": "n8n-nodes-base.slackTrigger",
       "typeVersion": 1,
@@ -1113,7 +1108,7 @@
     "errorWorkflow": "MLxaOYbzMS9DFoIv"
   },
   "triggerCount": 1,
-  "versionId": "520c1ba6-e7e5-409d-bf5c-ed884d1d46b2",
+  "versionId": "a1c6c26f-d60c-40d7-9885-53b53f7413ec",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
