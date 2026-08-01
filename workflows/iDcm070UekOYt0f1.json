@@ -103,7 +103,7 @@
               "id": "d6",
               "name": "execUrl",
               "type": "string",
-              "value": "=https://darwin-staging.app.n8n.cloud/workflow/{{ $json.workflowId }}/executions/{{ $json.id }}"
+              "value": "={{ $vars.instance_url}}workflow/{{ $json.workflowId }}/executions/{{ $json.id }}"
             },
             {
               "id": "d7",
@@ -253,7 +253,7 @@
           "mode": "id",
           "value": "={{ $json.customData.channel || $json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.channel }}"
         },
-        "text": "=🚨 Execution failed: https://darwin-staging.app.n8n.cloud/workflow/{{ $json.workflowId }}/executions/{{ $json.id }}",
+        "text": "=🚨 Execution failed: {{ $vars.instance_url}}workflow/{{ $json.workflowId }}/executions/{{ $json.id }}",
         "otherOptions": {
           "thread_ts": {
             "replyValues": {
@@ -414,7 +414,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "4191e16b-6bab-4ed9-8990-ebf72493b50b",
+  "versionId": "21935a42-0965-4072-9079-2ec0d3f846f2",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

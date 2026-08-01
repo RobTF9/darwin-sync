@@ -103,7 +103,7 @@
           "mode": "id",
           "value": "={{ $('Get Execution').first().json.customData.channel || $('Get Execution').first().json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.channel }}"
         },
-        "text": "=❌ Sorry — this execution failed. Details: https://darwin-staging.app.n8n.cloud/workflow/{{ $('Get Execution').first().json.workflowId }}/executions/{{ $('Get Execution').first().json.id }}",
+        "text": "=❌ Sorry — this execution failed. Details: {{ $vars.instance_url}}workflow/{{ $('Get Execution').first().json.workflowId }}/executions/{{ $('Get Execution').first().json.id }}",
         "otherOptions": {
           "includeLinkToWorkflow": false,
           "thread_ts": {
@@ -185,7 +185,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "975e5d21-5627-4f42-bad6-7f8aa3157d93",
+  "versionId": "90f00a65-6cc1-4372-8cc2-0a59443e0405",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
