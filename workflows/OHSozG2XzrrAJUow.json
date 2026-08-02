@@ -1,0 +1,231 @@
+{
+  "id": "OHSozG2XzrrAJUow",
+  "name": "WaitForExecution",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "executionId"
+            },
+            {
+              "name": "maxWaitSeconds",
+              "type": "number"
+            },
+            {
+              "name": "pollIntervalSeconds",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "c9c850b8-d1b7-4023-b1ce-1bd298ce3c82",
+      "name": "Sub-flow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const t = $input.first().json;\nconst pollInterval = Number(t.pollIntervalSeconds) || 10;\nconst maxWait = Number(t.maxWaitSeconds) || 300;\nreturn [{ json: {\n  executionId: t.executionId,\n  pollIntervalSeconds: pollInterval,\n  maxWaitSeconds: maxWait,\n  startedAtMs: Date.now(),\n} }];"
+      },
+      "id": "d3be0f6c-a69b-425b-a1e2-fad8d743907a",
+      "name": "Init",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $('Init').item.json.executionId }}",
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "68a8b2a9-10a7-487f-8e7c-4676e41a6c8c",
+      "name": "Get Execution",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        432,
+        -32
+      ],
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const init = $(\"Init\").item.json;\nconst exec = $input.first().json;\nconst status = exec.status || (exec.finished === false ? \"running\" : \"success\");\nconst elapsedSec = Math.round((Date.now() - init.startedAtMs) / 1000);\nconst running = [\"running\",\"waiting\",\"new\",\"unknown\"].includes(status);\nconst timedOut = elapsedSec >= init.maxWaitSeconds;\nconst keepPolling = running && !timedOut;\nreturn [{ json: {\n  verdict: keepPolling ? \"poll\" : \"done\",\n  status,\n  executionId: init.executionId,\n  elapsedSeconds: elapsedSec,\n  maxWaitSeconds: init.maxWaitSeconds,\n  stoppedAt: exec.stoppedAt || null,\n  keepPolling,\n  timedOut: timedOut && running,\n  finished: !running,\n} }];"
+      },
+      "id": "ab89d021-b086-48a8-bfcd-ba56bf9f424d",
+      "name": "Evaluate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.verdict }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "poll"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0f34ee2b-816a-4bd2-a417-634a93037ff8",
+      "name": "Keep Polling?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        912,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Init').item.json.pollIntervalSeconds }}"
+      },
+      "id": "cafd39d6-f3db-4181-a01d-aaa5f2a38c7c",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1136,
+        -32
+      ],
+      "webhookId": "bc57e078-4510-4807-8ffa-cfd25bbb6f6b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const init = $(\"Init\").item.json;\nconst e = $input.first().json;\nlet result;\nif (e.timedOut) {\n  result = {\n    status: \"timeout\",\n    executionId: e.executionId,\n    elapsedSeconds: e.elapsedSeconds,\n    message: \"Execution still running after \" + e.elapsedSeconds + \"s (max \" + init.maxWaitSeconds + \"s). Poll again or inspect manually.\"\n  };\n} else {\n  result = { status: e.status, executionId: e.executionId, stoppedAt: e.stoppedAt, elapsedSeconds: e.elapsedSeconds, finished: e.finished };\n}\nreturn [{ json: result }];"
+      },
+      "id": "f8d6fab4-6e3e-4afd-a997-c7cd974e33d3",
+      "name": "Format Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        192
+      ]
+    }
+  ],
+  "connections": {
+    "Sub-flow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Init",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init": {
+      "main": [
+        [
+          {
+            "node": "Get Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Execution": {
+      "main": [
+        [
+          {
+            "node": "Evaluate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate": {
+      "main": [
+        [
+          {
+            "node": "Keep Polling?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Polling?": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Get Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "c5b5b457-fc61-4afa-911f-1422ed3ce682",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

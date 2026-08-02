@@ -79,7 +79,8 @@
     {
       "parameters": {
         "trigger": [
-          "app_mention"
+          "app_mention",
+          "message"
         ],
         "watchWorkspace": true,
         "options": {}
@@ -845,6 +846,39 @@
         -2368,
         128
       ]
+    },
+    {
+      "id": "1b76bc62-5839-46e7-a966-1ac0bcb91dd1",
+      "name": "IsMentionOrDM",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2520,
+        128
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ ($('OnEvent').item.json.type === 'app_mention' || $('OnEvent').item.json.channel_type === 'im') && !['U09Q22R53T6','U0BLRFB0FJR'].includes($('OnEvent').item.json.user) && !($('OnEvent').item.json.bot_id) }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -853,17 +887,6 @@
         [
           {
             "node": "SetState",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OnEvent": {
-      "main": [
-        [
-          {
-            "node": "exec_data",
             "type": "main",
             "index": 0
           }
@@ -1099,6 +1122,28 @@
           }
         ]
       ]
+    },
+    "OnEvent": {
+      "main": [
+        [
+          {
+            "node": "IsMentionOrDM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IsMentionOrDM": {
+      "main": [
+        [
+          {
+            "node": "exec_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1108,7 +1153,7 @@
     "errorWorkflow": "MLxaOYbzMS9DFoIv"
   },
   "triggerCount": 1,
-  "versionId": "a1c6c26f-d60c-40d7-9885-53b53f7413ec",
+  "versionId": "e680d41a-9e1d-4ccf-8332-aea625f6cea9",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
