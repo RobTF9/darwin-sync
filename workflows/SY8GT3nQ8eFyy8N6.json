@@ -1,0 +1,462 @@
+{
+  "id": "SY8GT3nQ8eFyy8N6",
+  "name": "CostDigest",
+  "nodes": [
+    {
+      "id": "6a1146bc-f013-484a-bc97-229351bd2a67",
+      "name": "Daily 06:30 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -800,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 6,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "be2184fa-6da5-4d50-874a-3f63d52b4164",
+      "name": "Build Workflow List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const workflows = [\n  { workflowId: 'HDMvthliXrAcZrXp', workflowName: 'Darwin' },\n  { workflowId: 'gQ6Ee8PxLdU39nxh', workflowName: 'SessionAnalysis' },\n  { workflowId: 'v33yZBOdJuvyym7s', workflowName: 'JobAnalysis' },\n  { workflowId: 'YgLLZRCPGssHQMny', workflowName: 'OpportunityAnalysis' },\n  { workflowId: 'cLfiqVMDnmNppMaG', workflowName: 'SessionQuestionWorker' },\n  { workflowId: 'U2dYt2dN4bOytzK6', workflowName: 'ProjectCreate' },\n  { workflowId: '61OdVE9sCEJgFHPY', workflowName: 'SessionSearch' },\n  { workflowId: 'aiyPD50CSH3AEbI0', workflowName: 'SessionVectors' },\n  { workflowId: 'JaAnQVNWTIFEIHrq', workflowName: 'JobVectors' },\n  { workflowId: 'fPAICfE6SOP5Q2Fa', workflowName: 'EvalDispatch' },\n  { workflowId: 'ZMyr5DWlrfXlhhKs', workflowName: 'Builder' },\n];\nreturn workflows.map((w) => ({ json: w }));"
+      }
+    },
+    {
+      "id": "6612cf93-55d7-44e3-9181-0b1bc6da7ee6",
+      "name": "Get Executions",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        300
+      ],
+      "parameters": {
+        "resource": "execution",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 100,
+        "filters": {
+          "workflowId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.workflowId }}"
+          },
+          "status": "success"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "id": "76028d8b-63cf-4aa3-8e26-adb6ca212c29",
+      "name": "Filter & Flatten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const listItems = $('Build Workflow List').all();\nconst idToName = {};\nfor (const it of listItems) { idToName[it.json.workflowId] = it.json.workflowName; }\nconst cutoff = Date.now() - 24 * 60 * 60 * 1000;\nconst out = [];\nfor (const item of $input.all()) {\n  const ex = item.json;\n  if (!ex || !ex.id) continue;\n  const startedAt = ex.startedAt || ex.startedAtDate || ex.createdAt;\n  if (startedAt) {\n    const t = new Date(startedAt).getTime();\n    if (!isNaN(t) && t < cutoff) continue;\n  }\n  const wfId = (ex.workflowId != null) ? String(ex.workflowId) : '';\n  out.push({ json: {\n    executionId: String(ex.id),\n    workflowId: wfId,\n    workflowName: idToName[wfId] || ex.workflowName || 'unknown',\n  }});\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "ee7daad0-1d9c-4a83-a061-5a7f7f1f25ef",
+      "name": "Get Execution Data",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        160,
+        300
+      ],
+      "parameters": {
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $json.executionId }}",
+        "options": {
+          "activeWorkflows": true
+        }
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "id": "d21118bb-5bcd-403e-820d-b8fa8bcef3d6",
+      "name": "Extract Token Usage & Calculate Cost",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const PRICES = {\n  // Opus models (per 1M tokens)\n  'claude-opus-4-0520': { input: 15, output: 75 },\n  'claude-opus-4-1': { input: 15, output: 75 },\n  'claude-opus-4-5': { input: 5, output: 25 },\n  'claude-opus-4-6': { input: 15, output: 75 },\n  'claude-opus-4-7': { input: 15, output: 75 },\n  'claude-opus-4-8': { input: 15, output: 75 },\n\n  // Sonnet models\n  'claude-sonnet-4-0514': { input: 3, output: 15 },\n  'claude-sonnet-4-20250514': { input: 3, output: 15 },\n  'claude-sonnet-4-5': { input: 3, output: 15 },\n  'claude-sonnet-4-6': { input: 3, output: 15 },\n\n  // Haiku models\n  'claude-haiku-4-5': { input: 1, output: 5 },\n\n  // Fable / Opus 5\n  'claude-fable-5': { input: 10, output: 50 },\n  'claude-opus-5': { input: 5, output: 25 },\n  'claude-sonnet-5': { input: 3, output: 15 },\n\n  // OpenAI embeddings\n  'text-embedding-3-small': { input: 0.02, output: 0.02 },\n  'text-embedding-ada-002': { input: 0.10, output: 0.10 },\n};\n\n// Fuzzy matching fallback\nfunction getPrice(model) {\n  if (!model) return { input: 15, output: 75 }; // unknown = assume expensive\n  const m = model.toLowerCase();\n  if (PRICES[m]) return PRICES[m];\n  if (m.includes('opus-5') || m.includes('opus-4-5')) return { input: 5, output: 25 };\n  if (m.includes('opus')) return { input: 15, output: 75 };\n  if (m.includes('sonnet')) return { input: 3, output: 15 };\n  if (m.includes('haiku')) return { input: 1, output: 5 };\n  if (m.includes('fable')) return { input: 10, output: 50 };\n  if (m.includes('embedding')) return { input: 0.02, output: 0.02 };\n  return { input: 15, output: 75 }; // fallback\n}\nconst flatItems = $('Filter & Flatten').all();\nconst perWorkflow = {};\nconst perModel = {};\nlet grandCost = 0;\nlet grandExecutions = 0;\nlet grandTokens = 0;\nconst dataItems = $input.all();\nfor (let i = 0; i < dataItems.length; i++) {\n  const item = dataItems[i].json || {};\n  const meta = (flatItems[i] && flatItems[i].json) || {};\n  const workflowId = meta.workflowId || (item.workflowId != null ? String(item.workflowId) : 'unknown');\n  const workflowName = meta.workflowName || 'unknown';\n  const runData = item && item.data && item.data.resultData && item.data.resultData.runData;\n  let execCost = 0;\n  let execTokens = 0;\n  if (runData && typeof runData === 'object') {\n    for (const nodeName of Object.keys(runData)) {\n      const runs = runData[nodeName];\n      if (!Array.isArray(runs)) continue;\n      for (const run of runs) {\n        const lm = run && run.data && run.data.ai_languageModel;\n        if (!Array.isArray(lm)) continue;\n        let modelName = 'unknown';\n        try {\n          const io = run.inputOverride && run.inputOverride.ai_languageModel;\n          if (Array.isArray(io) && io[0] && io[0][0] && io[0][0].json && io[0][0].json.options && io[0][0].json.options.model) {\n            modelName = io[0][0].json.options.model;\n          }\n        } catch (e) {}\n        for (const outer of lm) {\n          if (!Array.isArray(outer)) continue;\n          for (const entry of outer) {\n            const tu = entry && entry.json && entry.json.tokenUsage;\n            if (!tu) continue;\n            const promptTokens = Number(tu.promptTokens || 0);\n            const completionTokens = Number(tu.completionTokens || 0);\n            const p = getPrice(modelName);\n            const cost = (promptTokens / 1e6) * p.input + (completionTokens / 1e6) * p.output;\n            execCost += cost;\n            execTokens += promptTokens + completionTokens;\n            if (!perModel[modelName]) perModel[modelName] = { inputTokens: 0, outputTokens: 0, cost: 0 };\n            perModel[modelName].inputTokens += promptTokens;\n            perModel[modelName].outputTokens += completionTokens;\n            perModel[modelName].cost += cost;\n          }\n        }\n      }\n    }\n  }\n  if (!perWorkflow[workflowId]) {\n    perWorkflow[workflowId] = { workflowName, workflowId, totalCost: 0, executionCount: 0, totalTokens: 0 };\n  }\n  perWorkflow[workflowId].totalCost += execCost;\n  perWorkflow[workflowId].executionCount += 1;\n  perWorkflow[workflowId].totalTokens += execTokens;\n  grandCost += execCost;\n  grandExecutions += 1;\n  grandTokens += execTokens;\n}\nconst workflowsArr = Object.values(perWorkflow).map((w) => ({\n  workflowId: w.workflowId,\n  workflowName: w.workflowName,\n  totalCost: w.totalCost,\n  executionCount: w.executionCount,\n  avgCostPerRun: w.executionCount > 0 ? w.totalCost / w.executionCount : 0,\n  totalTokens: w.totalTokens,\n}));\nworkflowsArr.sort((a, b) => b.totalCost - a.totalCost);\nconst modelsArr = Object.keys(perModel).map((m) => ({\n  model: m,\n  inputTokens: perModel[m].inputTokens,\n  outputTokens: perModel[m].outputTokens,\n  cost: perModel[m].cost,\n}));\nmodelsArr.sort((a, b) => b.cost - a.cost);\nreturn [{ json: {\n  date: new Date().toISOString().slice(0, 10),\n  grandTotalCost: grandCost,\n  grandTotalExecutions: grandExecutions,\n  grandTotalTokens: grandTokens,\n  workflows: workflowsArr,\n  models: modelsArr,\n}}];"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "c5b63b82-611b-42c1-a47a-b3a138a90e87",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        460
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Reads the single merged item: main summary fields (from Extract) + pipeline fields (from Aggregate)\nconst r = ($input.first() && $input.first().json) || {};\nconst date = r.date || new Date().toISOString().slice(0, 10);\nconst fmtCost = (n) => '$' + Number(n || 0).toFixed(4);\nconst fmtCost2 = (n) => '$' + Number(n || 0).toFixed(2);\nconst fmtK = (n) => (Number(n || 0) / 1000).toFixed(1) + 'K';\nconst workflows = Array.isArray(r.workflows) ? r.workflows : [];\nconst models = Array.isArray(r.models) ? r.models : [];\nconst grandExecutions = Number(r.grandTotalExecutions || 0);\n\n// Pipeline data now arrives on the SAME merged item (combineByPosition)\nconst pipeCount = Number(r.pipelineSessionCount || 0);\nconst pipeTotal = Number(r.pipelineTotalCost || 0);\nconst pipeAvg = Number(r.pipelineAvgPerSession || 0);\nconst pipeWorkflows = (r.pipelineWorkflows && typeof r.pipelineWorkflows === 'object') ? r.pipelineWorkflows : {};\nconst PIPE_ORDER = ['SessionAnalysis', 'JobAnalysis', 'OpportunityAnalysis', 'SessionVectors', 'JobVectors'];\n\nfunction pipelineLines() {\n  const out = [];\n  out.push('');\n  if (pipeCount === 0) {\n    out.push('\\uD83D\\uDCE6 Analysis Pipeline: No sessions processed in the last 24h');\n    return out;\n  }\n  out.push('\\uD83D\\uDCE6 Analysis Pipeline: ' + pipeCount + ' sessions processed');\n  out.push('Total: ' + fmtCost2(pipeTotal) + ' (avg ' + fmtCost2(pipeAvg) + '/session)');\n  for (const name of PIPE_ORDER) {\n    const w = pipeWorkflows[name];\n    if (!w) continue;\n    const cost = Number(w.cost || 0);\n    const execs = Number(w.execCount || 0);\n    if (execs > 0 && cost === 0) {\n      out.push('\\u2022 ' + name + ' \\u2014 ' + execs + ' executions (embeddings \\u2014 cost not captured)');\n    } else {\n      out.push('\\u2022 ' + name + ' \\u2014 ' + fmtCost2(cost) + ' (' + execs + ' executions)');\n    }\n  }\n  return out;\n}\n\nconst lines = [];\nlines.push('\\uD83E\\uDDFE Daily AI Cost Report \\u2014 ' + date);\nlines.push('');\nif (grandExecutions === 0) {\n  lines.push('No AI executions in the last 24 hours.');\n} else {\n  lines.push('Total: ' + fmtCost(r.grandTotalCost) + ' across ' + grandExecutions + ' executions');\n  lines.push('');\n  lines.push('By Workflow:');\n  const withRuns = workflows.filter((w) => Number(w.executionCount || 0) > 0);\n  for (const w of withRuns) {\n    lines.push('\\u2022 ' + w.workflowName + ' \\u2014 ' + fmtCost(w.totalCost) + ' (' + w.executionCount + ' runs, avg ' + fmtCost(w.avgCostPerRun) + '/run)');\n  }\n  lines.push('');\n  lines.push('By Model:');\n  if (models.length === 0) {\n    lines.push('\\u2022 (no token usage captured)');\n  } else {\n    for (const m of models) {\n      lines.push('\\u2022 ' + m.model + ' \\u2014 ' + fmtCost(m.cost) + ' (' + fmtK(m.inputTokens) + ' input / ' + fmtK(m.outputTokens) + ' output tokens)');\n    }\n  }\n}\nlines.push(...pipelineLines());\nlines.push('');\nlines.push('\\u26A0\\uFE0F Gaps: Embedding token usage not captured via execution data.');\nconst message = lines.join('\\n');\nreturn [{ json: { message } }];"
+      },
+      "executeOnce": false
+    },
+    {
+      "id": "2118389e-2549-4a4f-8c7b-a6bb76222951",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1120,
+        460
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09DRCJLQCE"
+        },
+        "messageType": "text",
+        "text": "={{ $json.message }}",
+        "otherOptions": {
+          "mrkdwn": true,
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "executeOnce": true,
+      "webhookId": "f1e1b919-6f11-4b36-8769-60ff75f89baa"
+    },
+    {
+      "id": "56ab6ec3-37d5-4a09-b57b-105b46e7ed66",
+      "name": "Build Pipeline List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        620
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [\n  { json: { workflowId: 'gQ6Ee8PxLdU39nxh', workflowName: 'SessionAnalysis', sessionIdField: 'id' } },\n  { json: { workflowId: 'v33yZBOdJuvyym7s', workflowName: 'JobAnalysis', sessionIdField: 'id' } },\n  { json: { workflowId: 'YgLLZRCPGssHQMny', workflowName: 'OpportunityAnalysis', sessionIdField: 'id' } },\n  { json: { workflowId: 'aiyPD50CSH3AEbI0', workflowName: 'SessionVectors', sessionIdField: 'session_id' } },\n  { json: { workflowId: 'JaAnQVNWTIFEIHrq', workflowName: 'JobVectors', sessionIdField: 'session_id' } },\n];"
+      }
+    },
+    {
+      "id": "4f35a2b7-406d-4ac8-afe5-a6046d1e3913",
+      "name": "Get Pipeline Executions",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        620
+      ],
+      "parameters": {
+        "resource": "execution",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 100,
+        "filters": {
+          "workflowId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.workflowId }}"
+          },
+          "status": "success"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "id": "373ef9a4-9e38-48b6-89a7-354b35f6a71c",
+      "name": "Flatten Pipeline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        620
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const listItems = $('Build Pipeline List').all();\nconst idToMeta = {};\nfor (const it of listItems) { idToMeta[it.json.workflowId] = it.json; }\nconst cutoff = Date.now() - 24 * 60 * 60 * 1000;\nconst out = [];\nfor (const item of $input.all()) {\n  const ex = item.json;\n  if (!ex || !ex.id) continue;\n  const startedAt = ex.startedAt || ex.startedAtDate || ex.createdAt;\n  if (startedAt) {\n    const t = new Date(startedAt).getTime();\n    if (!isNaN(t) && t < cutoff) continue;\n  }\n  const wfId = (ex.workflowId != null) ? String(ex.workflowId) : '';\n  const meta = idToMeta[wfId] || {};\n  out.push({ json: {\n    executionId: String(ex.id),\n    workflowId: wfId,\n    workflowName: meta.workflowName || ex.workflowName || 'unknown',\n    sessionIdField: meta.sessionIdField || 'id',\n  }});\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "6808a2f7-5a68-43b8-99ca-a1e48a34981a",
+      "name": "Get Pipeline Exec Data",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        160,
+        620
+      ],
+      "parameters": {
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $json.executionId }}",
+        "options": {
+          "activeWorkflows": true
+        }
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "id": "70f61084-cd55-444e-85d1-e14ed05fc4a9",
+      "name": "Aggregate Pipeline Costs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        620
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const PRICES = {\n  // Opus models (per 1M tokens)\n  'claude-opus-4-0520': { input: 15, output: 75 },\n  'claude-opus-4-1': { input: 15, output: 75 },\n  'claude-opus-4-5': { input: 5, output: 25 },\n  'claude-opus-4-6': { input: 15, output: 75 },\n  'claude-opus-4-7': { input: 15, output: 75 },\n  'claude-opus-4-8': { input: 15, output: 75 },\n\n  // Sonnet models\n  'claude-sonnet-4-0514': { input: 3, output: 15 },\n  'claude-sonnet-4-20250514': { input: 3, output: 15 },\n  'claude-sonnet-4-5': { input: 3, output: 15 },\n  'claude-sonnet-4-6': { input: 3, output: 15 },\n\n  // Haiku models\n  'claude-haiku-4-5': { input: 1, output: 5 },\n\n  // Fable / Opus 5\n  'claude-fable-5': { input: 10, output: 50 },\n  'claude-opus-5': { input: 5, output: 25 },\n  'claude-sonnet-5': { input: 3, output: 15 },\n\n  // OpenAI embeddings\n  'text-embedding-3-small': { input: 0.02, output: 0.02 },\n  'text-embedding-ada-002': { input: 0.10, output: 0.10 },\n};\n\n// Fuzzy matching fallback\nfunction getPrice(model) {\n  if (!model) return { input: 15, output: 75 }; // unknown = assume expensive\n  const m = model.toLowerCase();\n  if (PRICES[m]) return PRICES[m];\n  if (m.includes('opus-5') || m.includes('opus-4-5')) return { input: 5, output: 25 };\n  if (m.includes('opus')) return { input: 15, output: 75 };\n  if (m.includes('sonnet')) return { input: 3, output: 15 };\n  if (m.includes('haiku')) return { input: 1, output: 5 };\n  if (m.includes('fable')) return { input: 10, output: 50 };\n  if (m.includes('embedding')) return { input: 0.02, output: 0.02 };\n  return { input: 15, output: 75 }; // fallback\n}\n\nconst flatItems = $('Flatten Pipeline').all();\nconst dataItems = $input.all();\nconst sessionMap = {}; // session_id -> { workflows: { name: { cost, tokens, execCount } }, totalCost, totalTokens }\n\nfor (let i = 0; i < dataItems.length; i++) {\n  const item = (dataItems[i] && dataItems[i].json) || {};\n  const meta = (flatItems[i] && flatItems[i].json) || {};\n  const wfName = meta.workflowName || 'unknown';\n  const sessionIdField = meta.sessionIdField || 'id';\n  const runData = item && item.data && item.data.resultData && item.data.resultData.runData;\n  if (!runData || typeof runData !== 'object') continue;\n\n  // Extract session_id from sub_trigger node output\n  let sessionId = null;\n  const triggerData = runData['sub_trigger'];\n  if (Array.isArray(triggerData) && triggerData[0] && triggerData[0].data && triggerData[0].data.main && triggerData[0].data.main[0] && triggerData[0].data.main[0][0] && triggerData[0].data.main[0][0].json) {\n    sessionId = triggerData[0].data.main[0][0].json[sessionIdField];\n  }\n  if (!sessionId) sessionId = 'unknown';\n\n  // Walk all nodes for token usage (proven lm/outer/entry shape)\n  let execCost = 0;\n  let execTokens = 0;\n  for (const nodeName of Object.keys(runData)) {\n    const runs = runData[nodeName];\n    if (!Array.isArray(runs)) continue;\n    for (const run of runs) {\n      const lm = run && run.data && run.data.ai_languageModel;\n      if (!Array.isArray(lm)) continue;\n      let modelName = 'unknown';\n      try {\n        const io = run.inputOverride && run.inputOverride.ai_languageModel;\n        if (Array.isArray(io) && io[0] && io[0][0] && io[0][0].json && io[0][0].json.options && io[0][0].json.options.model) {\n          modelName = io[0][0].json.options.model;\n        }\n      } catch (e) {}\n      for (const outer of lm) {\n        if (!Array.isArray(outer)) continue;\n        for (const entry of outer) {\n          const tu = entry && entry.json && entry.json.tokenUsage;\n          if (!tu) continue;\n          const promptTokens = Number(tu.promptTokens || 0);\n          const completionTokens = Number(tu.completionTokens || 0);\n          const p = getPrice(modelName);\n          const cost = (promptTokens / 1e6) * p.input + (completionTokens / 1e6) * p.output;\n          execCost += cost;\n          execTokens += promptTokens + completionTokens;\n        }\n      }\n    }\n  }\n\n  if (!sessionMap[sessionId]) {\n    sessionMap[sessionId] = { workflows: {}, totalCost: 0, totalTokens: 0 };\n  }\n  sessionMap[sessionId].totalCost += execCost;\n  sessionMap[sessionId].totalTokens += execTokens;\n  if (!sessionMap[sessionId].workflows[wfName]) {\n    sessionMap[sessionId].workflows[wfName] = { cost: 0, tokens: 0, execCount: 0 };\n  }\n  sessionMap[sessionId].workflows[wfName].cost += execCost;\n  sessionMap[sessionId].workflows[wfName].tokens += execTokens;\n  sessionMap[sessionId].workflows[wfName].execCount += 1;\n}\n\nconst sessions = Object.entries(sessionMap).filter(([id]) => id !== 'unknown');\nconst totalPipelineCost = sessions.reduce((sum, [, s]) => sum + s.totalCost, 0);\nconst avgPerSession = sessions.length > 0 ? totalPipelineCost / sessions.length : 0;\n\nconst wfTotals = {};\nfor (const [, session] of sessions) {\n  for (const [wfName, wfData] of Object.entries(session.workflows)) {\n    if (!wfTotals[wfName]) wfTotals[wfName] = { cost: 0, tokens: 0, execCount: 0 };\n    wfTotals[wfName].cost += wfData.cost;\n    wfTotals[wfName].tokens += wfData.tokens;\n    wfTotals[wfName].execCount += wfData.execCount;\n  }\n}\n\nreturn [{\n  json: {\n    pipelineSessionCount: sessions.length,\n    pipelineTotalCost: totalPipelineCost,\n    pipelineAvgPerSession: avgPerSession,\n    pipelineWorkflows: wfTotals,\n    pipelineSessions: Object.fromEntries(sessions.map(([id, data]) => [id, { cost: data.totalCost, tokens: data.totalTokens }])),\n  }\n}];",
+        "executeOnce": true
+      }
+    },
+    {
+      "id": "79190ec5-167c-4291-bed6-5e9eef815bd0",
+      "name": "Combine Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        640,
+        460
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 2,
+        "options": {
+          "includeUnpaired": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 06:30 UTC": {
+      "main": [
+        [
+          {
+            "node": "Build Workflow List",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Pipeline List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Workflow List": {
+      "main": [
+        [
+          {
+            "node": "Get Executions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Executions": {
+      "main": [
+        [
+          {
+            "node": "Filter & Flatten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Flatten": {
+      "main": [
+        [
+          {
+            "node": "Get Execution Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Execution Data": {
+      "main": [
+        [
+          {
+            "node": "Extract Token Usage & Calculate Cost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Pipeline List": {
+      "main": [
+        [
+          {
+            "node": "Get Pipeline Executions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pipeline Executions": {
+      "main": [
+        [
+          {
+            "node": "Flatten Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Pipeline": {
+      "main": [
+        [
+          {
+            "node": "Get Pipeline Exec Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pipeline Exec Data": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Pipeline Costs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Token Usage & Calculate Cost": {
+      "main": [
+        [
+          {
+            "node": "Combine Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Pipeline Costs": {
+      "main": [
+        [
+          {
+            "node": "Combine Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Results": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "9983d882-54d9-4e3f-a439-591ae6639dae",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wWGhCjDluNfE1cPJ",
+  "isArchived": false,
+  "nodeGroups": []
+}

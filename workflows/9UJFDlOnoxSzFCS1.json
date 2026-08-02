@@ -848,21 +848,18 @@
       ]
     },
     {
-      "id": "1b76bc62-5839-46e7-a966-1ac0bcb91dd1",
-      "name": "IsMentionOrDM",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        -2520,
-        128
-      ],
       "parameters": {
         "conditions": {
-          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ ($('OnEvent').item.json.type === 'app_mention' || $('OnEvent').item.json.channel_type === 'im') && !['U09Q22R53T6','U0BLRFB0FJR'].includes($('OnEvent').item.json.user) && !($('OnEvent').item.json.bot_id) }}",
+              "leftValue": "={{ ($('OnEvent').item.json.type === 'app_mention' || $('OnEvent').item.json.channel_type === 'im')}}",
               "operator": {
                 "operation": "true",
                 "singleValue": true,
@@ -870,15 +867,18 @@
               }
             }
           ],
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          }
+          "combinator": "and"
         },
         "options": {}
-      }
+      },
+      "id": "1b76bc62-5839-46e7-a966-1ac0bcb91dd1",
+      "name": "IsMentionOrDM",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2528,
+        128
+      ]
     }
   ],
   "connections": {
@@ -1153,7 +1153,7 @@
     "errorWorkflow": "MLxaOYbzMS9DFoIv"
   },
   "triggerCount": 1,
-  "versionId": "e680d41a-9e1d-4ccf-8332-aea625f6cea9",
+  "versionId": "8d52570e-987f-4a40-a802-76197eae8792",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
