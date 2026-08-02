@@ -1,0 +1,169 @@
+{
+  "id": "MS14Oksst5sZnjiK",
+  "name": "ProjectUpdate",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "projectId"
+            },
+            {
+              "name": "script"
+            },
+            {
+              "name": "name"
+            },
+            {
+              "name": "type"
+            }
+          ]
+        }
+      },
+      "id": "007078f0-0dbc-49cc-913e-dfa444d2eede",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\n\nconst projectId = (input.projectId || '').trim();\nif (!projectId) {\n  throw new Error('projectId is required to update a project.');\n}\n\nconst updates = {};\n\nconst script = (input.script || '').trim();\nif (script) updates.script = script;\n\nconst name = (input.name || '').trim();\nif (name) updates.name = name;\n\nconst type = (input.type || '').trim();\nif (type) {\n  const validTypes = ['discovery_interview', 'usability_test', 'concept_test', 'card_sort', 'survey', 'diary_study', 'field_study', 'other'];\n  if (!validTypes.includes(type)) {\n    throw new Error(`Invalid project type \"${type}\". Must be one of: ${validTypes.join(', ')}`);\n  }\n  updates.type = type;\n}\n\nif (Object.keys(updates).length === 0) {\n  throw new Error('No fields provided to update. Provide at least one of: script, name, type.');\n}\n\nreturn { projectId, updates };"
+      },
+      "id": "1b8a3ecc-69d4-4e24-9353-ed8f2bbbf037",
+      "name": "validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const { projectId, updates } = $input.item.json;\nreturn { id: projectId, ...updates };"
+      },
+      "id": "7777a4dc-288a-4757-8d64-37ccc926cdf3",
+      "name": "prepare_data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "project",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": "id"
+      },
+      "id": "219568b5-d875-4003-8b8e-9c668c3eb8cd",
+      "name": "update_project",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const result = $input.item.json;\nconst projectId = result.id;\nconst pidgeonheadUrl = `https://pidgeonhead.netlify.app/projects/${projectId}`;\n\nconst updatedFields = Object.keys($('validate').item.json.updates);\n\nreturn {\n  message: `Project updated successfully. Updated fields: ${updatedFields.join(', ')}.`,\n  projectId,\n  pidgeonheadUrl,\n  updatedFields\n};"
+      },
+      "id": "10756e57-ff7f-41fc-91c8-9066a7331c48",
+      "name": "format_response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate": {
+      "main": [
+        [
+          {
+            "node": "prepare_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_data": {
+      "main": [
+        [
+          {
+            "node": "update_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_project": {
+      "main": [
+        [
+          {
+            "node": "format_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "65dc2a92-2bb7-4bf7-9474-009b722122f3",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

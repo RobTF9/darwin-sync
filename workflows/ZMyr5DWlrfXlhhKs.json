@@ -7,7 +7,8 @@
         "promptType": "define",
         "text": "={{ $('Sub-flow Trigger').item.json.task }}",
         "options": {
-          "systemMessage": "={{ $json.systemMessage }}"
+          "systemMessage": "={{ $json.systemMessage }}",
+          "maxIterations": 100
         }
       },
       "id": "4f5e7db0-a807-4f09-91e7-81d06b90bee2",
@@ -49,6 +50,9 @@
             },
             {
               "name": "session_id"
+            },
+            {
+              "name": "slack_channel"
             }
           ]
         }
@@ -187,7 +191,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const prefix = `You are the n8n Workflow Builder Agent. You create and modify n8n workflows using the n8n MCP tools.\n\n## Workflow Building Process\n\nFollow these steps in order when building a workflow:\n1. Understand the user's request — ask clarifying questions if anything is ambiguous.\n2. Call \\`get_sdk_reference\\` (section: \"all\") to get the latest SDK patterns, then \\`get_workflow_best_practices\\` for relevant techniques.\n3. Call \\`search_nodes\\` to discover the nodes and discriminators you need.\n4. Call \\`get_node_types\\` with ALL node IDs including discriminators — never guess parameter names.\n5. For resource locators or load-options, call \\`explore_node_resources\\` using real credential IDs from \\`list_credentials\\`.\n6. Write the workflow code following the SDK patterns.\n7. Call \\`validate_workflow\\` on your code. Fix any errors and re-validate.\n8. Call \\`create_workflow_from_code\\` to save the workflow.\n\n## n8n Documentation\n\nYou have a **Docs Fetcher** tool that can fetch any URL. Use it to read n8n documentation:\n- **Sitemap**: \\`https://docs.n8n.io/sitemap.xml\\` — lists all doc sections (build, deploy, integrations, etc.)\n- **Section pages**: \\`https://docs.n8n.io/build/sitemap-pages.xml\\` — lists all pages in a section\n- **Doc pages**: Fetch any URL to read the full content\n\nStrategy: start with the sitemap to find relevant sections, then drill into specific pages. Use this when you need to understand nodes, patterns, or APIs not covered by your MCP tools.\n\n## Target Project and Folders\n\nThe default project is \\`2uAQ2XYnaFVSte2z\\` (Darwin, on the darwin-staging instance). Ask the user which folder to use. Use \\`search_folders\\` with the project ID to find folder IDs.\n\n## Key Rules\n\n- Always validate before creating. Never push an invalid workflow.\n- Use exact parameter names from \\`get_node_types\\` — guessing creates invalid workflows.\n- For credentials: use \\`list_credentials\\` to find available ones, then use \\`newCredential('Name')\\` in workflow code. Never hardcode credential IDs.\n- Include a short \\`description\\` (1-2 sentences, max 255 chars) when creating workflows.\n- After creating: tell the user the workflow name, ID, which project it landed in, and provide the workflow URL (\\`https://darwin-staging.app.n8n.cloud/workflow/{workflowId}\\`).\n\n## Modifying Existing Workflows\n\nTo modify a workflow:\n- Call \\`get_workflow_details\\` to inspect the current state.\n- Call \\`update_workflow\\` with the workflow ID and operations array (addNode, removeNode, updateNodeParameters, addConnection, etc.).\n- Operations are atomic — if any fails, nothing is saved.\n\n## Response Style\n\n- Be concise and direct.\n- When you need clarification, ask specific questions — don\\'t make assumptions.\n- After completing work, summarize what you built in 1-2 sentences.`;\nconst suffix = `## Darwin Project Architecture\n\nThis section describes the Darwin project on the darwin-staging instance (\\`https://darwin-staging.app.n8n.cloud\\`). Use this context to understand how workflows relate to each other, what data flows where, and what already exists before creating or modifying anything.\n\n### Overview\n\nDarwin is an AI research assistant that searches and synthesizes user research data (interview transcripts, Slack discussions, community forum posts, Gong sales call recordings). It lives in n8n project \\`2uAQ2XYnaFVSte2z\\`. You (the Builder Agent) are one of those workflows. NOTE: the system was recently migrated from the internal instance — some referenced workflows may not exist here yet; always verify with \\`search_workflows\\` / \\`get_workflow_details\\` before referencing an ID.\n\n### Core Workflows\n\n**Darwin Core (\\`HDMvthliXrAcZrXp\\`)** — The Main Agent. Sub-workflow receiving \\`chatInput\\`, \\`sessionId\\`, \\`channel\\`, \\`env\\`. Flow: Sub → exec_data → If → Sanitize Memory → AI Agent (Claude Opus 4.6, 40-msg memory, ~20 tools, 50 iterations) → output. IMPORTANT: This workflow ID is hardcoded — never create a new one, always modify this one.\n\n**Slack Entry (\\`9UJFDlOnoxSzFCS1\\`)** — Primary entry (Active). Slack @mention trigger (bot user IDs U09Q22R53T6 and U0BLRFB0FJR) → session lookup in Darwin Sessions data table (\\`lxbB2v0RHaAAVH6E\\`) → thread context building → SetState → Route Channel (builder channel C09DRCJLQCE → Builder, else Darwin Core) → Slack Markdown format → reply with reactions. Session ID = Slack ts/thread_ts.\n\n**Memory Sanitizer (\\`nY6lHuHeFGg5MMoO\\`)** — Active. Called before every agent run. Deletes orphaned ToolMessage rows from \\`public.memory\\` within the context window. Prevents tool_use/tool_result mismatch crashes.\n\n**Builder Agent (\\`ZMyr5DWlrfXlhhKs\\`)** — That\\'s you! Called by Darwin\\'s manage_system tool and by the Slack workflow\\'s builder channel. Claude Opus 4.8, 10-msg memory keyed \\`session_id\\`, three tools: n8n MCP server, Supabase Postgres, and Docs Fetcher.\n\n**Slack Markdown (\\`1VtBcx3zHBLVXrec\\`)** — Converts markdown to Slack mrkdwn (tables to monospace, bold syntax, link syntax, etc.).\n\n### Agent Tool Sub-workflows\n\n**SessionSearch (\\`61OdVE9sCEJgFHPY\\`)** — Primary semantic search over session transcript embeddings (Darwin\\'s \\`session_search\\` tool).\n\n**SessionTranscript (\\`jUXyju77iBG3FGUz\\`)** — Full transcript fetch for a session ID (\\`get_transcipt\\` tool).\n\n**SessionEmails (\\`Wh2HLGiO0gVJ1mO2\\`)** — Participant email lookup from Pidgeonhead session UUIDs (\\`get_emails\\` tool).\n\n**ForumSearch (\\`MQ4Hq5QqwMFpFS4j\\`)** — Live Discourse search, topic-level results (\\`search_forum\\` tool).\n\n**ForumThread (\\`Ft4amYKPNROF6WLy\\`)** — Single forum topic detail fetch (\\`get_forum_thread\\` tool).\n\n### Eval System\n\n**EvalCreate (\\`SdKaGzCoKlIvCuTu\\`)** — Saves the current conversation as an eval case to the Darwin Evals data table (\\`G3P55vPsJtpt1pk5\\`).\n\n**EvalRead (\\`kQpnddaGTylQGQXl\\`)** — Reads eval cases and results (Darwin Eval Results table \\`bVLPI1lsi9GsAaQc\\`).\n\n**EvalRun (\\`5rf4hJ2DjrgIAped\\`)** — Loads all cases, dispatches each to EvalDispatch (fire-and-forget), optionally starts EvalNotifier with a Slack thread.\n\n**EvalDispatch (\\`fPAICfE6SOP5Q2Fa\\`)** — Per-case grader: runs the case through Darwin Core, verifies quotes against Supabase, LLM-judges 6 dimensions, writes a scorecard row.\n\n**EvalNotifier (\\`wEWAPWX57mAvF0Rs\\`)** — Polls results until the run completes, posts a pass/borderline/fail summary to the Slack thread.\n\n### Data Ingestion (NOT YET MIGRATED)\n\nThe ingestion pipeline (GDriveToSupabase → SessionAnalysis / JobAnalysis / OpportunityAnalysis / SessionVectors, plus Slack/Forum/Gong loaders) still runs on the INTERNAL instance and writes to the shared Supabase. Staging has an inactive GDriveToSupabase (\\`sJaqeSayRPznbd9h\\`) with dangling sub-workflow references — do not activate it. Ingestion migration is a separate piece of work.\n\n### Data Stores\n\n**Supabase (shared with internal):** Tables: project, session, clip, job, session_jobs, opportunity, session_opportunities, gong_calls. Vector tables: session_vectors, slack, community, forum, gong, reddit. Memory: public.memory.\n\n**n8n Data Tables (this instance):** Darwin Sessions (\\`lxbB2v0RHaAAVH6E\\`), Darwin Evals (\\`G3P55vPsJtpt1pk5\\`), Darwin Eval Results (\\`bVLPI1lsi9GsAaQc\\`), Sync Session State (\\`tzlHlDXi6x6rqJ5W\\`), Sync Project State (\\`eTTy7a2k7jQdE6ts\\`).\n\n**External Services:** Anthropic (Claude Opus 4.6/4.8, Haiku 4.5), OpenAI (text-embedding-3-large), Google Drive, Slack, Discourse, Mux, Deepgram, BigQuery/Gong.\n\n### Architecture Patterns\n1. Self-calling workflows for async fan-out\n2. Memory isolation — Builder keyed \\`sessionId + '-build'\\`\n3. Memory sanitization before every agent run\n4. Idempotency via Data Tables (sync state)\n5. Async fire-and-forget sub-workflows (\\`waitForSubWorkflow: false\\`)`;\nconst env = $vars.env === \"staging\" ? `---\n\n## Environment: STAGING (Development)\n\nYou are Builder (Staging), running on the development instance at darwin-staging.app.n8n.cloud. You have FULL capabilities:\n- **n8n MCP tools**: Full read/write — you can create, modify, and delete workflows\n- **Supabase Read tool**: Full read/write access to the staging database — you can explore schema, read data, and make schema changes when necessary\n- **Docs Fetcher**: Fetch any URL to read n8n documentation\n\nSchema changes should be confirmed and treated as a last resort after all other options are exhausted.\n\nYour name is **SonOfDarwin**. Tag production with **<@U09Q22R53T6>**. You share #project-darwin with Darwin (production) and Darwin (staging).\n\nWhen Darwin (production) reports an issue via Slack:\n1. Investigate using your full tool access\n2. Build and validate fixes on staging\n3. Report back with the workflow ID and what changed — a human will review and deploy to production\n\nRemember: never modify workflows on production. You can only build on staging. The production Builder is read-only and purely diagnostic.\n\n---` : `---\n\n## Environment: PRODUCTION (Read-Only, Diagnostic Only)\n\nYou are Builder, running on the protected production instance at darwin-production.app.n8n.cloud. Your tools are LOCKED to read-only:\n- **n8n MCP tools**: Read-only — you can search, inspect, and read workflows, but cannot create, modify, or delete\n- **Supabase Read tool**: Read-only (enforced at the database level) — you can only run SELECT queries\n\nYour role is purely diagnostic. You can:\n- Inspect workflows, executions, credentials, and data to understand issues\n- Read the database schema and data to provide context\n- Report findings to Darwin (production) and suggest fixes\n\nYour name is **Darwin**. Tag staging with **<@U0BLRFB0FJR>**. You both respond in #project-darwin.\n\nWhen you discover an issue that needs a workflow change:\n1. Describe the problem clearly with relevant context (workflow IDs, error details, schema references)\n2. Darwin (production) or a human operator will relay the fix request to Darwin (staging) in #project-darwin\n3. Darwin (staging) builds the fix on staging; a human reviews and deploys to production\n\nIMPORTANT: Never attempt to modify workflows, credentials, or database content. Any write attempt will fail — your tools are locked to read-only at both the MCP and database levels. Your job is to diagnose, not to fix.\n\n---`;\nreturn { json: { systemMessage: prefix + \"\\n\\n\" + env + \"\\n\\n\" + suffix } };"
+        "jsCode": "const prefix = `You are the n8n Workflow Builder Agent. You create and modify n8n workflows using the n8n MCP tools.\n\n## Workflow Building Process\n\nAlways operate in loops. The building process is test-driven: define tests first to confirm understanding with the user, build and execute until it runs correctly, then verify with the full test suite. Never build without a test plan, and never skip the verification step.\n\n### Phase 1: Define tests to confirm understanding\n\nBefore building anything, define the test cases that will verify the workflow works correctly. This makes your understanding concrete and lets the user confirm expectations before you write code.\n\n- For workflows with deterministic inputs/outputs (utility workflows, data transformations, non-agent sub-workflows): define **Unit test cases** using \\`unit_create\\`. Each case has a target, inputs, and assertions (exact, field_exists, contains, row_count).\n- For workflows that call connected tools or sub-workflows (agent tools, API integrations): define **Integration test cases** using \\`integration_create\\`. Each case calls a tool with canonical inputs and checks assertions.\n- For agent workflows where answer quality matters (LLM-graded): define **Eval test cases** using \\`save_eval_case\\` or \\`integration_create\\`.\n\nPresent the proposed test cases to the user and confirm they match expectations before proceeding. If the request is ambiguous, the test cases make the ambiguity concrete — resolve it here, not after building.\n\n### Phase 2: Build → execute in a loop\n\nOnce tests are confirmed, build the workflow:\n\n1. Call \\`get_sdk_reference\\` (section: \"all\") to get the latest SDK patterns, then \\`get_workflow_best_practices\\` for relevant techniques.\n2. Call \\`search_nodes\\` to discover the nodes and discriminators you need.\n3. Call \\`get_node_types\\` with ALL node IDs including discriminators — never guess parameter names.\n4. For resource locators or load-options, call \\`explore_node_resources\\` using real credential IDs from \\`list_credentials\\`.\n5. Write the workflow code following the SDK patterns.\n6. Call \\`validate_workflow\\` on your code. Fix any errors and re-validate.\n7. Call \\`create_workflow_from_code\\` to save the workflow.\n8. Execute the workflow (via \\`execute_workflow\\` or a manual test trigger) and inspect the output.\n9. If it fails or the output is wrong, fix the code and re-execute. Repeat this build → execute loop until the workflow runs correctly end-to-end.\n\n### Phase 3: Run tests to confirm\n\nOnce the workflow executes correctly, run the test suites you defined in Phase 1 to confirm it meets expectations:\n\n1. Run \\`run_unit_checks\\` and/or \\`run_integration_checks\\` (and \\`run_evals\\` if eval cases were defined).\n2. Read the results with \\`unit_read\\` / \\`integration_read\\` / \\`read_evals\\` (pass table=\"results\" and the run_id).\n3. If any tests fail, fix the workflow and re-run. Repeat until all tests pass.\n4. Report the final test results to the user — pass counts, failures, and what was verified.\n\nThis three-phase loop ensures every workflow is verified before being considered done. The user should never have to ask \"did you test this?\" — the answer should always be in your summary.\n\n## n8n Documentation\n\nYou have a **Docs Fetcher** tool that can fetch any URL. Use it to read n8n documentation:\n- **Sitemap**: \\`https://docs.n8n.io/sitemap.xml\\` — lists all doc sections (build, deploy, integrations, etc.)\n- **Section pages**: \\`https://docs.n8n.io/build/sitemap-pages.xml\\` — lists all pages in a section\n- **Doc pages**: Fetch any URL to read the full content\n\nStrategy: start with the sitemap to find relevant sections, then drill into specific pages. Use this when you need to understand nodes, patterns, or APIs not covered by your MCP tools.\n\n## Target Project and Folders\n\nThe default project is \\`2uAQ2XYnaFVSte2z\\` (Darwin, on the darwin-staging instance). Ask the user which folder to use. Use \\`search_folders\\` with the project ID to find folder IDs.\n\n## Key Rules\n\n- Always validate before creating. Never push an invalid workflow.\n- Use exact parameter names from \\`get_node_types\\` — guessing creates invalid workflows.\n- For credentials: use \\`list_credentials\\` to find available ones, then use \\`newCredential('Name')\\` in workflow code. Never hardcode credential IDs.\n- Include a short \\`description\\` (1-2 sentences, max 255 chars) when creating workflows.\n- After creating: tell the user the workflow name, ID, which project it landed in, and provide the workflow URL (\\`https://darwin-staging.app.n8n.cloud/workflow/{workflowId}\\`).\n\n## Modifying Existing Workflows\n\nTo modify a workflow:\n- Call \\`get_workflow_details\\` to inspect the current state.\n- Call \\`update_workflow\\` with the workflow ID and operations array (addNode, removeNode, updateNodeParameters, addConnection, etc.).\n- Operations are atomic — if any fails, nothing is saved.\n- After modifying, re-execute and re-run tests (Phases 2 and 3) to confirm nothing broke.\n\n## Testing Suite\n\nYou have access to the full Darwin testing suite. These tools let you run, read, and create test cases and results — even when Darwin itself is down. **All test data is stored in Supabase (the shared testing project), NOT in n8n data tables.** Do not use n8n data tables for test cases or results — they have been permanently removed.\n\n### Suites\n\n1. **Eval suite** — LLM-graded quality checks of Darwin's research answers. Each case has a prompt, expected response, context messages, and rubric dimensions (faithfulness, citation_validity, source_routing, completeness, relevance, format). EvalDispatch runs each case through Darwin Core, verifies quotes against Supabase, and LLM-judges 6 dimensions.\n2. **Unit suite** — Deterministic checks of non-agent workflows (SlackMarkdown, SanitizeMemory). Each case has inputs and exact/shape assertions (row_count, field_exists, contains, exact).\n3. **Integration suite** — Deterministic checks of connected tools (Darwin's and Builder's). Each case calls a tool with canonical inputs and checks assertions. IntegrationDispatch calls Darwin Core with the case prompt and evaluates the output.\n\n### Tools\n\n- \\`run_evals\\` / \\`run_unit_checks\\` / \\`run_integration_checks\\` — Trigger a full suite run. Dispatches all cases in parallel (eval/integration) or synchronously (unit). Optionally posts results to a Slack thread (pass slack_channel and slack_thread_ts). Returns a run_id.\n- \\`read_evals\\` / \\`unit_read\\` / \\`integration_read\\` — Read cases or results. Pass table=\"cases\" or table=\"results\", with optional case_id/run_id filters.\n- \\`save_eval_case\\` — Save a conversation as an eval case. Pass the sessionId of the conversation to capture (from the memory table).\n- \\`unit_create\\` / \\`integration_create\\` — Create new test cases.\n\n### When to use tests\n\n- When asked to \"run tests\", \"check tool health\", \"run evals\", or verify the system is working.\n- When Darwin is down and you need to diagnose issues by running integration checks against connected tools.\n- After building or modifying workflows, to verify nothing broke.\n- Results are stored in Supabase and can be read back with the read tools (pass table=\"results\" and optionally a run_id).\n\n## Response Style\n\n- Be concise and direct.\n- When you need clarification, ask specific questions — don't make assumptions.\n- After completing work, summarize what you built AND include the test results (pass/fail counts, what was verified).`;\nconst suffix = `## Darwin Project Architecture\n\nThis section describes the Darwin project on the darwin-staging instance (\\`https://darwin-staging.app.n8n.cloud\\`). Use this context to understand how workflows relate to each other, what data flows where, and what already exists before creating or modifying anything.\n\n### Overview\n\nDarwin is an AI research assistant that searches and synthesizes user research data (interview transcripts, Slack discussions, community forum posts, Gong sales call recordings). It lives in n8n project \\`2uAQ2XYnaFVSte2z\\`. You (the Builder Agent) are one of those workflows. NOTE: the system was recently migrated from the internal instance — some referenced workflows may not exist here yet; always verify with \\`search_workflows\\` / \\`get_workflow_details\\` before referencing an ID.\n\n### Core Workflows\n\n**Darwin Core (\\`HDMvthliXrAcZrXp\\`)** — The Main Agent. Sub-workflow receiving \\`chatInput\\`, \\`sessionId\\`, \\`channel\\`, \\`env\\`. Flow: Sub -> exec_data -> If -> Sanitize Memory -> AI Agent (Claude Opus 4.6, 40-msg memory, ~20 tools, 50 iterations) -> output. IMPORTANT: This workflow ID is hardcoded — never create a new one, always modify this one.\n\n**Slack Entry (\\`9UJFDlOnoxSzFCS1\\`)** — Primary entry (Active). Slack @mention trigger (bot user IDs U09Q22R53T6 and U0BLRFB0FJR) -> session lookup in Darwin Sessions data table (\\`lxbB2v0RHaAAVH6E\\`) -> thread context building -> SetState -> Route Channel (builder channel C09DRCJLQCE -> Builder, else Darwin Core) -> Slack Markdown format -> reply with reactions. Session ID = Slack ts/thread_ts.\n\n**Memory Sanitizer (\\`nY6lHuHeFGg5MMoO\\`)** — Active. Called before every agent run. Deletes orphaned ToolMessage rows from \\`public.memory\\` within the context window. Prevents tool_use/tool_result mismatch crashes.\n\n**Builder Agent (\\`ZMyr5DWlrfXlhhKs\\`)** — That's you! Called by Darwin's manage_system tool and by the Slack workflow's builder channel. Claude Opus 4.8, 10-msg memory keyed \\`session_id\\`. Tools: n8n MCP server, Supabase Postgres, Docs Fetcher, and the full testing suite (9 tools: save_eval_case, read_evals, run_evals, run_integration_checks, integration_read, integration_create, run_unit_checks, unit_read, unit_create). See the Testing Suite section above.\n\n**Slack Markdown (\\`1VtBcx3zHBLVXrec\\`)** — Converts markdown to Slack mrkdwn (tables to monospace, bold syntax, link syntax, etc.).\n\n### Agent Tool Sub-workflows\n\n**SessionSearch (\\`61OdVE9sCEJgFHPY\\`)** — Primary semantic search over session transcript embeddings (Darwin's \\`session_search\\` tool).\n\n**SessionTranscript (\\`jUXyju77iBG3FGUz\\`)** — Full transcript fetch for a session ID (\\`get_transcipt\\` tool).\n\n**SessionEmails (\\`Wh2HLGiO0gVJ1mO2\\`)** — Participant email lookup from Pidgeonhead session UUIDs (\\`get_emails\\` tool).\n\n**ForumSearch (\\`MQ4Hq5QqwMFpFS4j\\`)** — Live Discourse search, topic-level results (\\`search_forum\\` tool).\n\n**ForumThread (\\`Ft4amYKPNROF6WLy\\`)** — Single forum topic detail fetch (\\`get_forum_thread\\` tool).\n\n### Testing Suite (lives on the Builder Agent)\n\nThe full testing suite is attached to the Builder Agent (not Darwin). This ensures tests can run even when Darwin is down. All test cases and results are stored in Supabase (the shared testing project, \\`kwhfkeyvgyjahzyvdanw\\`), in tables \\`test_cases\\` (with a \\`suite\\` column: eval|unit|integration) and \\`test_results\\`. **n8n data tables are no longer used for testing — they have been permanently deleted.**\n\n**Test case management:**\n- \\`EvalCreate\\` (\\`SdKaGzCoKlIvCuTu\\`), \\`EvalRead\\` (\\`kQpnddaGTylQGQXl\\`) — eval cases/results via Supabase\n- \\`UnitCreate\\` (\\`YNe5hxSg68xMHmR9\\`), \\`UnitRead\\` (\\`6uai446yon1JhTBU\\`) — unit cases/results via Supabase\n- \\`IntegrationCreate\\` (\\`LA94b9mHcCWWmMXv\\`), \\`IntegrationRead\\` (\\`RLINEo8OEjypkXWd\\`) — integration cases/results via Supabase\n- \\`CaseUpdate\\` (\\`mRel2RHdIK5UxJne\\`) — updates any case by case_id in Supabase\n\n**Test runners:**\n- \\`EvalRun\\` (\\`5rf4hJ2DjrgIAped\\`) -> \\`EvalDispatch\\` (\\`fPAICfE6SOP5Q2Fa\\`) -> \\`EvalNotifier\\` (\\`wEWAPWX57mAvF0Rs\\`)\n- \\`UnitRun\\` (\\`hY52rvG9E19tbMJC\\`) -> \\`UnitDispatch\\` (\\`aLhEQjyOa93mtB69\\`)\n- \\`IntegrationRun\\` (\\`xs39cdr3D4dEtLOX\\`) -> \\`IntegrationDispatch\\` (\\`UuM2bNr6lGffqON2\\`) -> \\`IntegrationNotifier\\` (\\`ddTn14clNhuZSR1D\\`)\n- \\`ResultsDigest\\` (\\`XGtc4jrzJmjZTTlg\\`) — runs all suites sequentially\n- \\`ErrorRun\\` (\\`V576VWUWEOknnz8m\\`) — chaos harness for error workflows\n\n### Data Ingestion (NOT YET MIGRATED)\n\nThe ingestion pipeline (GDriveToSupabase -> SessionAnalysis / JobAnalysis / OpportunityAnalysis / SessionVectors, plus Slack/Forum/Gong loaders) still runs on the INTERNAL instance and writes to the shared Supabase. Staging has an inactive GDriveToSupabase (\\`sJaqeSayRPznbd9h\\`) with dangling sub-workflow references — do not activate it. Ingestion migration is a separate piece of work.\n\n### Data Stores\n\n**Supabase (shared with internal):** Tables: project, session, clip, job, session_jobs, opportunity, session_opportunities, gong_calls. Vector tables: session_vectors, slack, community, forum, gong, reddit. Memory: public.memory.\n\n**Supabase Testing Project (\\`kwhfkeyvgyjahzyvdanw\\`):** Tables: \\`test_cases\\` (suite, case_id, description, inputs, assertions, target, agent, eval_config) and \\`test_results\\` (test_case_id, run_id, instance, status, output, score, run_date). Connected via the \"Supabase Tests\" credential.\n\n**n8n Data Tables (this instance):** Darwin Sessions (\\`lxbB2v0RHaAAVH6E\\`), Sync Session State (\\`tzlHlDXi6x6rqJ5W\\`), Sync Project State (\\`eTTy7a2k7jQdE6ts\\`). NOTE: All testing data tables (Darwin Evals, Darwin Eval Results, Darwin Unit Cases, Darwin Unit Results, Darwin Integration Cases, Darwin Integration Results) have been permanently deleted — testing data lives in Supabase only.\n\n**External Services:** Anthropic (Claude Opus 4.6/4.8, Haiku 4.5), OpenAI (text-embedding-3-large), Google Drive, Slack, Discourse, Mux, Deepgram, BigQuery/Gong.\n\n### Architecture Patterns\n1. Self-calling workflows for async fan-out\n2. Memory isolation — Builder keyed \\`sessionId + '-build'\\`\n3. Memory sanitization before every agent run\n4. Async fire-and-forget sub-workflows (\\`waitForSubWorkflow: false\\`)`;\nconst env = $vars.env === \"staging\" ? `---\n\n## Environment: STAGING (Development)\n\nYou are Builder (Staging), running on the development instance at darwin-staging.app.n8n.cloud. You have FULL capabilities:\n- **n8n MCP tools**: Full read/write — you can create, modify, and delete workflows\n- **Supabase Read tool**: Full read/write access to the staging database — you can explore schema, read data, and make schema changes when necessary\n- **Docs Fetcher**: Fetch any URL to read n8n documentation\n- **Testing suite**: Full access — run tests, read/create cases and results\n\nSchema changes should be confirmed and treated as a last resort after all other options are exhausted.\n\nYour name is **SonOfDarwin**. Tag production with **<@U09Q22R53T6>**. You share #project-darwin with Darwin (production) and Darwin (staging).\n\nWhen Darwin (production) reports an issue via Slack:\n1. Investigate using your full tool access\n2. Build and validate fixes on staging\n3. Report back with the workflow ID and what changed — a human will review and deploy to production\n\nRemember: never modify workflows on production. You can only build on staging. The production Builder is read-only and purely diagnostic.\n\n---` : `---\n\n## Environment: PRODUCTION (Read-Only, Diagnostic Only)\n\nYou are Builder, running on the protected production instance at darwin-production.app.n8n.cloud. Your tools are LOCKED to read-only:\n- **n8n MCP tools**: Read-only — you can search, inspect, and read workflows, but cannot create, modify, or delete\n- **Supabase Read tool**: Read-only (enforced at the database level) — you can only run SELECT queries\n- **Testing suite**: Read-only — you can read test cases and results, but cannot create cases or run suites (the runners call Darwin Core which requires write access)\n\nYour role is purely diagnostic. You can:\n- Inspect workflows, executions, credentials, and data to understand issues\n- Read the database schema and data to provide context\n- Read test cases and results to understand test health\n- Report findings to Darwin (production) and suggest fixes\n\nYour name is **Darwin**. Tag staging with **<@U0BLRFB0FJR>**. You both respond in #project-darwin.\n\nWhen you discover an issue that needs a workflow change:\n1. Describe the problem clearly with relevant context (workflow IDs, error details, schema references)\n2. Darwin (production) or a human operator will relay the fix request to Darwin (staging) in #project-darwin\n3. Darwin (staging) builds the fix on staging; a human reviews and deploys to production\n\nIMPORTANT: Never attempt to modify workflows, credentials, or database content. Any write attempt will fail — your tools are locked to read-only at both the MCP and database levels. Your job is to diagnose, not to fix.\n\n---`;\nreturn { json: { systemMessage: prefix + \"\\n\\n\" + env + \"\\n\\n\" + suffix } };\n"
       },
       "id": "prompt-builder",
       "name": "Build Prompt",
@@ -216,6 +220,624 @@
       "position": [
         1088,
         240
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Saves a conversation as an eval test case. Call this when a user asks to save, record, or create an eval case from a conversation. Captures the full conversation history including multi-turn context. Parameters: sessionId (required, the conversation session ID to capture), expected_response (optional, override for what the correct answer should be - leave empty to use the last response as the baseline), prohibited_tools (optional, comma-separated tools that should NOT be called), expected_tools (optional, comma-separated tools that SHOULD be called), source_thread (optional, link to the Slack thread).",
+        "workflowId": {
+          "__rl": true,
+          "value": "SdKaGzCoKlIvCuTu",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/SdKaGzCoKlIvCuTu",
+          "cachedResultName": "Darwin — EvalCreate"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "expected_response": "={{ $fromAI('expected_response', 'Optional override for the correct answer. Empty to use last response as baseline.', 'string') }}",
+            "expected_tools": "={{ $fromAI('expected_tools', 'Optional comma-separated tools that SHOULD be called.', 'string') }}",
+            "prohibited_tools": "={{ $fromAI('prohibited_tools', 'Optional comma-separated tools that should NOT be called.', 'string') }}",
+            "sessionId": "={{ $('Sub-flow Trigger').item.json.session_id }}",
+            "source_thread": "={{ $fromAI('source_thread', 'Optional link to the Slack thread.', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "display": true,
+              "displayName": "sessionId",
+              "id": "sessionId",
+              "removed": false,
+              "required": false,
+              "type": "string",
+              "defaultMatch": false
+            },
+            {
+              "canBeUsedToMatch": true,
+              "display": true,
+              "displayName": "expected_response",
+              "id": "expected_response",
+              "removed": false,
+              "required": false,
+              "type": "string",
+              "defaultMatch": false
+            },
+            {
+              "canBeUsedToMatch": true,
+              "display": true,
+              "displayName": "prohibited_tools",
+              "id": "prohibited_tools",
+              "removed": false,
+              "required": false,
+              "type": "string",
+              "defaultMatch": false
+            },
+            {
+              "canBeUsedToMatch": true,
+              "display": true,
+              "displayName": "expected_tools",
+              "id": "expected_tools",
+              "removed": false,
+              "required": false,
+              "type": "string",
+              "defaultMatch": false
+            },
+            {
+              "canBeUsedToMatch": true,
+              "display": true,
+              "displayName": "source_thread",
+              "id": "source_thread",
+              "removed": false,
+              "required": false,
+              "type": "string",
+              "defaultMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "c3e1ae31-fcf0-4f93-9400-6957be7a7ce3",
+      "name": "save_eval_case",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Reads eval cases or eval results from the Darwin evaluation system. Use this to check what eval cases exist, view results from eval runs, or check scores. Parameters: table (required, either \"cases\" to list eval test cases, or \"results\" to view eval run scores and verdicts), run_id (optional, filter results to a specific eval run), case_id (optional, filter to a specific case).",
+        "workflowId": {
+          "__rl": true,
+          "value": "kQpnddaGTylQGQXl",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/kQpnddaGTylQGQXl",
+          "cachedResultName": "Darwin — EvalRead"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "table",
+              "id": "table",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "run_id",
+              "id": "run_id",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "case_id",
+              "id": "case_id",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "case_id": "={{ $fromAI('case_id', 'Optional case id filter.', 'string') }}",
+            "run_id": "={{ $fromAI('run_id', 'Optional eval run id filter.', 'string') }}",
+            "table": "={{ $fromAI('table', 'Either \"cases\" or \"results\".', 'string') }}"
+          }
+        }
+      },
+      "id": "5c94ae9b-c10e-4cf2-bcf7-031ee9e9d779",
+      "name": "read_evals",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Triggers a full eval run across all stored eval cases. Dispatches all cases in parallel and optionally posts results to a Slack thread when complete. Parameters: slack_channel (optional, Slack channel ID to post results to when complete), slack_thread_ts (optional, Slack thread timestamp to reply to with results). If both are provided, results will be posted to that thread automatically when all cases finish. Otherwise results can be checked with the read_evals tool.",
+        "workflowId": {
+          "__rl": true,
+          "value": "5rf4hJ2DjrgIAped",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/5rf4hJ2DjrgIAped",
+          "cachedResultName": "Darwin — EvalRun"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "slack_channel": "={{ $('Sub-flow Trigger').item.json.slack_channel }}",
+            "slack_thread_ts": "={{ $('Sub-flow Trigger').item.json.session_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "slack_channel",
+              "id": "slack_channel",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "slack_thread_ts",
+              "id": "slack_thread_ts",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "40027f87-2c5f-4bf7-b06a-c73b9b6d9a1c",
+      "name": "run_evals",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Triggers the Integration test suite: calls every connected tool (Darwin's and Builder's) with canonical inputs and checks deterministic assertions. Results are stored in Supabase and a summary is returned (optionally posted to the Slack thread). Use when asked to run integration checks/tests or verify tool health.",
+        "workflowId": {
+          "__rl": true,
+          "value": "xs39cdr3D4dEtLOX",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/xs39cdr3D4dEtLOX",
+          "cachedResultName": "Darwin — IntegrationRun"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "slack_channel": "={{ $('Sub-flow Trigger').item.json.slack_channel }}",
+            "slack_thread_ts": "={{ $('Sub-flow Trigger').item.json.session_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "slack_channel",
+              "id": "slack_channel",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "slack_thread_ts",
+              "id": "slack_thread_ts",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "faf8d284-8a04-47a3-ad81-e6176cd1a7f8",
+      "name": "run_integration_checks",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Reads Integration test cases or results. Parameters: table (required, \"cases\" or \"results\"), case_id (optional filter), run_id (optional filter).",
+        "workflowId": {
+          "__rl": true,
+          "value": "RLINEo8OEjypkXWd",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/RLINEo8OEjypkXWd",
+          "cachedResultName": "Darwin — IntegrationRead"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "table",
+              "id": "table",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "run_id",
+              "id": "run_id",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "case_id",
+              "id": "case_id",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "case_id": "={{ $fromAI('case_id', 'Optional case id filter.', 'string') }}",
+            "run_id": "={{ $fromAI('run_id', 'Optional run id filter.', 'string') }}",
+            "table": "={{ $fromAI('table', 'Either \"cases\" or \"results\".', 'string') }}"
+          }
+        }
+      },
+      "id": "788a609c-fff8-4b66-a3b8-43d596ae3d41",
+      "name": "integration_read",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1392,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Adds an Integration test case (a deterministic check of one connected tool). Parameters: case_id (unique slug), target_type (\"workflow\" or \"sql\"), target (workflow name e.g. SessionSearch, or tool name for sql), agent (\"darwin\" or \"builder\"), description, inputs (JSON string of canonical inputs; for sql type: {\"sql\": \"...\"}), assertions (JSON string array, e.g. [{\"type\":\"row_count\",\"op\":\">=\",\"value\":1}], [{\"type\":\"exact\",\"path\":\"name\",\"value\":\"x\"}], [{\"type\":\"field_exists\",\"path\":\"id\"}], [{\"type\":\"contains\",\"value\":\"text\"}]).",
+        "workflowId": {
+          "__rl": true,
+          "value": "LA94b9mHcCWWmMXv",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/LA94b9mHcCWWmMXv",
+          "cachedResultName": "Darwin — IntegrationCreate"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "case_id",
+              "id": "case_id",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "target_type",
+              "id": "target_type",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "target",
+              "id": "target",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "agent",
+              "id": "agent",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "description",
+              "id": "description",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "inputs",
+              "id": "inputs",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "assertions",
+              "id": "assertions",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "agent": "={{ $fromAI('agent', 'darwin or builder.', 'string') }}",
+            "assertions": "={{ $fromAI('assertions', 'JSON string array of assertions.', 'string') }}",
+            "case_id": "={{ $fromAI('case_id', 'Unique case slug.', 'string') }}",
+            "description": "={{ $fromAI('description', 'What this checks.', 'string') }}",
+            "inputs": "={{ $fromAI('inputs', 'JSON string of canonical inputs.', 'string') }}",
+            "target": "={{ $fromAI('target', 'Workflow/tool name.', 'string') }}",
+            "target_type": "={{ $fromAI('target_type', 'workflow or sql.', 'string') }}"
+          }
+        }
+      },
+      "id": "a3360b24-c973-41a8-b00a-44cc18d00e55",
+      "name": "integration_create",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Triggers the Unit test suite: deterministic checks of non-agent workflows (e.g. SlackMarkdown, SanitizeMemory). Results are stored in Supabase and a summary is returned (optionally posted to the Slack thread). Use when asked to run unit checks/tests.",
+        "workflowId": {
+          "__rl": true,
+          "value": "hY52rvG9E19tbMJC",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/hY52rvG9E19tbMJC",
+          "cachedResultName": "Darwin — UnitRun"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "slack_channel": "={{ $('Sub-flow Trigger').item.json.slack_channel }}",
+            "slack_thread_ts": "={{ $('Sub-flow Trigger').item.json.session_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "slack_channel",
+              "id": "slack_channel",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "slack_thread_ts",
+              "id": "slack_thread_ts",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "164c9ce1-a17c-40bd-8ccd-2a7cb1312c75",
+      "name": "run_unit_checks",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Reads Unit test cases or results. Parameters: table (required, \"cases\" or \"results\"), case_id (optional filter), run_id (optional filter).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "6uai446yon1JhTBU"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "table",
+              "id": "table",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "run_id",
+              "id": "run_id",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "case_id",
+              "id": "case_id",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "case_id": "={{ $fromAI('case_id', 'Optional case id filter.', 'string') }}",
+            "run_id": "={{ $fromAI('run_id', 'Optional run id filter.', 'string') }}",
+            "table": "={{ $fromAI('table', 'Either \"cases\" or \"results\".', 'string') }}"
+          }
+        }
+      },
+      "id": "d875459e-1a3d-462b-9f72-e6470677ac25",
+      "name": "unit_read",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Adds a Unit test case (deterministic check of a non-agent workflow). Parameters: case_id (unique slug), target (SlackMarkdown or SanitizeMemory), description, inputs (JSON string), assertions (JSON string array, e.g. [{\"type\":\"exact\",\"value\":{\"output\":\"...\"}}]).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YNe5hxSg68xMHmR9"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "case_id",
+              "id": "case_id",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "target",
+              "id": "target",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "description",
+              "id": "description",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "inputs",
+              "id": "inputs",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "assertions",
+              "id": "assertions",
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "assertions": "={{ $fromAI('assertions', 'JSON string array of assertions.', 'string') }}",
+            "case_id": "={{ $fromAI('case_id', 'Unique case slug.', 'string') }}",
+            "description": "={{ $fromAI('description', 'What this checks.', 'string') }}",
+            "inputs": "={{ $fromAI('inputs', 'JSON string of inputs.', 'string') }}",
+            "target": "={{ $fromAI('target', 'Target workflow name.', 'string') }}"
+          }
+        }
+      },
+      "id": "3a7bb1cd-4a84-483c-b962-891a258e4433",
+      "name": "unit_create",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        560
       ]
     }
   ],
@@ -307,6 +929,105 @@
           }
         ]
       ]
+    },
+    "save_eval_case": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "read_evals": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "run_evals": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "run_integration_checks": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "integration_read": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "integration_create": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "run_unit_checks": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "unit_read": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "unit_create": {
+      "ai_tool": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -318,7 +1039,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "df1205d9-59ff-42be-983e-85ed1854cb9a",
+  "versionId": "73402114-9082-48e3-85dd-a019169c1d1b",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

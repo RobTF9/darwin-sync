@@ -1,6 +1,6 @@
 {
   "id": "yZf7RKAPLc3ZiO5E",
-  "name": "Darwin Integration Cases",
+  "name": "DELETED - Darwin Integration Cases (migrated to Supabase test_cases)",
   "columns": [
     {
       "id": "Q9liWvgqeNoHJuem",
@@ -63,5 +63,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-07-30T12:54:52.605Z",
-  "updatedAt": "2026-07-31T08:14:41.725Z"
+  "updatedAt": "2026-08-01T19:19:55.000Z"
 }

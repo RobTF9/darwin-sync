@@ -40,111 +40,6 @@
       }
     },
     {
-      "id": "16a38480-c178-444c-9dad-5c59c55c9f32",
-      "name": "Insert Case",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        -160,
-        300
-      ],
-      "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "yZf7RKAPLc3ZiO5E"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "case_id": "={{ $json.case_id }}",
-            "target_type": "={{ $json.target_type || \"workflow\" }}",
-            "target": "={{ $json.target }}",
-            "agent": "={{ $json.agent }}",
-            "description": "={{ $json.description }}",
-            "inputs": "={{ $json.inputs }}",
-            "assertions": "={{ $json.assertions }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "target_type",
-              "displayName": "target_type",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "target",
-              "displayName": "target",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "agent",
-              "displayName": "agent",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "description",
-              "displayName": "description",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "inputs",
-              "displayName": "inputs",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "assertions",
-              "displayName": "assertions",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "2b024e9a-2cec-4eeb-8901-415f65657782",
       "name": "Confirm",
       "type": "n8n-nodes-base.code",
@@ -156,6 +51,60 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "jsCode": "return { json: { ok: true, case_id: $('Input').item.json.case_id, target: $('Input').item.json.target } };"
+      }
+    },
+    {
+      "id": "0e675216-e18b-433e-b768-6bcf6f6a52e2",
+      "name": "Insert Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        300
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "suite",
+              "fieldValue": "integration"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "target",
+              "fieldValue": "={{ $json.target }}"
+            },
+            {
+              "fieldId": "agent",
+              "fieldValue": "={{ $json.agent }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $json.description }}"
+            },
+            {
+              "fieldId": "inputs",
+              "fieldValue": "={{ $json.inputs }}"
+            },
+            {
+              "fieldId": "assertions",
+              "fieldValue": "={{ $json.assertions }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "test_cases"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
       }
     }
   ],
@@ -188,7 +137,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "44e1b5ff-c7a4-4591-b054-73e2a8c51556",
+  "versionId": "296ba2cb-17f1-4f1b-bbf2-6262ea2bafab",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

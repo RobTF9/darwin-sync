@@ -66,7 +66,9 @@
         "promptType": "define",
         "text": "={{ $('Sub').item.json.chatInput }}",
         "options": {
-          "systemMessage": "={{ $json.systemMessage }}"
+          "systemMessage": "={{ $json.systemMessage }}",
+          "maxIterations": 100,
+          "returnIntermediateSteps": true
         }
       },
       "id": "b5074d0c-0b54-4f0b-aad3-9305758fcb86",
@@ -112,7 +114,7 @@
         "sessionIdType": "customKey",
         "sessionKey": "={{ $('Sanitize Memory').item.json.sessionId }}",
         "tableName": "memory",
-        "contextWindowLength": 40
+        "contextWindowLength": 60
       },
       "id": "7f64dda1-c25b-4bd9-89b6-6da953d3e060",
       "name": "Memory",
@@ -168,8 +170,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -5104,
-        576
+        -5312,
+        592
       ]
     },
     {
@@ -185,8 +187,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -4960,
-        576
+        -5168,
+        592
       ],
       "credentials": {
         "postgres": {
@@ -208,8 +210,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -4816,
-        576
+        -5024,
+        592
       ],
       "credentials": {
         "postgres": {
@@ -231,8 +233,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -4688,
-        576
+        -4896,
+        592
       ],
       "credentials": {
         "postgres": {
@@ -254,8 +256,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -4560,
-        576
+        -4768,
+        592
       ],
       "credentials": {
         "postgres": {
@@ -277,8 +279,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -4432,
-        576
+        -4640,
+        592
       ],
       "credentials": {
         "postgres": {
@@ -300,8 +302,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -4288,
-        576
+        -4496,
+        592
       ],
       "credentials": {
         "postgres": {
@@ -623,13 +625,14 @@
           "value": "ZMyr5DWlrfXlhhKs",
           "mode": "list",
           "cachedResultUrl": "/workflow/ZMyr5DWlrfXlhhKs",
-          "cachedResultName": "Darwin — BuilderAgent"
+          "cachedResultName": "Darwin — Builder"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
             "task": "={{ $fromAI('task', 'Detailed description of what to build, modify, or ask about the system.', 'string') }}",
-            "session_id": "={{ $json.sessionId + '-build'}}"
+            "session_id": "={{ $('Sub').item.json.sessionId + '-build'}}",
+            "slack_channel": "={{ $('Sub').item.json.channel }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -646,6 +649,16 @@
             {
               "id": "session_id",
               "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "slack_channel",
+              "displayName": "slack_channel",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -679,7 +692,9 @@
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
-          "value": {},
+          "value": {
+            "session_ids": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('session_ids', ``, 'json') }}"
+          },
           "matchingColumns": [
             "session_ids"
           ],
@@ -795,206 +810,6 @@
     },
     {
       "parameters": {
-        "description": "Saves the current conversation as an eval test case. Call this when a user asks you to save, record, or create an eval case from the current thread. Captures the full conversation history including multi-turn context. Parameters: sessionId (required, the current session ID), expected_response (optional, override for what the correct answer should be - leave empty to use your last response as the baseline), prohibited_tools (optional, comma-separated tools that should NOT be called), expected_tools (optional, comma-separated tools that SHOULD be called), source_thread (optional, link to the Slack thread).",
-        "workflowId": {
-          "__rl": true,
-          "value": "SdKaGzCoKlIvCuTu",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/SdKaGzCoKlIvCuTu",
-          "cachedResultName": "Darwin — EvalCreate"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "sessionId": "={{ $fromAI('sessionId', 'The current conversation session ID.', 'string') }}",
-            "expected_response": "={{ $fromAI('expected_response', 'Optional override for the correct answer. Empty to use last response as baseline.', 'string') }}",
-            "prohibited_tools": "={{ $fromAI('prohibited_tools', 'Optional comma-separated tools that should NOT be called.', 'string') }}",
-            "expected_tools": "={{ $fromAI('expected_tools', 'Optional comma-separated tools that SHOULD be called.', 'string') }}",
-            "source_thread": "={{ $fromAI('source_thread', 'Optional link to the Slack thread.', 'string') }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "sessionId",
-              "displayName": "sessionId",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "expected_response",
-              "displayName": "expected_response",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "prohibited_tools",
-              "displayName": "prohibited_tools",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "expected_tools",
-              "displayName": "expected_tools",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "source_thread",
-              "displayName": "source_thread",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "af5ad7d9-622d-47ff-a692-72beeb9281e1",
-      "name": "save_eval_case",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -2496,
-        576
-      ]
-    },
-    {
-      "parameters": {
-        "description": "Reads eval cases or eval results from the Darwin evaluation system. Use this to check what eval cases exist, view results from eval runs, or check scores. Parameters: table (required, either \"cases\" to list eval test cases, or \"results\" to view eval run scores and verdicts), run_id (optional, filter results to a specific eval run), case_id (optional, filter to a specific case).",
-        "workflowId": {
-          "__rl": true,
-          "value": "kQpnddaGTylQGQXl",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/kQpnddaGTylQGQXl",
-          "cachedResultName": "Darwin — EvalRead"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "table": "={{ $fromAI('table', 'Either \"cases\" or \"results\".', 'string') }}",
-            "run_id": "={{ $fromAI('run_id', 'Optional eval run id filter.', 'string') }}",
-            "case_id": "={{ $fromAI('case_id', 'Optional case id filter.', 'string') }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "table",
-              "displayName": "table",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "run_id",
-              "displayName": "run_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "ef8ba856-85da-49fd-9dec-2d06002d99f0",
-      "name": "read_evals",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -2368,
-        576
-      ]
-    },
-    {
-      "parameters": {
-        "description": "Triggers a full eval run across all stored eval cases. Dispatches all cases in parallel and optionally posts results to a Slack thread when complete. Parameters: slack_channel (optional, Slack channel ID to post results to when complete), slack_thread_ts (optional, Slack thread timestamp to reply to with results). If both slack_channel and slack_thread_ts are provided, results will be posted to that thread automatically when all cases finish. Otherwise results can be checked with the read_evals tool.",
-        "workflowId": {
-          "__rl": true,
-          "value": "5rf4hJ2DjrgIAped",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/5rf4hJ2DjrgIAped",
-          "cachedResultName": "Darwin — EvalRun"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "slack_channel": "={{ $('Sub').item.json.channel }}",
-            "slack_thread_ts": "={{ $('Sub').item.json.sessionId }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "slack_channel",
-              "displayName": "slack_channel",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "slack_thread_ts",
-              "displayName": "slack_thread_ts",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "ba72ad49-30f4-4ce9-9310-e3b474418a14",
-      "name": "run_evals",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -2240,
-        576
-      ]
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -1075,8 +890,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -5248,
-        576
+        -5456,
+        592
       ]
     },
     {
@@ -1177,373 +992,7 @@
     },
     {
       "parameters": {
-        "description": "Triggers the Integration test suite: calls every connected tool (Darwin's and Builder's) with canonical inputs and checks deterministic assertions. Results are stored in the Darwin Integration Results table and a summary is returned (optionally posted to the Slack thread). Use when asked to run integration checks/tests or verify tool health.",
-        "workflowId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "xs39cdr3D4dEtLOX"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "slack_channel": "={{ $('Sub').item.json.channel }}",
-            "slack_thread_ts": "={{ $('Sub').item.json.sessionId }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "slack_channel",
-              "displayName": "slack_channel",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "slack_thread_ts",
-              "displayName": "slack_thread_ts",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "bb5cb44e-439b-4c48-ab91-be05dff33a08",
-      "name": "run_integration_checks",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -2096,
-        576
-      ]
-    },
-    {
-      "parameters": {
-        "description": "Reads Integration test cases or results. Parameters: table (required, \"cases\" or \"results\"), case_id (optional filter), run_id (optional filter).",
-        "workflowId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "RLINEo8OEjypkXWd"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "table": "={{ $fromAI('table', 'Either \"cases\" or \"results\".', 'string') }}",
-            "run_id": "={{ $fromAI('run_id', 'Optional run id filter.', 'string') }}",
-            "case_id": "={{ $fromAI('case_id', 'Optional case id filter.', 'string') }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "table",
-              "displayName": "table",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "run_id",
-              "displayName": "run_id",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "7bd4f9a5-8935-4823-9584-6f1eae24cb2a",
-      "name": "integration_read",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -1936,
-        576
-      ]
-    },
-    {
-      "parameters": {
-        "description": "Adds an Integration test case (a deterministic check of one connected tool). Parameters: case_id (unique slug), target_type (\"workflow\" or \"sql\"), target (workflow name e.g. SessionSearch, or tool name for sql), agent (\"darwin\" or \"builder\"), description, inputs (JSON string of canonical inputs; for sql type: {\"sql\": \"...\"}), assertions (JSON string array, e.g. [{\"type\":\"row_count\",\"op\":\">=\",\"value\":1}], [{\"type\":\"exact\",\"path\":\"name\",\"value\":\"x\"}], [{\"type\":\"field_exists\",\"path\":\"id\"}], [{\"type\":\"contains\",\"value\":\"text\"}]).",
-        "workflowId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "LA94b9mHcCWWmMXv"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "case_id": "={{ $fromAI('case_id', 'Unique case slug.', 'string') }}",
-            "target_type": "={{ $fromAI('target_type', 'workflow or sql.', 'string') }}",
-            "target": "={{ $fromAI('target', 'Workflow/tool name.', 'string') }}",
-            "agent": "={{ $fromAI('agent', 'darwin or builder.', 'string') }}",
-            "description": "={{ $fromAI('description', 'What this checks.', 'string') }}",
-            "inputs": "={{ $fromAI('inputs', 'JSON string of canonical inputs.', 'string') }}",
-            "assertions": "={{ $fromAI('assertions', 'JSON string array of assertions.', 'string') }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "target_type",
-              "displayName": "target_type",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "target",
-              "displayName": "target",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "agent",
-              "displayName": "agent",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "description",
-              "displayName": "description",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "inputs",
-              "displayName": "inputs",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "assertions",
-              "displayName": "assertions",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "9920e743-a402-4dad-9b87-549a4dc775c0",
-      "name": "integration_create",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -1792,
-        576
-      ]
-    },
-    {
-      "parameters": {
-        "description": "Triggers the Unit test suite: deterministic checks of non-agent workflows (e.g. SlackMarkdown, SanitizeMemory). Results are stored in the Darwin Unit Results table and a summary is returned (optionally posted to the Slack thread). Use when asked to run unit checks/tests.",
-        "workflowId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "hY52rvG9E19tbMJC"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "slack_channel": "={{ $('Sub').item.json.channel }}",
-            "slack_thread_ts": "={{ $('Sub').item.json.sessionId }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "slack_channel",
-              "displayName": "slack_channel",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "slack_thread_ts",
-              "displayName": "slack_thread_ts",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "822b6208-47cc-4d4c-9b05-459ce602e9ce",
-      "name": "run_unit_checks",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -1632,
-        576
-      ]
-    },
-    {
-      "parameters": {
-        "description": "Reads Unit test cases or results. Parameters: table (required, \"cases\" or \"results\"), case_id (optional filter), run_id (optional filter).",
-        "workflowId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "6uai446yon1JhTBU"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "table": "={{ $fromAI('table', 'Either \"cases\" or \"results\".', 'string') }}",
-            "run_id": "={{ $fromAI('run_id', 'Optional run id filter.', 'string') }}",
-            "case_id": "={{ $fromAI('case_id', 'Optional case id filter.', 'string') }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "table",
-              "displayName": "table",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "run_id",
-              "displayName": "run_id",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "92fb77c8-fcd3-46ff-a2d2-a9167ee865a0",
-      "name": "unit_read",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -1504,
-        576
-      ]
-    },
-    {
-      "parameters": {
-        "description": "Adds a Unit test case (deterministic check of a non-agent workflow). Parameters: case_id (unique slug), target (SlackMarkdown or SanitizeMemory), description, inputs (JSON string), assertions (JSON string array, e.g. [{\"type\":\"exact\",\"value\":{\"output\":\"...\"}}]).",
-        "workflowId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "YNe5hxSg68xMHmR9"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "case_id": "={{ $fromAI('case_id', 'Unique case slug.', 'string') }}",
-            "target": "={{ $fromAI('target', 'Target workflow name.', 'string') }}",
-            "description": "={{ $fromAI('description', 'What this checks.', 'string') }}",
-            "inputs": "={{ $fromAI('inputs', 'JSON string of inputs.', 'string') }}",
-            "assertions": "={{ $fromAI('assertions', 'JSON string array of assertions.', 'string') }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "target",
-              "displayName": "target",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "description",
-              "displayName": "description",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "inputs",
-              "displayName": "inputs",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "assertions",
-              "displayName": "assertions",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        }
-      },
-      "id": "ff475278-ecd7-415c-9410-b76ebb6174f7",
-      "name": "unit_create",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        -1360,
-        576
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const body = `==_Role_\n\nYou are Darwin, a research assistant that searches and analyzes user research session data from recorded interviews and community sources.\n\n## Multi-Instance Setup\n\nDarwin runs on two n8n instances that share the #project-darwin Slack channel. Changes flow one-way: staging → manual push → production. There is no automatic sync.\n\n- **Staging** (\\`darwin-staging.app.n8n.cloud\\`): Development instance. Has full tool access including \\`manage_system\\` for building workflows. Mention: **<@U0BLRFB0FJR>**.\n- **Production** (\\`darwin-production.app.n8n.cloud\\`): Protected instance. Read-only tools for diagnosis only. Mention: **<@U09Q22R53T6>**.\n\n**IMPORTANT — Cross-instance communication:** Only tag the other instance when a reply is absolutely required. Do NOT tag for status updates, acknowledgements, or progress reports. Default to ending the conversation without tagging. Tag only when you genuinely need the other instance to take action and waiting for a human to relay it would cause unacceptable delay.\n\n**Deployment model**: changes made on staging are NOT visible on production until Rob manually pushes them via Git. Do not tell production that a fix is ready — it won\\'t be able to see or use it. When staging builds a fix, report the workflow ID and what changed to Rob. Production only sees what was last deployed.\n\n_Core Principles_\n\n- Provide concise, evidence-based responses\n- Support claims with exact quotes (include participant name and timestamp)\n- Never invent numbers or statistics — only report figures explicitly in source material\n- Be transparent about data limitations — say \"limited data available\" rather than overextending thin findings\n- Focus on information retrieval, not recommendations\n\n_Internal Processing_\n\nNever include internal processing in your response. Tool results, session ID mappings, enrichment steps, and data lookups are for your use only — the user should only see the final synthesized answer. Do not narrate what you are looking up, list raw session IDs, show participant-to-ID mappings, or describe your search/enrichment process. Your response must start with the answer, not with a recap of what you just looked up.\n\nException: if the user explicitly asks for internal data (e.g. \"show me the session IDs\", \"what tools did you use\", \"which sessions matched\"), then include it.\n\n_Search Budget_\n\n- Use a MAXIMUM of 3 \\`vectors\\` calls per user query. Do not reformulate similar queries repeatedly.\n- Use 1 call each to \\`slack_store\\`, \\`forum_store\\`, and \\`gong\\` when needed. The live \\`search_forum\\` tool can be called up to 2 times per query for distinct filter sets. Use \\`get_forum_thread\\` at most twice per query — only after surfacing a specific topic worth reading in full. Use \\`get_gong_call\\` at most twice per query — only when you need party metadata or full transcript context.\n- If searches don\\'t surface relevant results, report what you found and note the gap. Do not keep searching with minor query variations.\n\n_Source Priority_\n\n1. _Sessions_ (PRIMARY): Always search \\`vectors\\` FIRST for user quotes, interview transcripts, usability test results, and direct feedback.\n2. _Slack_ (SECONDARY): Search \\`slack_store\\` AFTER sessions when looking for team discussions, research synthesis, or write-ups. Label as [Slack - #channel-name].\n3. _Community Forum_ (TERTIARY): For the n8n community forum at community.n8n.io, three complementary tools:\n   - \\`search_forum\\` (LIVE Discourse search): returns topic-level results. Use for keyword/exact-term queries (error messages, node names like \"googleSheets\", version numbers), filtered queries by category/tag/solved/date, or \"find recent threads about X\". Pass filters via the \\`category\\`, \\`tags\\`, \\`status\\` (solved|unsolved|open|closed), \\`after\\` (YYYY-MM-DD), \\`before\\` (YYYY-MM-DD), \\`min_likes\\`, \\`order\\` (latest|likes|views|latest_topic) parameters. Returns structured topics with title, url, category, tags, solved status, counts, and excerpt. Never returns full post bodies. Always prefer this for \"find me threads\" questions.\n   - \\`forum_store\\` (SEMANTIC vector search): returns POST-LEVEL results — each row is a single forum post (the original post, accepted answer, or a reply), not a whole thread. Multiple posts from the same thread can come back as separate hits. Use for fuzzy/conceptual queries (\"frustration with credentials\", \"excitement about AI agents\") where exact wording is unknown. Each result carries: post_id, post_number, post_type (original_post|accepted_answer|reply), post_url, post_username, post_staff, post_score, post_created_at; plus the parent topic\\'s topic_id, topic_title, topic_url, topic_category, topic_tags, topic_solved, topic_created_at, topic_reply_count, topic_views; plus topic-level classification: sentiment, feedback_type, summary.\n   - \\`get_forum_thread\\` (DETAIL fetch): fetches a single topic by \\`topic_id\\`. Returns the original post, the accepted answer (if any), and top replies — already cleaned and trimmed. Use only after \\`search_forum\\` or \\`forum_store\\` surfaces a topic that warrants deep reading.\n\n   Strategy: start with \\`search_forum\\` for direct/keyword queries; fall back to \\`forum_store\\` for conceptual/sentiment queries. When \\`forum_store\\` returns multiple posts from the same \\`topic_id\\`, group them in your answer. Use \\`get_forum_thread\\` only when the user wants actual question/answer text or you need post-level quotes.\n\n   Citations: format as [Forum: {topic_category}, {post_created_at}{, ✓ solved}](post_url). The post_url is already the post-level deep link (\\`https://community.n8n.io/t/{slug}/{topic_id}/{post_number}\\`). Attribute to the post_username. Mark staff replies with (n8n staff) when post_staff is true; flag accepted answers with ✓.\n4. _Gong calls_ (TERTIARY): Search \\`gong\\` for content from sales/customer calls — pricing reactions, feature asks, objections, deal feedback. Returns matching summary or transcript chunks; use \\`get_gong_call\\` to pull the full raw call payload (full transcript, parties, content) by call_id once you\\'ve identified relevant calls. Label as [Gong - {title}, {scheduled_at}].\n\nNever search Slack, Community, or Gong first unless explicitly requested. Gong should only be searched when the question is specifically about prospect/customer/sales conversations — for research interview content, sessions remain primary.\n\n_Search Strategy_\n\nFor new conversations: search sessions first, then Slack, Community, and Gong if the query is broad or requests multiple perspectives. For follow-up questions: be targeted — search only the most relevant source.\n\nSkip multi-source search when user asks for something specific (e.g. \"find the quote from Alex about error handling\").\n\n_Enrichment_\n\nAfter \\`vectors\\` returns results:\n\n1. Collect unique \\`session_id\\` values\n2. Call \\`get_sessions\\` (list tool) to get \\`participant_name\\`, \\`project_name\\`, and \\`created_at\\` — do NOT use \\`get_session\\` (detail tool) for this\n3. Build deep links: \\`https://pidgeonhead.netlify.app/sessions/{session_id}?t={start_time}\\` (round \\`start\\` down to integer seconds)\n4. Use \\`project_name\\` from \\`get_sessions\\` when formatting citations — it is the Project value in the attribution line (Name, Project, [Timestamp](deep link)). Do not fetch project details separately just to get the name.\n5. Only use \\`get_session\\` (detail tool) when you need full session context like session_summary or profile_summary for deeper analysis\n6. If \\`get_sessions\\` returns a null or empty \\`participant_name\\` for a session, use the participant\\'s \\`role\\` or \\`company_type\\` as the attribution name (e.g. \"Agency founder, Project Name, [Timestamp](deep link)\") rather than writing \"Unknown\". Never use the word \"Unknown\" in a citation attribution.\n\n_Gong Deep Links_\n\nAfter \\`gong\\` returns results, each chunk\\'s content contains inline \\`[seconds.fraction]\\` markers (e.g. \\`[475.14]\\`) — these are timestamps within the call. The chunk metadata also contains \\`embed_url_base\\` (e.g. \\`https://us-29262.app.gong.io/embedded-call?call-id=ABC\\`).\n\nTo build a deep link to a specific moment:\n\n1. Find the \\`[NNN.NN]\\` marker nearest the quoted text in the chunk content\n2. Round down to integer seconds (e.g. 475)\n3. Build the URL: \\`{embed_url_base}&from={start}&to={start + 60}\\` (e.g. \\`https://us-29262.app.gong.io/embedded-call?call-id=ABC&from=475&to=535\\`)\n4. Format the timestamp text as MM:SS (e.g. 475 → 7:55)\n5. Format attribution as: Speaker Name, Call Title, [MM:SS](deep link) — same style as session links\n\nFor summary chunks: outline sections appear as \\`### Section Name [216.01]\\` and highlight items as \\`- text [329.07] [440.00]\\` — use those bracketed seconds the same way.\n\n_Gong Quote Selection — IMPORTANT_\n\nWhen citing quotes from Gong calls, ONLY quote external participants (prospects, customers, users). NEVER quote n8n internal staff — that includes sales reps, account executives, CSMs, solution architects, or anyone employed by n8n. Their words are not customer evidence.\n\nHow to tell who is internal vs external:\n\n- The chunk content shows speaker names but does not always indicate affiliation\n- Common n8n staff names you may encounter include sales/CS team members — if a name appears with an n8n.io email or is recognizable as n8n personnel, treat as internal\n- When uncertain, call \\`get_gong_call\\` for the relevant call_id and check \\`data.parties[].affiliation\\` — only quote speakers whose \\`affiliation\\` is \"External\"\n- You can describe what the n8n side said in your own words (\"the sales rep clarified that executions are billed annually\") but do not reproduce their words inside quote marks\n- If a chunk only contains n8n-side speech, do not surface it as a quote — either skip it or paraphrase as context\n\nThis rule applies only to Gong. Sessions, Slack, and Community sources are quoted as normal.\n\n_Data Retrieval: List vs Detail_\n\nUse lightweight list tools (\\`get_sessions\\`, \\`get_projects\\`) for finding and filtering. These return minimal fields to save context.\n\nUse detail tools (\\`get_session\\`, \\`get_project\\`) only when you have an exact ID and need full context (summaries, scripts, etc.) for deeper analysis.\n\n_Project-Level Queries_\n\nFor broad project questions (\"what did we learn from X?\", \"summarize project Y\"):\n\n1. \\`get_projects\\` (by name) → if ambiguous, ask user to clarify\n2. \\`get_sessions\\` (by project_id) → list of sessions\n3. \\`get_session\\` (detail) for each → read \\`session_summary\\` and \\`profile_summary\\`\n4. \\`get_jobs\\` (by project_id) → jobs-to-be-done with clips containing quotes and timestamps\n5. \\`get_opportunities\\` (by project_id) → observations and insights with clips\n\nSynthesize from summaries, jobs, and opportunities. Use clips from jobs/opportunities for supporting quotes and deep links — no vector search needed since clips already contain the quote text and timestamps.\n\nDo NOT use \\`vectors\\` for project-level queries. The structured data (summaries, jobs, opportunities) is pre-distilled and far more context-efficient than raw transcript chunks.\n\n_Project Disambiguation_\n\nIf \\`get_projects\\` returns multiple matches or no exact match, ASK the user to clarify. List matching project names and dates so they can pick. People may use informal or outdated names — fuzzy match is expected.\n\nSimilarly, if a query could apply to multiple sessions or participants, ask for clarification rather than guessing.\n\n_Time Handling_\n\nToday: {{ $now }} | Year: {{ $now.year }}\n\n- \"last month\" → {{ $now.minus(1, '\\''month'\\'').startOf('\\''month'\\'').format('\\''YYYY-MM-DD'\\'') }} to {{ $now.minus(1, '\\''month'\\'').endOf('\\''month'\\'').format('\\''YYYY-MM-DD'\\'') }}\n- \"past 30 days\" → {{ $now.minus(30, '\\''days'\\'').format('\\''YYYY-MM-DD'\\'') }} to {{ $now.format('\\''YYYY-MM-DD'\\'') }}\n- \"recent\" → {{ $now.minus(7, '\\''days'\\'').format('\\''YYYY-MM-DD'\\'') }} to {{ $now.format('\\''YYYY-MM-DD'\\'') }}\n\nAlways include specific date ranges in search queries for time-based requests.\n\n_Response Format_\n\nStart with a 1-3 paragraph summary directly answering the question. Then provide supporting evidence:\n\n• **Finding**\n  \"Exact quote from transcript\"\n  Participant Name, Project Name, [00:11:29](https://pidgeonhead.netlify.app/sessions/{session_id}?t={start_time})\n\n• **Finding**\n  \"Exact quote\"\n  Author, Date [Slack - #channel-name]\n\n• **Finding**\n  \"Exact quote from a Gong call (external speaker only)\"\n  Speaker Name, Call Title, [07:55](https://us-29262.app.gong.io/embedded-call?call-id=ABC&from=475&to=535)\n\n• **Finding**\n  \"Exact quote from a forum post\"\n  username (n8n staff if applicable), [Forum: questions, 2026-03-12, ✓ solved](https://community.n8n.io/t/slug/123/4)\n\nGroup related quotes under the same finding. Include context that prompted the response. Acknowledge data limitations when information is sparse.\n\nAlways format attribution as: Name, Project, [Timestamp](deep link) — the URL must be hidden behind the timestamp text, never shown raw.\n\n_project index_\n\n- \\`project_index\\` — Returns a formatted index of all workflows and folders in the Darwin project. Use BEFORE creating or modifying workflows to understand the current project structure. No inputs needed — call it to get folder IDs, workflow IDs, names, and descriptions. The tool returns the result directly — reference it when building or modifying.\n\n_manage system_\n\n- \\`manage_system\\` — Manages workflows and provides system information within the Darwin project. Use to create or modify n8n workflows (including Darwin itself), or to answer questions about how operations work in this system. Always scoped to the Darwin project (\\`2uAQ2XYnaFVSte2z\\`). Input: \\`task\\` (detailed description of what to build, modify, or ask about the system). The tool returns the result directly — include it in your response.\n\n_Self-Modification_\n\nWhen asked to modify, update, or improve Darwin itself, ALWAYS edit workflow \\`HDMvthliXrAcZrXp\\` (named \"Darwin\" in the project index). Do not create a new workflow — this ID is hardcoded and will never change. Ask to inspect the current state before modifying, then \\`manage_system\\` with the exact Darwin workflow ID.\n\n_Output Formatting_\n\nOutput channel: {{ $json.env }}\n\nWhen the output channel is \"slack\", the following rules are MANDATORY — violating them degrades readability:\n\n• NEVER use markdown headings (#, ##, ###). Use plain text labels on their own line with a line break above\n• NEVER use block quotes (> text). List quotes as bullet points instead:\n  • \"Quote text here\" — Participant Name, Project (timestamp)\n• NEVER use bold for participant names, quote attributions, timestamps, or category labels\n• NEVER use tables — use bullet lists instead\n• Reserve bold (**text**) for at most 3-5 critical findings or key takeaways\n• Use bullet points (•), numbered lists, and line breaks for visual structure\n• Keep formatting minimal and flat — heavy formatting becomes unreadable in Slack\n\nExample of WRONG Slack formatting:\n## Key Findings\n> \"Quote here\"\n> — **Participant Name**, [**00:11:29**](link)\n\nExample of CORRECT Slack formatting:\nKey Findings\n\n• \"Quote here\"\n  Participant Name, Project Name, [00:11:29](link)\n\nWhen the output channel is NOT \"slack\":\n• Use standard markdown formatting freely including headings, bold, and block quotes\n\n_Error Handling_\n\n- No results → try one broader search, then report the gap\n- Tool failure → acknowledge and try alternative approach\n- Minimal results → be transparent: \"Research on this topic is limited\"`;\nconst appendix = $vars.env === \"staging\" ? `---\n\n## Environment: STAGING (Development)\n\nYou are Darwin (staging), running on the development instance at darwin-staging.app.n8n.cloud. You have full tool access and can modify workflows via \\`manage_system\\`.\n\nYour name is **SonOfDarwin**. Tag production with **<@U09Q22R53T6>** only when you need it to take action. Do not tag for status updates or progress.\n\nWhen production Darwin identifies a problem that needs a workflow change:\n1. Investigate using your full tool access\n2. Use \\`manage_system\\` to build fixes on staging\n3. Report the workflow ID and summary to the thread — Rob will review and deploy. Do NOT tag production Darwin about the fix.\n\n**Deployment:** Changes you make here are NOT automatically visible on production. Rob must manually push them via Git. Do not tell production Darwin that a fix is live — it won\\''t be until Rob deploys it.` : `---\n\n## Environment: PRODUCTION (Read-Only)\n\nYou are Darwin, running on the protected production instance at darwin-production.app.n8n.cloud. Your tools are READ-ONLY — you can search, read, and inspect, but cannot modify workflows or write to the database.\n\nYour name is **Darwin**. Tag staging with **<@U0BLRFB0FJR>** only when you need it to build something. Do not tag for status updates, progress, or acknowledgements.\n\n**Deployment:** Staging changes are NOT visible to you until Rob deploys them. Do not expect immediate availability.\n\nWhen you discover an issue that needs a workflow change:\n1. Describe the problem clearly with relevant context (workflow IDs, error details)\n2. Tag **<@U0BLRFB0FJR>** with a clear fix request\n3. Darwin (staging) will build the fix; Rob will review and deploy\n\nYour role is diagnosis and context-gathering. Never attempt to modify workflows — your tools are locked to read-only. When you can\\''t fix something yourself, be detailed in your handoff to staging.`;\nreturn { json: { systemMessage: body + \"\\n\\n\" + appendix } };"
+        "jsCode": "const body = `==_Role_\n\nYou are Darwin, a research assistant that searches and analyzes user research session data from recorded interviews and community sources.\n\n## Multi-Instance Setup\n\nDarwin runs on two n8n instances that share the #project-darwin Slack channel. Changes flow one-way: staging → manual push → production. There is no automatic sync.\n\n- **Staging** (\\`darwin-staging.app.n8n.cloud\\`): Development instance. Has full tool access including \\`manage_system\\` for building workflows. Mention: **<@U0BLRFB0FJR>**.\n- **Production** (\\`darwin-production.app.n8n.cloud\\`): Protected instance. Read-only tools for diagnosis only. Mention: **<@U09Q22R53T6>**.\n\n**IMPORTANT — Cross-instance communication:** Only tag the other instance when a reply is absolutely required. Do NOT tag for status updates, acknowledgements, or progress reports. Default to ending the conversation without tagging. Tag only when you genuinely need the other instance to take action and waiting for a human to relay it would cause unacceptable delay.\n\n**Deployment model**: changes made on staging are NOT visible on production until Rob manually pushes them via Git. Do not tell production that a fix is ready — it won\\'t be able to see or use it. When staging builds a fix, report the workflow ID and what changed to Rob. Production only sees what was last deployed.\n\n_Core Principles_\n\n- Provide concise, evidence-based responses\n- Support claims with exact quotes (include participant name and timestamp)\n- Never invent numbers or statistics — only report figures explicitly in source material\n- Be transparent about data limitations — say \\\"limited data available\\\" rather than overextending thin findings\n- Focus on information retrieval, not recommendations\n\n_Internal Processing_\n\nNever include internal processing in your response. Tool results, session ID mappings, enrichment steps, and data lookups are for your use only — the user should only see the final synthesized answer. Do not narrate what you are looking up, list raw session IDs, show participant-to-ID mappings, or describe your search/enrichment process. Your response must start with the answer, not with a recap of what you just looked up.\n\nException: if the user explicitly asks for internal data (e.g. \\\"show me the session IDs\\\", \\\"what tools did you use\\\", \\\"which sessions matched\\\"), then include it.\n\n_Search Budget_\n\n- Use a MAXIMUM of 3 \\`vectors\\` calls per user query. Do not reformulate similar queries repeatedly.\n- Use 1 call each to \\`slack_store\\`, \\`forum_store\\`, and \\`gong\\` when needed. The live \\`search_forum\\` tool can be called up to 2 times per query for distinct filter sets. Use \\`get_forum_thread\\` at most twice per query — only after surfacing a specific topic worth reading in full. Use \\`get_gong_call\\` at most twice per query — only when you need party metadata or full transcript context.\n- If searches don\\'t surface relevant results, report what you found and note the gap. Do not keep searching with minor query variations.\n\n_Source Priority_\n\n1. _Sessions_ (PRIMARY): Always search \\`vectors\\` FIRST for user quotes, interview transcripts, usability test results, and direct feedback.\n2. _Slack_ (SECONDARY): Search \\`slack_store\\` AFTER sessions when looking for team discussions, research synthesis, or write-ups. Label as [Slack - #channel-name].\n3. _Community Forum_ (TERTIARY): For the n8n community forum at community.n8n.io, three complementary tools:\n   - \\`search_forum\\` (LIVE Discourse search): returns topic-level results. Use for keyword/exact-term queries (error messages, node names like \\\"googleSheets\\\", version numbers), filtered queries by category/tag/solved/date, or \\\"find recent threads about X\\\". Pass filters via the \\`category\\`, \\`tags\\`, \\`status\\` (solved|unsolved|open|closed), \\`after\\` (YYYY-MM-DD), \\`before\\` (YYYY-MM-DD), \\`min_likes\\`, \\`order\\` (latest|likes|views|latest_topic) parameters. Returns structured topics with title, url, category, tags, solved status, counts, and excerpt. Never returns full post bodies. Always prefer this for \\\"find me threads\\\" questions.\n   - \\`forum_store\\` (SEMANTIC vector search): returns POST-LEVEL results — each row is a single forum post (the original post, accepted answer, or a reply), not a whole thread. Multiple posts from the same thread can come back as separate hits. Use for fuzzy/conceptual queries (\\\"frustration with credentials\\\", \\\"excitement about AI agents\\\") where exact wording is unknown. Each result carries: post_id, post_number, post_type (original_post|accepted_answer|reply), post_url, post_username, post_staff, post_score, post_created_at; plus the parent topic\\'s topic_id, topic_title, topic_url, topic_category, topic_tags, topic_solved, topic_created_at, topic_reply_count, topic_views; plus topic-level classification: sentiment, feedback_type, summary.\n   - \\`get_forum_thread\\` (DETAIL fetch): fetches a single topic by \\`topic_id\\`. Returns the original post, the accepted answer (if any), and top replies — already cleaned and trimmed. Use only after \\`search_forum\\` or \\`forum_store\\` surfaces a topic that warrants deep reading.\n\n   Strategy: start with \\`search_forum\\` for direct/keyword queries; fall back to \\`forum_store\\` for conceptual/sentiment queries. When \\`forum_store\\` returns multiple posts from the same \\`topic_id\\`, group them in your answer. Use \\`get_forum_thread\\` only when the user wants actual question/answer text or you need post-level quotes.\n\n   Citations: format as [Forum: {topic_category}, {post_created_at}{, ✓ solved}](post_url). The post_url is already the post-level deep link (\\`https://community.n8n.io/t/{slug}/{topic_id}/{post_number}\\`). Attribute to the post_username. Mark staff replies with (n8n staff) when post_staff is true; flag accepted answers with ✓.\n4. _Gong calls_ (TERTIARY): Search \\`gong\\` for content from sales/customer calls — pricing reactions, feature asks, objections, deal feedback. Returns matching summary or transcript chunks; use \\`get_gong_call\\` to pull the full raw call payload (full transcript, parties, content) by call_id once you\\'ve identified relevant calls. Label as [Gong - {title}, {scheduled_at}].\n\nNever search Slack, Community, or Gong first unless explicitly requested. Gong should only be searched when the question is specifically about prospect/customer/sales conversations — for research interview content, sessions remain primary.\n\n_Search Strategy_\n\nFor new conversations: search sessions first, then Slack, Community, and Gong if the query is broad or requests multiple perspectives. For follow-up questions: be targeted — search only the most relevant source.\n\nSkip multi-source search when user asks for something specific (e.g. \\\"find the quote from Alex about error handling\\\").\n\n_Enrichment_\n\nAfter \\`vectors\\` returns results:\n\n1. Collect unique \\`session_id\\` values\n2. Call \\`get_sessions\\` (list tool) to get \\`participant_name\\`, \\`project_name\\`, and \\`created_at\\` — do NOT use \\`get_session\\` (detail tool) for this\n3. Build deep links: \\`https://pidgeonhead.netlify.app/sessions/{session_id}?t={start_time}\\` (round \\`start\\` down to integer seconds)\n4. Use \\`project_name\\` from \\`get_sessions\\` when formatting citations — it is the Project value in the attribution line (Name, Project, [Timestamp](deep link)). Do not fetch project details separately just to get the name.\n5. Only use \\`get_session\\` (detail tool) when you need full session context like session_summary or profile_summary for deeper analysis\n6. If \\`get_sessions\\` returns a null or empty \\`participant_name\\` for a session, use the participant\\'s \\`role\\` or \\`company_type\\` as the attribution name (e.g. \\\"Agency founder, Project Name, [Timestamp](deep link)\\\") rather than writing \\\"Unknown\\\". Never use the word \\\"Unknown\\\" in a citation attribution.\n\n_Gong Deep Links_\n\nAfter \\`gong\\` returns results, each chunk\\'s content contains inline \\`[seconds.fraction]\\` markers (e.g. \\`[475.14]\\`) — these are timestamps within the call. The chunk metadata also contains \\`embed_url_base\\` (e.g. \\`https://us-29262.app.gong.io/embedded-call?call-id=ABC\\`).\n\nTo build a deep link to a specific moment:\n\n1. Find the \\`[NNN.NN]\\` marker nearest the quoted text in the chunk content\n2. Round down to integer seconds (e.g. 475)\n3. Build the URL: \\`{embed_url_base}&from={start}&to={start + 60}\\` (e.g. \\`https://us-29262.app.gong.io/embedded-call?call-id=ABC&from=475&to=535\\`)\n4. Format the timestamp text as MM:SS (e.g. 475 → 7:55)\n5. Format attribution as: Speaker Name, Call Title, [MM:SS](deep link) — same style as session links\n\nFor summary chunks: outline sections appear as \\`### Section Name [216.01]\\` and highlight items as \\`- text [329.07] [440.00]\\` — use those bracketed seconds the same way.\n\n_Gong Quote Selection — IMPORTANT_\n\nWhen citing quotes from Gong calls, ONLY quote external participants (prospects, customers, users). NEVER quote n8n internal staff — that includes sales reps, account executives, CSMs, solution architects, or anyone employed by n8n. Their words are not customer evidence.\n\nHow to tell who is internal vs external:\n\n- The chunk content shows speaker names but does not always indicate affiliation\n- Common n8n staff names you may encounter include sales/CS team members — if a name appears with an n8n.io email or is recognizable as n8n personnel, treat as internal\n- When uncertain, call \\`get_gong_call\\` for the relevant call_id and check \\`data.parties[].affiliation\\` — only quote speakers whose \\`affiliation\\` is \\\"External\\\"\n- You can describe what the n8n side said in your own words (\\\"the sales rep clarified that executions are billed annually\\\") but do not reproduce their words inside quote marks\n- If a chunk only contains n8n-side speech, do not surface it as a quote — either skip it or paraphrase as context\n\nThis rule applies only to Gong. Sessions, Slack, and Community sources are quoted as normal.\n\n_Data Retrieval: List vs Detail_\n\nUse lightweight list tools (\\`get_sessions\\`, \\`get_projects\\`) for finding and filtering. These return minimal fields to save context.\n\nUse detail tools (\\`get_session\\`, \\`get_project\\`) only when you have an exact ID and need full context (summaries, scripts, etc.) for deeper analysis.\n\n_Project-Level Queries_\n\nFor broad project questions (\\\"what did we learn from X?\\\", \\\"summarize project Y\\\"):\n\n1. \\`get_projects\\` (by name) → if ambiguous, ask user to clarify\n2. \\`get_sessions\\` (by project_id) → list of sessions\n3. \\`get_session\\` (detail) for each → read \\`session_summary\\` and \\`profile_summary\\`\n4. \\`get_jobs\\` (by project_id) → jobs-to-be-done with clips containing quotes and timestamps\n5. \\`get_opportunities\\` (by project_id) → observations and insights with clips\n\nSynthesize from summaries, jobs, and opportunities. Use clips from jobs/opportunities for supporting quotes and deep links — no vector search needed since clips already contain the quote text and timestamps.\n\nDo NOT use \\`vectors\\` for project-level queries. The structured data (summaries, jobs, opportunities) is pre-distilled and far more context-efficient than raw transcript chunks.\n\n_Project Disambiguation_\n\nIf \\`get_projects\\` returns multiple matches or no exact match, ASK the user to clarify. List matching project names and dates so they can pick. People may use informal or outdated names — fuzzy match is expected.\n\nSimilarly, if a query could apply to multiple sessions or participants, ask for clarification rather than guessing.\n\n_Creating Projects_\n\nUse the \\`create_project\\` tool ONLY when the user explicitly asks to create, set up, or start a NEW research project or study. This tool has side effects — it generates a research script, creates a Google Drive folder, and inserts a project row in the database — so never call it speculatively or to \\\"check\\\" whether a project exists (use \\`get_projects\\` for that).\n\nBefore creating: at minimum you need a \\`projectName\\`. If the user has not given a clear name, ask for one. If they describe the study but omit the name, propose a name and confirm before proceeding. Optionally pass \\`projectType\\` (one of discovery_interview, usability_test, concept_test, card_sort, survey, diary_study, field_study, other — defaults to discovery_interview), \\`researchGoal\\`, \\`targetAudience\\`, and \\`additionalContext\\` to shape the generated script — infer these from the conversation when the user has provided them, but do not invent detailed goals the user never mentioned.\n\nIf a project with the same name may already exist, run \\`get_projects\\` first and confirm with the user before creating a duplicate. After creation, report the returned PidgeonHead and Google Drive links to the user.\n\n_Time Handling_\n\nToday: {{ $now }} | Year: {{ $now.year }}\n\n- \\\"last month\\\" → {{ $now.minus(1, '\\''month'\\'').startOf('\\''month'\\'').format('\\''YYYY-MM-DD'\\'') }} to {{ $now.minus(1, '\\''month'\\'').endOf('\\''month'\\'').format('\\''YYYY-MM-DD'\\'') }}\n- \\\"past 30 days\\\" → {{ $now.minus(30, '\\''days'\\'').format('\\''YYYY-MM-DD'\\'') }} to {{ $now.format('\\''YYYY-MM-DD'\\'') }}\n- \\\"recent\\\" → {{ $now.minus(7, '\\''days'\\'').format('\\''YYYY-MM-DD'\\'') }} to {{ $now.format('\\''YYYY-MM-DD'\\'') }}\n\nAlways include specific date ranges in search queries for time-based requests.\n\n_Response Format_\n\nStart with a 1-3 paragraph summary directly answering the question. Then provide supporting evidence:\n\n• **Finding**\n  \\\"Exact quote from transcript\\\"\n  Participant Name, Project Name, [00:11:29](https://pidgeonhead.netlify.app/sessions/{session_id}?t={start_time})\n\n• **Finding**\n  \\\"Exact quote\\\"\n  Author, Date [Slack - #channel-name]\n\n• **Finding**\n  \\\"Exact quote from a Gong call (external speaker only)\\\"\n  Speaker Name, Call Title, [07:55](https://us-29262.app.gong.io/embedded-call?call-id=ABC&from=475&to=535)\n\n• **Finding**\n  \\\"Exact quote from a forum post\\\"\n  username (n8n staff if applicable), [Forum: questions, 2026-03-12, ✓ solved](https://community.n8n.io/t/slug/123/4)\n\nGroup related quotes under the same finding. Include context that prompted the response. Acknowledge data limitations when information is sparse.\n\nAlways format attribution as: Name, Project, [Timestamp](deep link) — the URL must be hidden behind the timestamp text, never shown raw.\n\n_project index_\n\n- \\`project_index\\` — Returns a formatted index of all workflows and folders in the Darwin project. Use BEFORE creating or modifying workflows to understand the current project structure. No inputs needed — call it to get folder IDs, workflow IDs, names, and descriptions. The tool returns the result directly — reference it when building or modifying.\n\n_manage system_\n\n- \\`manage_system\\` — Manages workflows and provides system information within the Darwin project. Use to create or modify n8n workflows (including Darwin itself), to answer questions about how operations work in this system, AND to run tests or verify system health (the Builder owns the full testing suite — see _Testing_ below). Always scoped to the Darwin project (\\`2uAQ2XYnaFVSte2z\\`). Input: \\`task\\` (detailed description of what to build, modify, test, or ask about the system). The tool returns the result directly — include it in your response.\n\n_create project_\n\n- \\`create_project\\` — Creates a new research project. Validates inputs, generates a UX research script (Claude Sonnet), creates a Google Drive folder, inserts a Supabase project row, and returns project links (PidgeonHead + Google Drive). Use ONLY when the user explicitly asks to create/set up a new project or study (see the Creating Projects section above). Parameters: \\`projectName\\` (required); optional \\`projectType\\`, \\`researchGoal\\`, \\`targetAudience\\`, \\`additionalContext\\`. Has real side effects — do not call speculatively.\n\n_update project_\n\n- \\`update_project\\` — Updates an existing research project. Use when the user wants to change a project\\'s script, name, or type. Requires a \\`projectId\\` (use \\`get_projects\\` to find it first if needed). Parameters: \\`projectId\\` (required, UUID); optional \\`script\\` (HTML string), \\`name\\`, \\`type\\`. At least one update field must be provided. Returns confirmation with the updated fields and a PidgeonHead link.\n\n_Self-Modification_\n\nWhen asked to modify, update, or improve Darwin itself, ALWAYS edit workflow \\`HDMvthliXrAcZrXp\\` (named \\\"Darwin\\\" in the project index). Do not create a new workflow — this ID is hardcoded and will never change. Ask to inspect the current state before modifying, then \\`manage_system\\` with the exact Darwin workflow ID.\n\n_Output Formatting_\n\nOutput channel: {{ $json.env }}\n\nWhen the output channel is \\\"slack\\\", the following rules are MANDATORY — violating them degrades readability:\n\n• NEVER use markdown headings (#, ##, ###). Use plain text labels on their own line with a line break above\n• NEVER use block quotes (> text). List quotes as bullet points instead:\n  • \\\"Quote text here\\\" — Participant Name, Project (timestamp)\n• NEVER use bold for participant names, quote attributions, timestamps, or category labels\n• NEVER use tables — use bullet lists instead\n• Reserve bold (**text**) for at most 3-5 critical findings or key takeaways\n• Use bullet points (•), numbered lists, and line breaks for visual structure\n• Keep formatting minimal and flat — heavy formatting becomes unreadable in Slack\n\nExample of WRONG Slack formatting:\n## Key Findings\n> \\\"Quote here\\\"\n> — **Participant Name**, [**00:11:29**](link)\n\nExample of CORRECT Slack formatting:\nKey Findings\n\n• \\\"Quote here\\\"\n  Participant Name, Project Name, [00:11:29](link)\n\nWhen the output channel is NOT \\\"slack\\\":\n• Use standard markdown formatting freely including headings, bold, and block quotes\n\n_Error Handling_\n\n- No results → try one broader search, then report the gap\n- Tool failure → acknowledge and try alternative approach\n- Minimal results → be transparent: \\\"Research on this topic is limited\\\"\n\n_Testing_\n\nYou do NOT have testing tools. The full testing suite (unit, integration, and eval) lives on the Builder agent. If asked to run tests, run evals, check tool health, run unit/integration checks, or verify the system is working, defer to the Builder agent via \\`manage_system\\` with a clear task describing what to test. The Builder can run tests even when you are down. Do not attempt to test workflows yourself — hand off to the Builder.`;\nconst appendix = $vars.env === \"staging\" ? `---\n\n## Environment: STAGING (Development)\n\nYou are Darwin (staging), running on the development instance at darwin-staging.app.n8n.cloud. You have full tool access and can modify workflows via \\`manage_system\\`.\n\nYour name is **SonOfDarwin**. Tag production with **<@U09Q22R53T6>** only when you need it to take action. Do not tag for status updates or progress.\n\nWhen production Darwin identifies a problem that needs a workflow change:\n1. Investigate using your full tool access\n2. Use \\`manage_system\\` to build fixes on staging\n3. Report the workflow ID and summary to the thread — Rob will review and deploy. Do NOT tag production Darwin about the fix.\n\n**Deployment:** Changes you make here are NOT automatically visible on production. Rob must manually push them via Git. Do not tell production Darwin that a fix is live — it won\\''t be until Rob deploys it.` : `---\n\n## Environment: PRODUCTION (Read-Only)\n\nYou are Darwin, running on the protected production instance at darwin-production.app.n8n.cloud. Your tools are READ-ONLY — you can search, read, and inspect, but cannot modify workflows or write to the database.\n\nYour name is **Darwin**. Tag staging with **<@U0BLRFB0FJR>** only when you need it to build something. Do not tag for status updates, progress, or acknowledgements.\n\n**Deployment:** Staging changes are NOT visible to you until Rob deploys them. Do not expect immediate availability.\n\nWhen you discover an issue that needs a workflow change:\n1. Describe the problem clearly with relevant context (workflow IDs, error details)\n2. Tag **<@U0BLRFB0FJR>** with a clear fix request\n3. Darwin (staging) will build the fix; Rob will review and deploy\n\nYour role is diagnosis and context-gathering. Never attempt to modify workflows — your tools are locked to read-only. When you can\\''t fix something yourself, be detailed in your handoff to staging.`;\nreturn { json: { systemMessage: body + \"\\n\\n\" + appendix } };"
       },
       "id": "prompt-darwin",
       "name": "Build Prompt",
@@ -1552,6 +1001,206 @@
       "position": [
         -4752,
         144
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Creates a new research project. Validates inputs, generates a UX research script (Claude Sonnet), creates a Google Drive folder, inserts a Supabase project row, and returns project links (PidgeonHead + Google Drive). Use when a user asks to create/set up a new research project or study.\n\nParameters:\n- projectName (string, required): The name of the new project.\n- projectType (string, optional): One of discovery_interview, usability_test, concept_test, card_sort, survey, diary_study, field_study, other. Defaults to discovery_interview.\n- researchGoal (string, optional): What the research aims to learn.\n- targetAudience (string, optional): Who the participants are.\n- additionalContext (string, optional): Any extra context to shape the script.",
+        "workflowId": {
+          "__rl": true,
+          "value": "U2dYt2dN4bOytzK6",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/U2dYt2dN4bOytzK6",
+          "cachedResultName": "Darwin — ProjectCreate"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "projectName": "={{ $fromAI('projectName', 'The name of the new research project.', 'string') }}",
+            "projectType": "={{ $fromAI('projectType', 'One of: discovery_interview, usability_test, concept_test, card_sort, survey, diary_study, field_study, other. Defaults to discovery_interview.', 'string') }}",
+            "researchGoal": "={{ $fromAI('researchGoal', 'What the research aims to learn.', 'string') }}",
+            "targetAudience": "={{ $fromAI('targetAudience', 'Who the participants are.', 'string') }}",
+            "additionalContext": "={{ $fromAI('additionalContext', 'Any extra context to shape the script.', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "projectName",
+              "displayName": "projectName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "projectType",
+              "displayName": "projectType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "researchGoal",
+              "displayName": "researchGoal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "targetAudience",
+              "displayName": "targetAudience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "additionalContext",
+              "displayName": "additionalContext",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "1234be2d-9d72-47f4-8c72-2a82572d9481",
+      "name": "create_project",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -4320,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Asks a research question across ALL approved sessions in parallel. Each session's transcript, profile, and summary is sent to an LLM which answers the question based on that session's evidence. Returns aggregated results with per-session answers, reasoning, and relevance flags.\n\nThis is a SLOW operation (can take up to 10 minutes). Use when the user wants to systematically analyze every session against a specific question, rather than searching for keywords.\n\nParameters:\n- question (required, string): The research question to ask across all sessions.",
+        "workflowId": {
+          "__rl": true,
+          "value": "H5pmFB4CcAPQumbK",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/H5pmFB4CcAPQumbK",
+          "cachedResultName": "Darwin — SessionQuestion"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "question": "={{ $fromAI('question', 'The research question to ask across every approved session', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "question",
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "92a7e000-d6a5-4c7a-b97a-d17693f217e6",
+      "name": "ask_all_sessions",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -5600,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Updates an existing research project in the database. Use when a user wants to update a project's script, name, or type. Requires the project ID (get it from get_projects first if needed).\n\nParameters:\n- projectId (string, required): The UUID of the project to update.\n- script (string, optional): New script content (HTML string) to replace the existing script.\n- name (string, optional): New project name.\n- type (string, optional): New project type (one of: discovery_interview, usability_test, concept_test, card_sort, survey, diary_study, field_study, other).\n\nAt least one of script, name, or type must be provided.",
+        "workflowId": {
+          "__rl": true,
+          "value": "MS14Oksst5sZnjiK",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/MS14Oksst5sZnjiK",
+          "cachedResultName": "Darwin — ProjectUpdate"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "projectId": "={{ $fromAI('projectId', 'The UUID of the project to update.', 'string') }}",
+            "script": "={{ $fromAI('script', 'New script content (HTML string).', 'string') }}",
+            "name": "={{ $fromAI('name', 'New project name.', 'string') }}",
+            "type": "={{ $fromAI('type', 'New project type.', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "projectId",
+              "displayName": "projectId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "script",
+              "displayName": "script",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "7f978fa9-b381-4354-8914-1f67307c220d",
+      "name": "update_project",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -2480,
+        592
       ]
     }
   ],
@@ -1808,39 +1457,6 @@
         ]
       ]
     },
-    "save_eval_case": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "read_evals": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "run_evals": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "If": {
       "main": [
         [
@@ -1881,78 +1497,45 @@
         ]
       ]
     },
-    "run_integration_checks": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "integration_read": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "integration_create": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "run_unit_checks": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "unit_read": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "unit_create": {
-      "ai_tool": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Build Prompt": {
       "main": [
         [
           {
             "node": "darwin",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_project": {
+      "ai_tool": [
+        [
+          {
+            "node": "darwin",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ask_all_sessions": {
+      "ai_tool": [
+        [
+          {
+            "node": "darwin",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_project": {
+      "ai_tool": [
+        [
+          {
+            "node": "darwin",
+            "type": "ai_tool",
             "index": 0
           }
         ]
@@ -1969,7 +1552,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "fe0083d6-4dde-47ce-bba1-baad2f27cc89",
+  "versionId": "74a9718b-6772-41a9-b3bd-b98633b56ab3",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

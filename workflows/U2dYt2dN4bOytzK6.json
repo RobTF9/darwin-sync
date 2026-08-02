@@ -1,0 +1,306 @@
+{
+  "id": "U2dYt2dN4bOytzK6",
+  "name": "ProjectCreate",
+  "nodes": [
+    {
+      "id": "a58d8215-765f-435e-8f88-1622bbf47747",
+      "name": "trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        256
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "projectName",
+              "type": "string"
+            },
+            {
+              "name": "projectType",
+              "type": "string"
+            },
+            {
+              "name": "researchGoal",
+              "type": "string"
+            },
+            {
+              "name": "targetAudience",
+              "type": "string"
+            },
+            {
+              "name": "additionalContext",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "736766d3-63f7-4b48-b9f3-e7a1aa53c1d3",
+      "name": "validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        256
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const validTypes = [\n  'discovery_interview',\n  'usability_test',\n  'concept_test',\n  'card_sort',\n  'survey',\n  'diary_study',\n  'field_study',\n  'other'\n];\n\nconst input = $input.item.json;\n\nconst projectName = (input.projectName || '').toString().trim();\nif (!projectName) {\n  throw new Error('projectName is required and cannot be empty');\n}\n\nlet projectType = (input.projectType || '').toString().trim();\nif (!validTypes.includes(projectType)) {\n  projectType = 'discovery_interview';\n}\n\nconst researchGoal = (input.researchGoal || '').toString().trim();\nconst targetAudience = (input.targetAudience || '').toString().trim();\nconst additionalContext = (input.additionalContext || '').toString().trim();\n\nreturn {\n  projectName,\n  projectType,\n  researchGoal,\n  targetAudience,\n  additionalContext\n};"
+      }
+    },
+    {
+      "id": "37692a8e-f21a-4120-86e5-677a5ebf85bd",
+      "name": "script_generator",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate a research script for the following project:\n\nProject Name: {{ $json.projectName }}\nProject Type: {{ $json.projectType }}\nResearch Goal: {{ $json.researchGoal }}\nTarget Audience: {{ $json.targetAudience || \"Not specified\" }}\nAdditional Context: {{ $json.additionalContext || \"None\" }}\n\nReturn ONLY the HTML script content, no preamble or explanation.",
+        "options": {
+          "systemMessage": "You are an expert UX research script writer. You create research scripts for user interviews and usability tests at n8n, a workflow automation platform.\n\nGiven a research goal, project type, and target audience, generate a well-structured research script in HTML format (since it will be stored in a rich text field).\n\n## Script Structure\n\nFollow this structure based on the project type:\n\n### For Discovery Interviews:\n1. **About the person** - Background questions about their role, company, technical ability\n2. **Topic-specific sections** - 2-4 sections based on the research goal, each with 3-5 questions\n3. **Wrap-up** - Magic wand question, anything else to add\n\n### For Usability Tests:\n1. **Pre-Session Setup** - Duration, format, recording notes, test environment details\n2. **Introduction & Rapport Building** (5 min) - Opening script, consent to record\n3. **Context & Background** (10-15 min) - Role, experience with similar tools\n4. **Task Introduction & Open Exploration** (30-40 min) - Task scenario, observation points, behavioral markers to watch\n5. **Debrief** (5-10 min) - Overall impressions, comparison to expectations\n\n### For Concept Tests:\n1. **Background** - Context about participant\n2. **Current experience** - How they handle the problem today\n3. **Concept presentation** - Show the concept, capture first reactions\n4. **Detailed feedback** - Specific questions about the concept\n5. **Wrap-up** - Overall assessment\n\n### For other types:\nUse a sensible structure based on the research goal.\n\n## Question Writing Guidelines\n\nFollow these principles from our interview technique coaching:\n\n**The Big Five question starters:** \"Tell me about…\", \"Walk me through…\", \"What's it like when…\", \"How do you…\", \"Can you describe…\"\n\n**Context-specific starters:**\n- Process: \"Take me back to…\", \"Starting from the beginning…\", \"What happens after…\"\n- Problems: \"What's challenging about…\", \"Where do things typically go wrong when…\", \"What gets in the way of…\"\n- Motivations: \"What made you decide to…\", \"What were you hoping would happen when…\", \"What's important to you about…\"\n\n**Rules:**\n1. Always use open-ended questions - never yes/no questions\n2. Focus on past behavior, not hypothetical futures\n3. Ask about specific instances (\"Tell me about the last time...\") not generalities\n4. Include \"Why we ask\" annotations in italics for questions where the research intent isn't obvious, formatted as: *Why we ask: explanation*\n5. Avoid leading questions - use neutral language\n6. Use the funnel technique: broad → narrow → specific → deeper\n7. Include follow-up prompts where useful\n\n**Formatting:**\n- Use HTML formatting (h1, h2, p, ul/li, em for italics, strong for bold)\n- Each question should be in bold\n- \"Why we ask\" notes should be in italics below the question\n- Leave placeholder bullets (&nbsp;) after questions for the researcher to take notes\n- Use <h1> for main sections, <h2> for subsections\n\nHere is an example of a well-structured discovery interview script for reference:\n\n<example>\n<h1>About the person</h1>\n<p><strong>What is your job? What does the company do? How many people work there?</strong></p>\n<ul><li>&nbsp;</li></ul>\n<p><strong>Can you code? Are you a developer?</strong></p>\n<ul><li><em>Why we ask: Are they technical enough to use n8n? To deploy it themselves?</em></li></ul>\n\n<h1>Automation experience</h1>\n<p><strong>What kind of things are you doing with n8n?</strong></p>\n<ul><li>&nbsp;</li></ul>\n<p><strong>Do you have any business-critical workflows that can't be allowed to fail?</strong></p>\n<ul><li><em>Why we ask: We think auditing will be more important if so. We want to check whether that's true and the proportion of the user base that answer 'yes'</em></li></ul>\n<p><strong>How do you get confidence your AI-generated code is working as expected?</strong></p>\n<ul><li><em>Why we ask: This is an essential question: we believe that there is an opportunity to make these things more understandable, but need to test this hypothesis</em></li></ul>\n<p><strong>If you could wave a magic wand and change 3 things about n8n to make it the best tool you've ever used, what would they be?</strong></p>\n<ul><li>&nbsp;</li></ul>\n</example>"
+        }
+      }
+    },
+    {
+      "id": "44715c30-8e90-4c54-a401-b8d4ef1a4dbe",
+      "name": "script_model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        528,
+        224
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {
+          "maxTokensToSample": 4096
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "id": "01f49a05-a86c-4298-bab9-3f0e45be99e2",
+      "name": "merge_results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        800,
+        256
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 2
+      }
+    },
+    {
+      "id": "2e9772e9-ca68-4494-897c-81ab919b4c2a",
+      "name": "create_folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        512,
+        400
+      ],
+      "parameters": {
+        "resource": "folder",
+        "operation": "create",
+        "name": "={{ $json.projectName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1RK9ac5VNAPgHoYwbVl93B-f8n_FAFdf2",
+          "cachedResultName": "Research Recordings"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "id": "4b89f8ac-58c3-4089-993c-fe53244fdcbd",
+      "name": "create_project",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        256
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "project",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $(\"validate\").item.json.projectName }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "={{ $(\"validate\").item.json.projectType }}"
+            },
+            {
+              "fieldId": "script",
+              "fieldValue": "={{ $(\"script_generator\").item.json.output }}"
+            },
+            {
+              "fieldId": "google_drive_id",
+              "fieldValue": "={{ $(\"create_folder\").item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "515dd504-b04e-4b05-be8f-870b261d0359",
+      "name": "format_response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        256
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const project = $input.item.json;\nconst folder = $('create_folder').item.json;\nconst validated = $('validate').item.json;\n\nconst projectId = project.id;\nconst projectName = validated.projectName;\nconst projectType = validated.projectType;\nconst folderId = folder.id;\n\nconst googleDriveUrl = 'https://drive.google.com/drive/folders/' + folderId;\nconst pidgeonheadUrl = 'https://pidgeonhead.netlify.app/projects/' + projectId;\n\nconst message = 'Created project \"' + projectName + '\" (' + projectType + ').\\n' +\n  'PidgeonHead: ' + pidgeonheadUrl + '\\n' +\n  'Google Drive folder: ' + googleDriveUrl;\n\nreturn {\n  projectId,\n  projectName,\n  projectType,\n  googleDriveUrl,\n  pidgeonheadUrl,\n  message\n};"
+      }
+    }
+  ],
+  "connections": {
+    "trigger": {
+      "main": [
+        [
+          {
+            "node": "validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate": {
+      "main": [
+        [
+          {
+            "node": "script_generator",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "create_folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "script_generator": {
+      "main": [
+        [
+          {
+            "node": "merge_results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "script_model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "script_generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge_results": {
+      "main": [
+        [
+          {
+            "node": "create_project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_folder": {
+      "main": [
+        [
+          {
+            "node": "merge_results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "create_project": {
+      "main": [
+        [
+          {
+            "node": "format_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "d19205ee-e0c7-4ae4-874e-9d3abe4eb23d",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

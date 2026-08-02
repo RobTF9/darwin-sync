@@ -37,129 +37,6 @@
       }
     },
     {
-      "id": "3b39b69c-e601-437e-bbda-5badee8fe9e9",
-      "name": "Route Suite",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
-      "position": [
-        -180,
-        300
-      ],
-      "parameters": {
-        "rules": {
-          "values": [
-            {
-              "outputKey": "unit",
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.suite }}",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    },
-                    "rightValue": "unit"
-                  }
-                ],
-                "combinator": "and"
-              }
-            }
-          ]
-        },
-        "options": {
-          "fallbackOutput": "extra",
-          "renameFallbackOutput": "integration"
-        }
-      }
-    },
-    {
-      "id": "b48282d6-1ad7-4088-8590-17a79dcd5191",
-      "name": "Update Unit Case",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        60,
-        220
-      ],
-      "parameters": {
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "njlfan4ReESe4VAZ"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "case_id",
-              "keyValue": "={{ $json.case_id }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "description": "={{ $json.description }}",
-            "inputs": "={{ $json.inputs }}",
-            "assertions": "={{ $json.assertions }}",
-            "target": "={{ $json.target }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "description",
-              "displayName": "description",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "inputs",
-              "displayName": "inputs",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "assertions",
-              "displayName": "assertions",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "acbabf52-38d5-4915-8a74-6f58f66a9802",
       "name": "Confirm",
       "type": "n8n-nodes-base.code",
@@ -174,85 +51,56 @@
       }
     },
     {
-      "id": "734f1c06-4115-44ba-89c0-b8fdcc346615",
-      "name": "Update Integration Case",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
+      "id": "c8a1a04f-4bb3-4d4f-b957-125dc60816a8",
+      "name": "Update Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
       "position": [
-        60,
-        380
+        -180,
+        300
       ],
       "parameters": {
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "yZf7RKAPLc3ZiO5E"
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $json.description }}"
+            },
+            {
+              "fieldId": "inputs",
+              "fieldValue": "={{ $json.inputs }}"
+            },
+            {
+              "fieldId": "assertions",
+              "fieldValue": "={{ $json.assertions }}"
+            },
+            {
+              "fieldId": "target",
+              "fieldValue": "={{ $json.target }}"
+            }
+          ]
         },
-        "matchType": "allConditions",
+        "filterType": "manual",
         "filters": {
           "conditions": [
             {
               "keyName": "case_id",
-              "keyValue": "={{ $json.case_id }}"
+              "keyValue": "={{ $json.case_id }}",
+              "condition": "eq"
             }
           ]
         },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "description": "={{ $json.description }}",
-            "inputs": "={{ $json.inputs }}",
-            "assertions": "={{ $json.assertions }}",
-            "target": "={{ $json.target }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "description",
-              "displayName": "description",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "inputs",
-              "displayName": "inputs",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "assertions",
-              "displayName": "assertions",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
+        "matchType": "allFilters",
+        "operation": "update",
+        "resource": "row",
+        "tableId": "test_cases"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
       }
     }
   ],
@@ -261,43 +109,14 @@
       "main": [
         [
           {
-            "node": "Route Suite",
+            "node": "Update Case",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Route Suite": {
-      "main": [
-        [
-          {
-            "node": "Update Unit Case",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Update Integration Case",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Unit Case": {
-      "main": [
-        [
-          {
-            "node": "Confirm",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Integration Case": {
+    "Update Case": {
       "main": [
         [
           {
@@ -314,7 +133,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "ba359cfa-ce7c-439f-b7b9-f00a24e9a03f",
+  "versionId": "0217450e-3420-4adf-8805-b6e920b81a77",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

@@ -34,89 +34,6 @@
       }
     },
     {
-      "id": "42c28368-f20a-42da-997d-aed579a41a3d",
-      "name": "Insert Case",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        -160,
-        300
-      ],
-      "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "njlfan4ReESe4VAZ"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "case_id": "={{ $json.case_id }}",
-            "target": "={{ $json.target }}",
-            "description": "={{ $json.description }}",
-            "inputs": "={{ $json.inputs }}",
-            "assertions": "={{ $json.assertions }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "target",
-              "displayName": "target",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "description",
-              "displayName": "description",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "inputs",
-              "displayName": "inputs",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            },
-            {
-              "id": "assertions",
-              "displayName": "assertions",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "69b42a7f-def9-4b72-901c-d36b9adbc1ae",
       "name": "Confirm",
       "type": "n8n-nodes-base.code",
@@ -128,6 +45,56 @@
       "parameters": {
         "mode": "runOnceForEachItem",
         "jsCode": "return { json: { ok: true, case_id: $('Input').item.json.case_id, target: $('Input').item.json.target } };"
+      }
+    },
+    {
+      "id": "57b87639-b844-4ea8-86e1-47ed93e26ea1",
+      "name": "Insert Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        300
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "suite",
+              "fieldValue": "unit"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "target",
+              "fieldValue": "={{ $json.target }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $json.description }}"
+            },
+            {
+              "fieldId": "inputs",
+              "fieldValue": "={{ $json.inputs }}"
+            },
+            {
+              "fieldId": "assertions",
+              "fieldValue": "={{ $json.assertions }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "test_cases"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
       }
     }
   ],
@@ -160,7 +127,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "d21a56f3-cfbe-4a2d-a429-a95ed8cf8926",
+  "versionId": "93e3824a-2970-4c26-bb3a-988d7f57eec8",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

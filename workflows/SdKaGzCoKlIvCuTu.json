@@ -50,13 +50,13 @@
       "credentials": {
         "postgres": {
           "id": "Av2ehn3RdLrlzohO",
-          "name": "Darwin Supabase"
+          "name": "Supabase Postgres"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const rows = $input.all().map(i => i.json);\nconst triggerData = $('When Executed by Darwin').first().json;\n\nfunction parseMessage(raw) {\n  let msg = raw;\n  if (typeof msg === 'string') {\n    try { msg = JSON.parse(msg); } catch (e) { return null; }\n  }\n  if (!msg || typeof msg !== 'object') return null;\n  let role = msg.role || msg.type || (msg.data && msg.data.type);\n  let content = msg.content;\n  if (content === undefined && msg.data) content = msg.data.content;\n  if (role === 'human') role = 'user';\n  if (role === 'ai') role = 'assistant';\n  if (content === undefined || content === null) return null;\n  if (typeof content !== 'string') content = JSON.stringify(content);\n  return { role, content };\n}\n\nconst messages = [];\nfor (const r of rows) {\n  const parsed = parseMessage(r.message);\n  if (parsed) messages.push(parsed);\n}\n\nlet lastUserIdx = -1;\nfor (let i = messages.length - 1; i >= 0; i--) {\n  if (messages[i].role === 'user') { lastUserIdx = i; break; }\n}\nlet lastAssistantIdx = -1;\nfor (let i = messages.length - 1; i >= 0; i--) {\n  if (messages[i].role === 'assistant') { lastAssistantIdx = i; break; }\n}\n\nconst input = lastUserIdx >= 0 ? messages[lastUserIdx].content : '';\nconst assistantLast = lastAssistantIdx >= 0 ? messages[lastAssistantIdx].content : '';\n\nconst excludeIdx = new Set();\nif (lastUserIdx >= 0) excludeIdx.add(lastUserIdx);\nif (lastAssistantIdx >= 0) excludeIdx.add(lastAssistantIdx);\nconst contextMessages = messages.filter((m, idx) => !excludeIdx.has(idx));\n\nconst override = (triggerData.expected_response || '').trim();\nconst expected_response = override !== '' ? override : assistantLast;\n\nconst case_id = 'eval-' + Date.now();\n\nreturn [{ json: {\n  case_id,\n  input,\n  context_messages: JSON.stringify(contextMessages),\n  context_turns: contextMessages.length,\n  expected_response,\n  prohibited_tools: triggerData.prohibited_tools || '',\n  expected_tools: triggerData.expected_tools || '',\n  source_thread: triggerData.source_thread || '',\n  created_at: new Date().toISOString()\n} }];"
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst triggerData = $('When Executed by Darwin').first().json;\n\nfunction parseMessage(raw) {\n  let msg = raw;\n  if (typeof msg === 'string') {\n    try { msg = JSON.parse(msg); } catch (e) { return null; }\n  }\n  if (!msg || typeof msg !== 'object') return null;\n  let role = msg.role || msg.type || (msg.data && msg.data.type);\n  let content = msg.content;\n  if (content === undefined && msg.data) content = msg.data.content;\n  if (role === 'human') role = 'user';\n  if (role === 'ai') role = 'assistant';\n  if (content === undefined || content === null) return null;\n  if (typeof content !== 'string') content = JSON.stringify(content);\n  return { role, content };\n}\n\nconst messages = [];\nfor (const r of rows) {\n  const parsed = parseMessage(r.message);\n  if (parsed) messages.push(parsed);\n}\n\nlet lastUserIdx = -1;\nfor (let i = messages.length - 1; i >= 0; i--) {\n  if (messages[i].role === 'user') { lastUserIdx = i; break; }\n}\nlet lastAssistantIdx = -1;\nfor (let i = messages.length - 1; i >= 0; i--) {\n  if (messages[i].role === 'assistant') { lastAssistantIdx = i; break; }\n}\n\nconst input = lastUserIdx >= 0 ? messages[lastUserIdx].content : '';\nconst assistantLast = lastAssistantIdx >= 0 ? messages[lastAssistantIdx].content : '';\n\nconst excludeIdx = new Set();\nif (lastUserIdx >= 0) excludeIdx.add(lastUserIdx);\nif (lastAssistantIdx >= 0) excludeIdx.add(lastAssistantIdx);\nconst contextMessages = messages.filter((m, idx) => !excludeIdx.has(idx));\n\nconst override = (triggerData.expected_response || '').trim();\nconst expected_response = override !== '' ? override : assistantLast;\n\nconst case_id = 'eval-' + Date.now();\n\nreturn [{ json: {\n  case_id,\n  input,\n  context_turns: contextMessages.length,\n  suite: 'eval',\n  inputs_json: JSON.stringify({ prompt: input }),\n  eval_config_json: JSON.stringify({\n    context_messages: contextMessages,\n    prohibited_tools: triggerData.prohibited_tools || '',\n    expected_tools: triggerData.expected_tools || '',\n    expected_response,\n    source_thread: triggerData.source_thread || '',\n    created_at: new Date().toISOString()\n  }),\n  description: input.slice(0, 200)\n} }];"
       },
       "id": "b4bda19a-60be-4bd5-b35c-c5404b179350",
       "name": "Parse Conversation",
@@ -64,116 +64,6 @@
       "typeVersion": 2,
       "position": [
         544,
-        384
-      ]
-    },
-    {
-      "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "value": "G3P55vPsJtpt1pk5",
-          "mode": "list",
-          "cachedResultName": "Darwin Evals",
-          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/G3P55vPsJtpt1pk5"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "case_id": "={{ $json.case_id }}",
-            "input": "={{ $json.input }}",
-            "context_messages": "={{ $json.context_messages }}",
-            "expected_response": "={{ $json.expected_response }}",
-            "expected_tools": "={{ $json.expected_tools }}",
-            "prohibited_tools": "={{ $json.prohibited_tools }}",
-            "source_thread": "={{ $json.source_thread }}",
-            "created_at": "={{ $json.created_at }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "case_id",
-              "displayName": "case_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "input",
-              "displayName": "input",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "context_messages",
-              "displayName": "context_messages",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "expected_response",
-              "displayName": "expected_response",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "expected_tools",
-              "displayName": "expected_tools",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "prohibited_tools",
-              "displayName": "prohibited_tools",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "source_thread",
-              "displayName": "source_thread",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "id": "62b6f242-5ef4-4138-860f-811c64293c1a",
-      "name": "Save Case",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        768,
         384
       ]
     },
@@ -223,6 +113,52 @@
         992,
         384
       ]
+    },
+    {
+      "id": "0a24a2ce-f261-4924-be51-ac0c6fefa00a",
+      "name": "Save Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        768,
+        384
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "suite",
+              "fieldValue": "={{ $json.suite }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "inputs",
+              "fieldValue": "={{ $json.inputs_json }}"
+            },
+            {
+              "fieldId": "eval_config",
+              "fieldValue": "={{ $json.eval_config_json }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $json.description }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "test_cases"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     }
   ],
   "connections": {
@@ -277,7 +213,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "bdd57e7a-a5a1-4c55-b6a1-b5e980bd7570",
+  "versionId": "3d594491-5d76-4a13-9bda-241e5476dc0d",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

@@ -69,25 +69,6 @@
       }
     },
     {
-      "id": "f04052b2-134c-421c-86b7-dd1513ec3d33",
-      "name": "Get Results",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        60,
-        220
-      ],
-      "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "Ky7fj4ueDOdTHyG9"
-        },
-        "returnAll": true
-      }
-    },
-    {
       "id": "59025808-9e69-4bb7-a52e-710644f127ba",
       "name": "Filter Rows",
       "type": "n8n-nodes-base.code",
@@ -102,22 +83,57 @@
       }
     },
     {
-      "id": "4d4f034c-83ef-4d2d-90e0-5b57df74ec5d",
+      "id": "79eae456-6281-4b49-9b2e-452b03b8d7be",
+      "name": "Get Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        60,
+        220
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "resource": "row",
+        "returnAll": true,
+        "tableId": "test_results"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "8a60843e-55ba-4e96-a74f-1e7130df2566",
       "name": "Get Cases",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
       "position": [
         60,
         380
       ],
       "parameters": {
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "yZf7RKAPLc3ZiO5E"
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "suite",
+              "keyValue": "integration",
+              "condition": "eq"
+            }
+          ]
         },
-        "returnAll": true
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "resource": "row",
+        "returnAll": true,
+        "tableId": "test_cases"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
       }
     }
   ],
@@ -179,7 +195,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "d64ed8c4-481d-4427-9a55-f35754ecf644",
+  "versionId": "6d9155b9-aac8-4071-a38c-c75adaa7bde6",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

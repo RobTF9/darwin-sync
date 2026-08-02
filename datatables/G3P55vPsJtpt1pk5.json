@@ -1,6 +1,6 @@
 {
   "id": "G3P55vPsJtpt1pk5",
-  "name": "Darwin Evals",
+  "name": "DELETED - Darwin Evals (migrated to Supabase test_cases)",
   "columns": [
     {
       "id": "2ojii1CdnKRASdzD",
@@ -69,5 +69,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-07-28T18:36:50.276Z",
-  "updatedAt": "2026-07-31T08:13:49.404Z"
+  "updatedAt": "2026-08-01T19:19:55.000Z"
 }

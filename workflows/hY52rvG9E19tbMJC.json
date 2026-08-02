@@ -146,7 +146,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const rows = $input.all().map((i) => i.json);\nconst total = rows.length;\nconst pass = rows.filter((r) => r.status === 'pass').length;\nconst bad = rows.filter((r) => r.status !== 'pass');\nconst lines = bad.map((r) => `• ${r.case_id} (${r.target}): ${r.status}`);\nconst message = bad.length === 0\n  ? `*Unit suite* ✅ all ${total} checks passed`\n  : `*Unit suite* ❌ ${bad.length}/${total} failed\\n${lines.join('\\n')}`;\nreturn [{ json: { run_id: $('Format Cases').first().json.run_id, total, pass, failed: bad.length, failures: bad, message } }];"
+        "jsCode": "// Aggregate from persisted test_results rows (source of truth) for this run.\nconst runId = $('Format Cases').first().json.run_id;\nlet rows = $input.all().map((i) => i.json).filter((r) => String(r.run_id) === String(runId));\n\n// Deduplicate by case_id, keeping the latest row per case (by run_date, then created_at).\nconst latestByCase = {};\nfor (const r of rows) {\n  const key = r.case_id;\n  const ts = Date.parse(r.run_date || r.created_at || 0) || 0;\n  if (!latestByCase[key] || ts >= latestByCase[key]._ts) {\n    latestByCase[key] = { ...r, _ts: ts };\n  }\n}\nrows = Object.values(latestByCase).map(({ _ts, ...r }) => r);\n\nconst total = rows.length;\nconst pass = rows.filter((r) => r.status === 'pass').length;\nconst bad = rows.filter((r) => r.status !== 'pass');\nconst lines = bad.map((r) => `\\u2022 ${r.case_id} (${r.target}): ${r.status}`);\nconst message = bad.length === 0\n  ? `*Unit suite* \\u2705 all ${total} checks passed`\n  : `*Unit suite* \\u274c ${bad.length}/${total} failed\\n${lines.join('\\n')}`;\nreturn [{ json: { run_id: runId, total, pass, failed: bad.length, failures: bad, message } }];"
       }
     },
     {
@@ -264,6 +264,39 @@
           "name": "Supabase Tests"
         }
       }
+    },
+    {
+      "id": "bbc3d53b-bf36-4716-b002-c3131c99a151",
+      "name": "Load Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        180,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "test_results",
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Format Cases').first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     }
   ],
   "connections": {
@@ -272,17 +305,6 @@
         [
           {
             "node": "Dispatch Case",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Dispatch Case": {
-      "main": [
-        [
-          {
-            "node": "Summarize",
             "type": "main",
             "index": 0
           }
@@ -339,6 +361,28 @@
           }
         ]
       ]
+    },
+    "Dispatch Case": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Results": {
+      "main": [
+        [
+          {
+            "node": "Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -347,7 +391,7 @@
     "timezone": "Europe/London"
   },
   "triggerCount": 0,
-  "versionId": "d4684cf1-3d00-4173-a4f4-de4331b75be1",
+  "versionId": "e55b1ac4-c634-46ec-a99f-097debff606f",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

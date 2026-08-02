@@ -126,7 +126,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json.session_ids;\nconst ids = Array.isArray(raw) ? raw : String(raw || '').split(',');\nreturn ids.map((s) => String(s).trim()).filter(Boolean).map((s) => ({ session_id: s }));"
+        "jsCode": "// Tolerant input parsing: find session UUID(s) under any common key name.\nconst item = ($input.first() && $input.first().json) ? $input.first().json : {};\n\nconst UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;\n\n// Candidate keys that might hold the session id(s), in priority order.\nconst candidateKeys = ['session_ids', 'session_id', 'sessionIds', 'sessionId', 'ids', 'id', 'input', 'query'];\n\nlet raw = null;\nfor (const k of candidateKeys) {\n  if (item[k] !== undefined && item[k] !== null && item[k] !== '') {\n    raw = item[k];\n    break;\n  }\n}\n\n// Normalize whatever we found into an array of strings.\nlet ids = [];\nif (Array.isArray(raw)) {\n  ids = raw;\n} else if (raw !== null && raw !== undefined) {\n  ids = String(raw).split(',');\n}\n\n// Clean up.\nids = ids.map((s) => String(s).trim()).filter(Boolean);\n\n// Fallback: if nothing usable was found under a known key, regex-scan the\n// entire input object for anything that looks like a UUID.\nif (ids.length === 0) {\n  try {\n    const blob = JSON.stringify(item);\n    const matches = blob.match(UUID_RE) || [];\n    ids = Array.from(new Set(matches));\n  } catch (e) {\n    ids = [];\n  }\n}\n\nreturn ids.map((s) => ({ session_id: s }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -256,7 +256,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "42c4a53b-7707-48f7-9abf-adb38b61f37b",
+  "versionId": "956b5590-aaf5-495a-a0f7-ef79384c0e17",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

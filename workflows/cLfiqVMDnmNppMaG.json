@@ -1,0 +1,341 @@
+{
+  "id": "cLfiqVMDnmNppMaG",
+  "name": "SessionQuestionWorker",
+  "nodes": [
+    {
+      "id": "119c87f5-bc8d-4c2f-bf04-d3384d2f855f",
+      "name": "SessionQuestion Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        112
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "question",
+              "type": "string"
+            },
+            {
+              "name": "session_id",
+              "type": "string"
+            },
+            {
+              "name": "row_id",
+              "type": "string"
+            },
+            {
+              "name": "participant_name",
+              "type": "string"
+            },
+            {
+              "name": "role",
+              "type": "string"
+            },
+            {
+              "name": "company_type",
+              "type": "string"
+            },
+            {
+              "name": "ai_usage",
+              "type": "string"
+            },
+            {
+              "name": "technical_ability",
+              "type": "string"
+            },
+            {
+              "name": "persona",
+              "type": "string"
+            },
+            {
+              "name": "profile_summary",
+              "type": "string"
+            },
+            {
+              "name": "session_summary",
+              "type": "string"
+            },
+            {
+              "name": "transcript",
+              "type": "string"
+            },
+            {
+              "name": "using_n8n_for",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "91b9a9f9-f565-4129-9303-32f746c38e4f",
+      "name": "Answer Question",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        112
+      ],
+      "parameters": {
+        "promptType": "define",
+        "hasOutputParser": true,
+        "text": "=## Question\n{{ $json.question }}\n\n## Participant Profile\n- Name: {{ $json.participant_name }}\n- Role: {{ $json.role }}\n- Company Type: {{ $json.company_type }}\n- AI Usage: {{ $json.ai_usage }}\n- Technical Ability: {{ $json.technical_ability }}\n- Persona: {{ $json.persona }}\n- Using n8n for: {{ $json.using_n8n_for }}\n\n## Profile Summary\n{{ $json.profile_summary }}\n\n## Session Summary\n{{ $json.session_summary }}\n\n## Full Transcript\n{{ $json.transcript }}",
+        "options": {
+          "systemMessage": "You are a research analyst. You will be given context about a research session participant and their full interview transcript. Answer the question based ONLY on evidence from this session. \n\nRespond in JSON format:\n{\n  \"answer\": \"Your concise answer based on evidence from this session\",\n  \"reasoning\": \"The evidence and quotes from the transcript that support your answer\",\n  \"relevant\": true/false  // whether this session contains relevant information for the question\n}\n\nIf the session does not contain relevant information for the question, set relevant to false and explain why in the reasoning.",
+          "maxIterations": 3
+        },
+        "needsFallback": false
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "763f25c7-418d-40d4-9280-ccda485bd9d7",
+      "name": "Answer Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        336
+      ],
+      "parameters": {
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{ \"answer\": \"Your concise answer based on evidence from this session\", \"reasoning\": \"The evidence and quotes from the transcript that support your answer\", \"relevant\": true }",
+        "autoFix": true
+      }
+    },
+    {
+      "id": "79230bc8-2764-4337-8e53-0e62294499cc",
+      "name": "Update Error",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        576,
+        208
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "session_question",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('SessionQuestion Input').item.json.row_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "response",
+              "fieldValue": "={{ JSON.stringify({ error: ($json.error?.message || $json.error || 'Unknown error') }) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "error"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "1e6ab025-1981-488e-a0f5-e93fe50ab6a0",
+      "name": "Update Complete",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        576,
+        16
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "session_question",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('SessionQuestion Input').item.json.row_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "response",
+              "fieldValue": "={{ JSON.stringify($json.output) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "complete"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "a570aab0-a150-456e-9c01-3d0c619f9334",
+      "name": "Analyst Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        240,
+        336
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-opus-4-7",
+          "cachedResultName": "Claude Opus 4.7"
+        },
+        "options": {
+          "maxTokensToSample": 2048
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "id": "5eaff7f7-0939-4297-933d-980356c458bf",
+      "name": "Auto-Fix Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        560,
+        336
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-opus-4-7",
+          "cachedResultName": "Claude Opus 4.7"
+        },
+        "options": {
+          "maxTokensToSample": 2048
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "SessionQuestion Input": {
+      "main": [
+        [
+          {
+            "node": "Answer Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Question": {
+      "main": [
+        [
+          {
+            "node": "Update Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Answer Question",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyst Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer Question",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-Fix Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "92e07531-3325-4091-ad2f-e6f01566dbcc",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

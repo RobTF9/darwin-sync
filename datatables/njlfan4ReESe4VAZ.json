@@ -1,6 +1,6 @@
 {
   "id": "njlfan4ReESe4VAZ",
-  "name": "Darwin Unit Cases",
+  "name": "DELETED - Darwin Unit Cases (migrated to Supabase test_cases)",
   "columns": [
     {
       "id": "bkL1FgDqF8ThBW3p",
@@ -51,5 +51,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-07-30T12:54:52.544Z",
-  "updatedAt": "2026-07-31T08:10:55.719Z"
+  "updatedAt": "2026-08-01T19:19:55.000Z"
 }

@@ -1,6 +1,6 @@
 {
   "id": "Ky7fj4ueDOdTHyG9",
-  "name": "Darwin Integration Results",
+  "name": "DELETED - Darwin Integration Results (migrated to Supabase test_results)",
   "columns": [
     {
       "id": "62QvFCsBe07hBMHy",
@@ -57,5 +57,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-07-30T12:54:52.494Z",
-  "updatedAt": "2026-07-31T08:14:41.666Z"
+  "updatedAt": "2026-08-01T19:19:55.000Z"
 }

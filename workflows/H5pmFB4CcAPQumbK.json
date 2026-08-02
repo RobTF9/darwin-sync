@@ -1,0 +1,667 @@
+{
+  "id": "H5pmFB4CcAPQumbK",
+  "name": "SessionQuestion",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "question"
+            }
+          ]
+        }
+      },
+      "id": "3958d2a0-aa4a-428b-96ee-047a9d67d8a5",
+      "name": "Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst runId = crypto.randomUUID();\nreturn [{ json: { question: $input.first().json.question, run_id: runId } }];"
+      },
+      "id": "5a0690e3-c826-413b-97cf-728ce71f36e1",
+      "name": "Generate Run ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "session",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "approved",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "id": "0534a796-e1bd-4d81-a33f-fcdacd292ee9",
+      "name": "Fetch Sessions",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        384
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sessions = $('Fetch Sessions').all();\nconst { run_id, question } = $('Generate Run ID').first().json;\n\nreturn sessions.map(s => ({\n  json: {\n    run_id,\n    session_id: s.json.id,\n    question,\n    status: 'pending'\n  }\n}));"
+      },
+      "id": "8da7906b-48ec-404a-9210-ef92e2bd936c",
+      "name": "Create Tracking Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "session_question",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.session_id }}"
+            },
+            {
+              "fieldId": "question",
+              "fieldValue": "={{ $json.question }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            }
+          ]
+        }
+      },
+      "id": "fec86a21-734e-4e38-8a16-e57ff4806d9a",
+      "name": "Insert Tracking Rows",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        384
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sessions = $('Fetch Sessions').all();\nconst trackingRows = $('Insert Tracking Rows').all();\nconst { question } = $('Generate Run ID').first().json;\n\nreturn sessions.map((s, i) => ({\n  json: {\n    question,\n    session_id: s.json.id,\n    row_id: trackingRows[i].json.id,\n    participant_name: s.json.participant_name || '',\n    role: s.json.role || '',\n    company_type: s.json.company_type || '',\n    ai_usage: s.json.ai_usage || '',\n    technical_ability: s.json.technical_ability || '',\n    persona: s.json.persona || '',\n    profile_summary: s.json.profile_summary || '',\n    session_summary: s.json.session_summary || '',\n    transcript: s.json.transcript || '',\n    using_n8n_for: s.json.using_n8n_for || ''\n  }\n}));"
+      },
+      "id": "556506d5-51e1-4543-938c-3b3de8e2f00e",
+      "name": "Prepare Dispatch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "cLfiqVMDnmNppMaG"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "question": "={{ $json.question }}",
+            "session_id": "={{ $json.session_id }}",
+            "row_id": "={{ $json.row_id }}",
+            "participant_name": "={{ $json.participant_name }}",
+            "role": "={{ $json.role }}",
+            "company_type": "={{ $json.company_type }}",
+            "ai_usage": "={{ $json.ai_usage }}",
+            "technical_ability": "={{ $json.technical_ability }}",
+            "persona": "={{ $json.persona }}",
+            "profile_summary": "={{ $json.profile_summary }}",
+            "session_summary": "={{ $json.session_summary }}",
+            "transcript": "={{ $json.transcript }}",
+            "using_n8n_for": "={{ $json.using_n8n_for }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "question",
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "row_id",
+              "displayName": "row_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "participant_name",
+              "displayName": "participant_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "company_type",
+              "displayName": "company_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "ai_usage",
+              "displayName": "ai_usage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "technical_ability",
+              "displayName": "technical_ability",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "persona",
+              "displayName": "persona",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "profile_summary",
+              "displayName": "profile_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_summary",
+              "displayName": "session_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "transcript",
+              "displayName": "transcript",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "using_n8n_for",
+              "displayName": "using_n8n_for",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "9f23e93f-6a87-4c9a-a8a4-e92e9ccd7dd2",
+      "name": "Dispatch to Worker",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "e65dc9d8-de54-4cc4-85d4-463c53de8681",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2016,
+        208
+      ],
+      "webhookId": "70b2d0af-867f-4c1f-8b6c-deb37e013325"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "session_question",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Generate Run ID').first().json.run_id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "f6eb32eb-945a-4549-a4cc-9fa927e45bf4",
+      "name": "Check Progress",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        208
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Check Progress').all().filter(r => r.json.id).length }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 0
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8e50ca50-44d3-417c-b45e-3e96f3630689",
+      "name": "Is Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2464,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "session_question",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Generate Run ID').first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "id": "b5c53a73-e47f-4108-9fbc-f76589f91f43",
+      "name": "Fetch Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2688,
+        384
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $('Fetch Results').all();\nconst question = $('Generate Run ID').first().json.question;\nconst run_id = $('Generate Run ID').first().json.run_id;\n\n// Clean up poll counter from static data\nconst staticData = $getWorkflowStaticData('global');\ndelete staticData[`pollCount_${run_id}`];\n\nconst completed = results.filter(r => r.json.status === 'complete');\nconst errors = results.filter(r => r.json.status === 'error');\nconst relevant = completed.filter(r => {\n  const resp = typeof r.json.response === 'string' ? JSON.parse(r.json.response) : r.json.response;\n  return resp && resp.relevant === true;\n});\n\nreturn [{\n  json: {\n    run_id,\n    question,\n    total_sessions: results.length,\n    completed: completed.length,\n    errors: errors.length,\n    relevant_sessions: relevant.length,\n    results: results.map(r => {\n      const resp = typeof r.json.response === 'string' ? JSON.parse(r.json.response) : r.json.response;\n      return {\n        session_id: r.json.session_id,\n        status: r.json.status,\n        response: resp\n      };\n    })\n  }\n}];"
+      },
+      "id": "4947f7c7-ddc1-4ceb-8d58-b72d4b11de16",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst runId = $('Generate Run ID').first().json.run_id;\n\n// Use run_id-scoped key so concurrent runs don't collide\nconst key = `pollCount_${runId}`;\nconst prevCount = staticData[key] || 0;\nconst newCount = prevCount + 1;\nstaticData[key] = newCount;\n\nreturn [{ \n  json: { \n    _pollCount: newCount, \n    run_id: runId, \n    question: $('Generate Run ID').first().json.question \n  } \n}];"
+      },
+      "id": "62d57036-e688-48fa-b894-f7608d39586f",
+      "name": "Increment Poll Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json._pollCount }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 60
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "697131ac-9dce-4f07-9578-42dfe511ce6e",
+      "name": "Check Timeout?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1792,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const runId = $('Generate Run ID').first().json.run_id;\nconst question = $('Generate Run ID').first().json.question;\n\n// Clean up poll counter\nconst staticData = $getWorkflowStaticData('global');\ndelete staticData[`pollCount_${runId}`];\n\nreturn [{\n  json: {\n    run_id: runId,\n    question,\n    error: 'Polling timed out after 10 minutes. Some sessions may still be processing.',\n    timed_out: true\n  }\n}];"
+      },
+      "id": "77c3093b-8d91-428c-b03f-83296fdb15a7",
+      "name": "Timeout Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Run ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Run ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sessions": {
+      "main": [
+        [
+          {
+            "node": "Create Tracking Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tracking Rows": {
+      "main": [
+        [
+          {
+            "node": "Insert Tracking Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Tracking Rows": {
+      "main": [
+        [
+          {
+            "node": "Prepare Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Dispatch": {
+      "main": [
+        [
+          {
+            "node": "Dispatch to Worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Progress": {
+      "main": [
+        [
+          {
+            "node": "Is Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Complete?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Increment Poll Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Results": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch to Worker": {
+      "main": [
+        [
+          {
+            "node": "Increment Poll Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Poll Count": {
+      "main": [
+        [
+          {
+            "node": "Check Timeout?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Timeout?": {
+      "main": [
+        [
+          {
+            "node": "Timeout Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "cf2fb127-3549-499c-9d7e-c044d1648cc3",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}
