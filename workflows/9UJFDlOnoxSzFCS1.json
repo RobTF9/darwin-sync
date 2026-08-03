@@ -88,8 +88,8 @@
       "type": "n8n-nodes-base.slackTrigger",
       "typeVersion": 1,
       "position": [
-        -2672,
-        128
+        -2784,
+        160
       ],
       "id": "9af570c0-ad94-42c5-837b-bf2b2e0b5a37",
       "name": "OnEvent",
@@ -859,15 +859,25 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ ($('OnEvent').item.json.type === 'app_mention' || $('OnEvent').item.json.channel_type === 'im')}}",
+              "leftValue": "={{ ($('OnEvent').item.json.type === 'app_mention')}}",
               "operator": {
                 "operation": "true",
                 "singleValue": true,
                 "type": "boolean"
               }
+            },
+            {
+              "id": "031f6d63-dd26-4dec-90a6-f14dbee5f3db",
+              "leftValue": "={{ $('OnEvent').item.json.channel_type === 'im' && !$json.bot_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
           ],
-          "combinator": "and"
+          "combinator": "or"
         },
         "options": {}
       },
@@ -876,8 +886,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -2528,
-        128
+        -2640,
+        160
       ]
     }
   ],
@@ -1153,7 +1163,7 @@
     "errorWorkflow": "MLxaOYbzMS9DFoIv"
   },
   "triggerCount": 1,
-  "versionId": "8d52570e-987f-4a40-a802-76197eae8792",
+  "versionId": "88a5ed65-6b73-4df9-8ab8-589784de418e",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
