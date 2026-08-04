@@ -1,0 +1,199 @@
+{
+  "id": "tzDPY17CgjqXIbi4",
+  "name": "DriftReport",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 18
+            }
+          ]
+        }
+      },
+      "id": "dfdf3fd5-fb2c-4b45-88a6-821e57da35ff",
+      "name": "Daily 6PM Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://darwin-staging.app.n8n.cloud/api/v1/workflows?limit=200",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "n8nApi",
+        "options": {}
+      },
+      "id": "9a32ea7b-539e-4e0c-b401-2b86374d509f",
+      "name": "Fetch Staging Workflows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        544,
+        208
+      ],
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "7d699755-3337-4025-807f-63751f3b91ea",
+      "name": "Merge Instances",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        848,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://darwin-production.app.n8n.cloud/api/v1/workflows?limit=200",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "n8nApi",
+        "options": {}
+      },
+      "id": "2db690f7-f451-41e5-9660-4bb3ecd2b31e",
+      "name": "Fetch Production Workflows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        544,
+        400
+      ],
+      "credentials": {
+        "n8nApi": {
+          "id": "m5pXcRS0AZrt1oS7",
+          "name": "n8n production"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get staging and production workflow lists\nconst stagingItems = $input.first().json.data || [];\nconst prodItems = $input.last().json.data || [];\n\n// Build lookup maps by workflow ID\nconst stagingMap = new Map();\nstagingItems.forEach(w => stagingMap.set(w.id, w));\n\nconst prodMap = new Map();\nprodItems.forEach(w => prodMap.set(w.id, w));\n\n// Deep diff helper for two objects\nfunction deepEqual(a, b) {\n  return JSON.stringify(a) === JSON.stringify(b);\n}\n\n// Compare nodes between staging and production versions of a workflow\nfunction diffNodes(stagingNodes, prodNodes) {\n  const stagingByName = new Map();\n  (stagingNodes || []).forEach(n => stagingByName.set(n.name, n));\n\n  const prodByName = new Map();\n  (prodNodes || []).forEach(n => prodByName.set(n.name, n));\n\n  const added = [];\n  const removed = [];\n  const modified = [];\n\n  for (const [name, sNode] of stagingByName) {\n    if (!prodByName.has(name)) {\n      added.push({ name, type: sNode.type });\n    }\n  }\n\n  for (const [name, pNode] of prodByName) {\n    if (!stagingByName.has(name)) {\n      removed.push({ name, type: pNode.type });\n    }\n  }\n\n  for (const [name, sNode] of stagingByName) {\n    const pNode = prodByName.get(name);\n    if (!pNode) continue;\n\n    const changes = [];\n\n    if (sNode.type !== pNode.type) {\n      changes.push(`type: ${pNode.type} \\u2192 ${sNode.type}`);\n    }\n\n    if (!deepEqual(sNode.parameters, pNode.parameters)) {\n      const allKeys = new Set([\n        ...Object.keys(sNode.parameters || {}),\n        ...Object.keys(pNode.parameters || {})\n      ]);\n      const paramChanges = [];\n      for (const key of allKeys) {\n        const sVal = (sNode.parameters || {})[key];\n        const pVal = (pNode.parameters || {})[key];\n        if (!deepEqual(sVal, pVal)) {\n          if (pVal === undefined) {\n            paramChanges.push(`+${key}`);\n          } else if (sVal === undefined) {\n            paramChanges.push(`-${key}`);\n          } else {\n            const sStr = typeof sVal === 'string' ? sVal : JSON.stringify(sVal);\n            const pStr = typeof pVal === 'string' ? pVal : JSON.stringify(pVal);\n            if (sStr.length < 50 && pStr.length < 50) {\n              paramChanges.push(`${key}: \\`${pStr}\\` \\u2192 \\`${sStr}\\``);\n            } else {\n              paramChanges.push(`${key} (modified)`);\n            }\n          }\n        }\n      }\n      if (paramChanges.length > 0) {\n        changes.push(`params: ${paramChanges.join(', ')}`);\n      }\n    }\n\n    if (changes.length > 0) {\n      modified.push({ name, type: sNode.type, changes });\n    }\n  }\n\n  return { added, removed, modified };\n}\n\n// Compare connections\nfunction diffConnections(stagingConns, prodConns) {\n  const sKeys = Object.keys(stagingConns || {});\n  const pKeys = Object.keys(prodConns || {});\n\n  const addedConns = sKeys.filter(k => !pKeys.includes(k));\n  const removedConns = pKeys.filter(k => !sKeys.includes(k));\n  const changedConns = [];\n\n  for (const key of sKeys) {\n    if (pKeys.includes(key) && !deepEqual(stagingConns[key], prodConns[key])) {\n      changedConns.push(key);\n    }\n  }\n\n  return { addedConns, removedConns, changedConns };\n}\n\n// Compare settings\nfunction diffSettings(stagingSettings, prodSettings) {\n  const s = stagingSettings || {};\n  const p = prodSettings || {};\n  const allKeys = new Set([...Object.keys(s), ...Object.keys(p)]);\n  const changes = [];\n\n  for (const key of allKeys) {\n    if (!deepEqual(s[key], p[key])) {\n      if (p[key] === undefined) {\n        changes.push(`+${key}: \\`${JSON.stringify(s[key])}\\``);\n      } else if (s[key] === undefined) {\n        changes.push(`-${key}`);\n      } else {\n        changes.push(`${key}: \\`${JSON.stringify(p[key])}\\` \\u2192 \\`${JSON.stringify(s[key])}\\``);\n      }\n    }\n  }\n\n  return changes;\n}\n\n// Classify each workflow\nconst inSync = [];\nconst drifted = [];\nconst newOnStaging = [];\nconst orphanedOnProd = [];\n\nfor (const [id, sw] of stagingMap) {\n  const pw = prodMap.get(id);\n  if (!pw) {\n    newOnStaging.push({\n      id: sw.id,\n      name: sw.name,\n      updatedAt: sw.updatedAt,\n      active: sw.active,\n      nodeCount: (sw.nodes || []).length,\n      nodeTypes: [...new Set((sw.nodes || []).map(n => n.type.split('.').pop()))]\n    });\n  } else if (sw.versionId !== pw.versionId) {\n    const nodeDiff = diffNodes(sw.nodes, pw.nodes);\n    const connDiff = diffConnections(sw.connections, pw.connections);\n    const settingsDiff = diffSettings(sw.settings, pw.settings);\n    const activeChanged = sw.active !== pw.active;\n\n    drifted.push({\n      id: sw.id,\n      name: sw.name,\n      stagingUpdated: sw.updatedAt,\n      prodUpdated: pw.updatedAt,\n      stagingActive: sw.active,\n      prodActive: pw.active,\n      activeChanged,\n      nodeDiff,\n      connDiff,\n      settingsDiff,\n      stagingNodeCount: (sw.nodes || []).length,\n      prodNodeCount: (pw.nodes || []).length\n    });\n  } else {\n    inSync.push({ id: sw.id, name: sw.name, active: sw.active });\n  }\n}\n\nfor (const [id, pw] of prodMap) {\n  if (!stagingMap.has(id)) {\n    orphanedOnProd.push({\n      id: pw.id,\n      name: pw.name,\n      updatedAt: pw.updatedAt,\n      active: pw.active\n    });\n  }\n}\n\n// Build Slack message\nconst now = new Date().toISOString().split('T')[0];\nlet msg = `*Darwin Drift Report \\u2014 ${now}*\\n\\n`;\n\nmsg += `*In sync:* ${inSync.length} workflow${inSync.length !== 1 ? 's' : ''}`;\nif (inSync.length > 0) {\n  msg += ` (${inSync.map(w => w.name).join(', ')})`;\n}\nmsg += `\\n\\n`;\n\nif (drifted.length > 0) {\n  msg += `*Staged changes (not yet on production):*\\n\\n`;\n  for (const d of drifted) {\n    const stagingDate = new Date(d.stagingUpdated).toLocaleDateString('en-US', {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'});\n    msg += `*${d.name}* (\\`${d.id}\\`)\\n`;\n    msg += `  Staging updated: ${stagingDate} | Nodes: ${d.prodNodeCount} \\u2192 ${d.stagingNodeCount}\\n`;\n\n    if (d.activeChanged) {\n      msg += `  Active status: prod=${d.prodActive} \\u2192 staging=${d.stagingActive}\\n`;\n    }\n\n    const nd = d.nodeDiff;\n    if (nd.added.length > 0) {\n      msg += `  + Nodes added: ${nd.added.map(n => `${n.name} (${n.type.split('.').pop()})`).join(', ')}\\n`;\n    }\n    if (nd.removed.length > 0) {\n      msg += `  - Nodes removed: ${nd.removed.map(n => `${n.name} (${n.type.split('.').pop()})`).join(', ')}\\n`;\n    }\n    if (nd.modified.length > 0) {\n      msg += `  ~ Nodes modified:\\n`;\n      for (const m of nd.modified) {\n        msg += `    \\u2022 ${m.name}: ${m.changes.join('; ')}\\n`;\n      }\n    }\n\n    const cd = d.connDiff;\n    if (cd.addedConns.length > 0 || cd.removedConns.length > 0 || cd.changedConns.length > 0) {\n      const connParts = [];\n      if (cd.addedConns.length > 0) connParts.push(`+${cd.addedConns.length} new`);\n      if (cd.removedConns.length > 0) connParts.push(`-${cd.removedConns.length} removed`);\n      if (cd.changedConns.length > 0) connParts.push(`${cd.changedConns.length} rewired`);\n      msg += `  Connections: ${connParts.join(', ')}\\n`;\n    }\n\n    if (d.settingsDiff.length > 0) {\n      msg += `  Settings: ${d.settingsDiff.join('; ')}\\n`;\n    }\n\n    msg += `\\n`;\n  }\n}\n\nif (newOnStaging.length > 0) {\n  msg += `*New on staging (never deployed):*\\n`;\n  for (const n of newOnStaging) {\n    const created = new Date(n.updatedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});\n    msg += `\\u2022 *${n.name}* (\\`${n.id}\\`) \\u2014 ${n.nodeCount} nodes (${n.nodeTypes.join(', ')}), created ${created}, active: ${n.active}\\n`;\n  }\n  msg += `\\n`;\n}\n\nif (orphanedOnProd.length > 0) {\n  msg += `*Orphaned on production (not on staging):*\\n`;\n  for (const o of orphanedOnProd) {\n    const updated = new Date(o.updatedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});\n    msg += `\\u2022 *${o.name}* (\\`${o.id}\\`) \\u2014 last updated ${updated}, active: ${o.active}\\n`;\n  }\n  msg += `\\n`;\n}\n\nif (drifted.length === 0 && newOnStaging.length === 0 && orphanedOnProd.length === 0) {\n  msg += `Everything is in sync! No deployment needed.\\n\\n`;\n}\n\nmsg += `---\\n_Total: ${stagingMap.size} staging, ${prodMap.size} production | ${drifted.length} drifted, ${newOnStaging.length} new, ${orphanedOnProd.length} orphaned_`;\n\nmsg += `\\n\\ncc <@U07S2V7RH6K>`;\n\nreturn [{ json: { text: msg, channel: 'C09DRCJLQCE', inSyncCount: inSync.length, driftedCount: drifted.length, newCount: newOnStaging.length, orphanedCount: orphanedOnProd.length } }];"
+      },
+      "id": "7132b3b2-5664-496c-aa75-c5f1bdaa7a7c",
+      "name": "Compare Workflows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.channel }}"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "7d958591-1111-47eb-af18-796dc691944c",
+      "name": "Send Drift Report",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1440,
+        304
+      ],
+      "webhookId": "b71d5d21-4c9d-42d2-900e-8b03881b3bf0",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 6PM Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch Staging Workflows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Production Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Staging Workflows": {
+      "main": [
+        [
+          {
+            "node": "Merge Instances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Instances": {
+      "main": [
+        [
+          {
+            "node": "Compare Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Production Workflows": {
+      "main": [
+        [
+          {
+            "node": "Merge Instances",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Compare Workflows": {
+      "main": [
+        [
+          {
+            "node": "Send Drift Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "44d93f1e-6f4d-4feb-9732-8394ba6e986b",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wWGhCjDluNfE1cPJ",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,0 +1,73 @@
+{
+  "id": "uaXAAddb8bmNqbqs",
+  "name": "LinearBuildState",
+  "columns": [
+    {
+      "id": "5tbWOFICioKsVnFf",
+      "name": "ticketId",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "L3BLhMSYqEaViQ32",
+      "name": "ticketIdentifier",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "W6BZnWFpcayU6brN",
+      "name": "title",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "4zoIgXDoFP3CMauA",
+      "name": "status",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "ezxo6r1uKs3OLEa2",
+      "name": "sessionId",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "w0MZCHJ2uHQYXuv5",
+      "name": "assigneeName",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "GDJG1YfwOfgmvhqX",
+      "name": "assigneeEmail",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "fG8KFwM9p0lJEUpz",
+      "name": "ticketUrl",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "i0yRXfXLSSdnn694",
+      "name": "attempts",
+      "type": "number",
+      "index": 8
+    },
+    {
+      "id": "B3be8BiDNhD1cqqq",
+      "name": "lastUpdated",
+      "type": "string",
+      "index": 9
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-08-03T15:13:36.319Z",
+  "updatedAt": "2026-08-03T16:50:00.755Z"
+}

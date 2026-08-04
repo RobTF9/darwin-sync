@@ -1,0 +1,16 @@
+{
+  "id": "iixAIGCkIqUZq83L",
+  "name": "Linear account",
+  "type": "linearApi",
+  "data": {
+    "apiKey": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}
