@@ -181,7 +181,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const project = $input.item.json;\nconst folder = $('create_folder').item.json;\nconst validated = $('validate').item.json;\n\nconst projectId = project.id;\nconst projectName = validated.projectName;\nconst projectType = validated.projectType;\nconst folderId = folder.id;\n\nconst googleDriveUrl = 'https://drive.google.com/drive/folders/' + folderId;\nconst pidgeonheadUrl = 'https://pidgeonhead.netlify.app/projects/' + projectId;\n\nconst message = 'Created project \"' + projectName + '\" (' + projectType + ').\\n' +\n  'PidgeonHead: ' + pidgeonheadUrl + '\\n' +\n  'Google Drive folder: ' + googleDriveUrl;\n\nreturn {\n  projectId,\n  projectName,\n  projectType,\n  googleDriveUrl,\n  pidgeonheadUrl,\n  message\n};"
+        "jsCode": "const project = $('create_project').item.json;\nconst folder = $('create_folder').item.json;\nconst validated = $('validate').item.json;\n\nconst projectId = project.id;\n\n// Validate UUID format — fail loudly if we somehow get a numeric or non-UUID id\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (!projectId || !uuidRegex.test(projectId)) {\n  throw new Error(`create_project returned a non-UUID project ID: \"${projectId}\". Expected a UUID from the project table.`);\n}\n\nconst projectName = validated.projectName;\nconst projectType = validated.projectType;\nconst folderId = folder.id;\n\nconst googleDriveUrl = 'https://drive.google.com/drive/folders/' + folderId;\nconst pidgeonheadUrl = 'https://pidgeonhead.netlify.app/projects/' + projectId;\n\nconst message = 'Created project \"' + projectName + '\" (' + projectType + ').\\n' +\n  'PidgeonHead: ' + pidgeonheadUrl + '\\n' +\n  'Google Drive folder: ' + googleDriveUrl;\n\nreturn {\n  projectId,\n  projectName,\n  projectType,\n  googleDriveUrl,\n  pidgeonheadUrl,\n  message\n};"
       },
       "id": "515dd504-b04e-4b05-be8f-870b261d0359",
       "name": "format_response",
@@ -351,7 +351,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "598f7c1a-abf4-43e5-878d-6c0dd13e6db1",
+  "versionId": "329d13b8-2a8e-48a6-a7bd-711e089b733c",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

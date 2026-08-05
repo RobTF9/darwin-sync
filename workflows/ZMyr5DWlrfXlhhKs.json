@@ -851,47 +851,47 @@
           "value": "OHSozG2XzrrAJUow"
         },
         "workflowInputs": {
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false,
           "mappingMode": "defineBelow",
-          "matchingColumns": [],
-          "schema": [
-            {
-              "canBeUsedToMatch": true,
-              "defaultMatch": false,
-              "display": true,
-              "displayName": "executionId",
-              "id": "executionId",
-              "removed": false,
-              "required": true,
-              "type": "string"
-            },
-            {
-              "canBeUsedToMatch": true,
-              "defaultMatch": false,
-              "display": true,
-              "displayName": "maxWaitSeconds",
-              "id": "maxWaitSeconds",
-              "removed": false,
-              "required": false,
-              "type": "number"
-            },
-            {
-              "canBeUsedToMatch": true,
-              "defaultMatch": false,
-              "display": true,
-              "displayName": "pollIntervalSeconds",
-              "id": "pollIntervalSeconds",
-              "removed": false,
-              "required": false,
-              "type": "number"
-            }
-          ],
           "value": {
             "executionId": "={{ $fromAI('executionId', 'The execution ID to wait for (returned by execute_workflow).', 'string') }}",
             "maxWaitSeconds": "={{ $fromAI('maxWaitSeconds', 'Optional max wait in seconds. Default 300.', 'number') }}",
             "pollIntervalSeconds": "={{ $fromAI('pollIntervalSeconds', 'Optional poll interval in seconds. Default 10.', 'number') }}"
-          }
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "executionId",
+              "displayName": "executionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "maxWaitSeconds",
+              "displayName": "maxWaitSeconds",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "pollIntervalSeconds",
+              "displayName": "pollIntervalSeconds",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         }
       },
       "id": "2411d572-375f-4f39-a708-0cf92b1b2e80",
@@ -1113,7 +1113,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "8c6e5390-92a3-485a-8847-9b49eb62018b",
+  "versionId": "eda5c84e-7541-47d5-bccb-44cf536c4e73",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
