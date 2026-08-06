@@ -1,0 +1,94 @@
+{
+  "id": "LMfY8AzvwNw5eqWl",
+  "name": "Linear State IDs Fetch",
+  "nodes": [
+    {
+      "id": "9a647bd8-69ba-4dbf-abbc-9abe9aebfefe",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "89af28c4-f26b-423f-858d-95086789f1d8",
+      "name": "Fetch Workflow States",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "linearApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: \"{ workflowStates { nodes { id name type team { id name } } } }\" }) }}"
+      },
+      "credentials": {
+        "linearApi": {
+          "id": "iixAIGCkIqUZq83L",
+          "name": "Linear account"
+        }
+      }
+    },
+    {
+      "id": "effac083-2cb9-485b-9ece-7cb69608942c",
+      "name": "Format States",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const resp = $input.first().json;\nconst nodes = (resp && resp.data && resp.data.workflowStates && resp.data.workflowStates.nodes) || [];\nconst rows = nodes.map(s => ({\n  stateName: s.name,\n  stateId: s.id,\n  stateType: s.type,\n  teamName: (s.team && s.team.name) || '',\n  teamId: (s.team && s.team.id) || ''\n}));\nrows.sort((a, b) => (a.teamName || '').localeCompare(b.teamName || '') || (a.stateType || '').localeCompare(b.stateType || ''));\nreturn rows.map(r => ({ json: r }));"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Fetch Workflow States",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Workflow States": {
+      "main": [
+        [
+          {
+            "node": "Format States",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "87bcd7b2-2d8f-40b6-98ff-d35203ad4477",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,0 +1,37 @@
+{
+  "id": "GZUVESKpC7PuIP5O",
+  "name": "Evals",
+  "columns": [
+    {
+      "id": "H7BEHlEdpMa9cwlJ",
+      "name": "chatInput",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "cpowisnSEROP3vyM",
+      "name": "sessionId",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "TgiTs50CNY3lumTs",
+      "name": "expectedAnswer",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "MkSQCZmtX7QCFuFf",
+      "name": "correctness",
+      "type": "number",
+      "index": 3
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-08-06T11:23:10.471Z",
+  "updatedAt": "2026-08-06T11:27:40.450Z"
+}

@@ -10,7 +10,7 @@
               "id": "ef722b63-606e-42a3-83e2-8a22464231d4",
               "name": "chatInput",
               "type": "string",
-              "value": "={{  $json.chatInput || $('OnEvent')?.item.json.text.replace(/<@(U09Q22R53T6|U0BLRFB0FJR)>\\s*/g, '') }}"
+              "value": "={{ ($('exec_data')?.first()?.json?.filePreamble || '') + ($json.chatInput || $('OnEvent')?.item.json.text.replace(/<@(U09Q22R53T6|U0BLRFB0FJR)>\\s*/g, '')) }}"
             },
             {
               "id": "de444cf3-7171-4e73-8bbf-819181a8e9d9",
@@ -43,8 +43,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -496,
-        64
+        1216,
+        -160
       ],
       "id": "6d5a587d-71bd-44b6-8ee1-86393728be91",
       "name": "SetState"
@@ -63,8 +63,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        -944,
-        208
+        128,
+        -160
       ],
       "id": "1dfc2f01-45af-4fbb-98ec-541fbc833883",
       "name": "ConfirmReciept",
@@ -88,8 +88,8 @@
       "type": "n8n-nodes-base.slackTrigger",
       "typeVersion": 1,
       "position": [
-        -2784,
-        160
+        -3200,
+        -512
       ],
       "id": "9af570c0-ad94-42c5-837b-bf2b2e0b5a37",
       "name": "OnEvent",
@@ -115,8 +115,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        -1168,
-        384
+        -96,
+        256
       ],
       "id": "4e0161d5-6c4c-4423-b956-136b13074047",
       "name": "ConfirmContinuation",
@@ -157,8 +157,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -944,
-        384
+        128,
+        256
       ],
       "id": "a48b9014-12a0-4ffa-96fc-c1fbba2c1fd0",
       "name": "RefreshState"
@@ -241,8 +241,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        160,
-        128
+        1872,
+        -96
       ],
       "id": "07e5e571-3baa-40a4-a22d-e44e84e48186",
       "name": "Darwin"
@@ -271,8 +271,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        1184,
-        144
+        2896,
+        -80
       ],
       "id": "afc3fda6-60e9-4120-9f3f-42fe24e43efc",
       "name": "SlackReply",
@@ -301,8 +301,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        736,
-        144
+        2448,
+        -80
       ],
       "webhookId": "d3de8cb5-c53e-454c-8d85-328a72b55985",
       "credentials": {
@@ -328,8 +328,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        960,
-        144
+        2672,
+        -80
       ],
       "webhookId": "2bf8c71d-9dde-4b4a-aa3e-cb88b5d75044",
       "credentials": {
@@ -376,8 +376,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        512,
-        144
+        2224,
+        -80
       ],
       "id": "772ec5a9-b146-4b2f-9d06-1fca4a8de5b1",
       "name": "format"
@@ -405,8 +405,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1,
       "position": [
-        -2080,
-        128
+        -1200,
+        -400
       ],
       "id": "462c0b63-fd57-4aa4-ac68-065f089ab5a1",
       "name": "FindSession",
@@ -487,8 +487,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        -1168,
-        208
+        -96,
+        -160
       ],
       "id": "a12e07f9-9129-443a-aafc-2600c35a205f",
       "name": "InsertSession"
@@ -523,8 +523,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -1632,
-        32
+        -560,
+        -576
       ]
     },
     {
@@ -545,8 +545,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        -1168,
-        32
+        -96,
+        -576
       ],
       "webhookId": "3e69554e-c9ad-4f7e-b8c5-962416b78bfd",
       "credentials": {
@@ -565,8 +565,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -944,
-        32
+        128,
+        -576
       ]
     },
     {
@@ -597,8 +597,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -1856,
-        128
+        -976,
+        -368
       ],
       "id": "d06d35db-75d6-4b8d-b9d8-57743ee801c1",
       "name": "SessionDoesntExists"
@@ -617,8 +617,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        -496,
-        32
+        576,
+        -576
       ],
       "id": "67762a68-b907-4df0-b44b-e68acb700683",
       "name": "ConfirmReciept1",
@@ -705,8 +705,8 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        -720,
-        32
+        352,
+        -576
       ],
       "id": "951f8e98-3cec-46ee-88d8-bc219d7907ed",
       "name": "InsertSession1"
@@ -728,8 +728,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -272,
-        32
+        800,
+        -576
       ],
       "id": "8e456f58-151f-43bd-935a-b7d507f64d1b",
       "name": "ThreadState"
@@ -763,8 +763,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -256,
-        64
+        1456,
+        -160
       ]
     },
     {
@@ -815,8 +815,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        160,
-        -96
+        1872,
+        -320
       ]
     },
     {
@@ -834,6 +834,10 @@
             {
               "key": "msgTs",
               "value": "={{ $('OnEvent').item.json.ts }}"
+            },
+            {
+              "key": "filePreamble",
+              "value": "={{ $json.filePreamble || '' }}"
             }
           ]
         }
@@ -843,8 +847,8 @@
       "type": "n8n-nodes-base.executionData",
       "typeVersion": 1.1,
       "position": [
-        -2368,
-        128
+        -1520,
+        -400
       ]
     },
     {
@@ -886,8 +890,110 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -2640,
-        160
+        -3056,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const SUPPORTED = new Set(['text/csv','application/csv','application/json','text/plain','text/tab-separated-values','application/xml','text/xml','text/markdown','text/javascript','application/javascript']);\nconst ev = $('OnEvent').first().json.event || $('OnEvent').first().json;\nconst files = Array.isArray(ev.files) ? ev.files : [];\nconst supported = files.filter(f => f && SUPPORTED.has((f.mimetype || '').toLowerCase()) && (f.url_private_download || f.url_private));\nif (supported.length === 0) {\n  return [{ json: { noFiles: true } }];\n}\nreturn supported.map(f => ({ json: {\n  noFiles: false,\n  url_private_download: f.url_private_download || f.url_private,\n  filename: f.name || f.title || 'file',\n  mimetype: (f.mimetype || '').toLowerCase(),\n  size: typeof f.size === 'number' ? f.size : 0\n}}));"
+      },
+      "id": "c549bccc-5a0b-4fe5-9f00-fe83e5585a71",
+      "name": "CheckFiles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2512,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "hf1",
+              "leftValue": "={{ $json.noFiles }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0bd99950-2688-4b55-885e-52f167a50055",
+      "name": "HasFiles",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2288,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url_private_download }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "fe074140-d96f-4985-ad46-da9372cabac7",
+      "name": "DownloadFile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -2048,
+        -304
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const CAP = 51200;\nconst items = $input.all();\nconst parts = [];\nfor (const it of items) {\n  const meta = it.json || {};\n  let content = meta.data;\n  if (content == null) content = '';\n  if (typeof content !== 'string') { try { content = JSON.stringify(content); } catch (e) { content = String(content); } }\n  let truncated = false;\n  if (content.length > CAP) { content = content.slice(0, CAP); truncated = true; }\n  if (truncated) content = content + '\\n[...truncated at 50KB]';\n  const fname = meta.filename || 'file';\n  const mtype = meta.mimetype || 'application/octet-stream';\n  const size = typeof meta.size === 'number' ? meta.size : 0;\n  parts.push('[Attached file: ' + fname + '] (' + mtype + ', ' + size + ' bytes)\\n---\\n' + content + '\\n---\\n');\n}\nconst filePreamble = parts.join('\\n');\nreturn [{ json: { filePreamble } }];"
+      },
+      "id": "80e5f897-50da-4902-8878-d38143643ae2",
+      "name": "BuildPreamble",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1824,
+        -304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { filePreamble: '' } }];"
+      },
+      "id": "1ce26944-e783-4648-9a99-70d4ffeab2ea",
+      "name": "NoFilePreamble",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1824,
+        -528
       ]
     }
   ],
@@ -1148,6 +1254,68 @@
       "main": [
         [
           {
+            "node": "CheckFiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckFiles": {
+      "main": [
+        [
+          {
+            "node": "HasFiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HasFiles": {
+      "main": [
+        [
+          {
+            "node": "NoFilePreamble",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DownloadFile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DownloadFile": {
+      "main": [
+        [
+          {
+            "node": "BuildPreamble",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildPreamble": {
+      "main": [
+        [
+          {
+            "node": "exec_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NoFilePreamble": {
+      "main": [
+        [
+          {
             "node": "exec_data",
             "type": "main",
             "index": 0
@@ -1163,7 +1331,7 @@
     "errorWorkflow": "MLxaOYbzMS9DFoIv"
   },
   "triggerCount": 1,
-  "versionId": "88a5ed65-6b73-4df9-8ab8-589784de418e",
+  "versionId": "2ab259c7-5eb9-48c0-9c67-72bd8e25880f",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

@@ -61,6 +61,18 @@
       "name": "lastUpdated",
       "type": "string",
       "index": 9
+    },
+    {
+      "id": "NSkmvev9cPN5tX57",
+      "name": "summary",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "Lsk7c8S9UObigOiH",
+      "name": "workflowIds",
+      "type": "string",
+      "index": 11
     }
   ],
   "ownedBy": {
@@ -69,5 +81,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-08-03T15:13:36.319Z",
-  "updatedAt": "2026-08-03T16:50:00.755Z"
+  "updatedAt": "2026-08-05T19:30:18.225Z"
 }
