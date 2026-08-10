@@ -1,0 +1,503 @@
+{
+  "id": "8Ypvt6VuLiQCMZT7",
+  "name": "UXR Recruiting Start",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "channel_id"
+            },
+            {
+              "name": "thread_ts"
+            },
+            {
+              "name": "user_id"
+            }
+          ]
+        }
+      },
+      "id": "5c362701-3202-48b9-8703-a45c2626dc3e",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "var j = $input.first().json;\nvar channelId = (j.channel_id || '').toString().trim();\nvar threadTs = (j.thread_ts || '').toString().trim();\nvar userId = (j.user_id || '').toString().trim();\nvar tsOk = /^\\d+\\.\\d+$/.test(threadTs);\nif (!channelId || !tsOk) {\n  return [{ json: { valid: false, error: 'Missing or invalid Slack context (channel_id=' + (channelId || 'empty') + ', thread_ts=' + (threadTs || 'empty') + '). Tell the user something went wrong and the recruiting wizard did not start.' } }];\n}\nreturn [{ json: { valid: true, session_key: channelId + '_' + threadTs, channel_id: channelId, thread_ts: threadTs, user_id: userId, now: new Date().toISOString() } }];",
+        "mode": "runOnceForAllItems",
+        "language": "javaScript"
+      },
+      "id": "65e52e89-b6ba-4a2f-a8a2-239beaa74680",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Validate Input').item.json.channel_id, thread_ts: $('Validate Input').item.json.thread_ts, text: \"Recruiting Wizard: who do you want to talk to? Options: n8n Users, Non-users, Cancel.\", blocks: [ { type: \"section\", text: { type: \"mrkdwn\", text: \":mag: *Recruiting Wizard*\\n\\nLet's find participants for your research. First, who do you want to talk to?\" } }, { type: \"actions\", elements: [ { type: \"button\", text: { type: \"plain_text\", text: \"n8n Users\", emoji: true }, style: \"primary\", action_id: \"uxr_audience_n8n_users\", value: \"n8n_users\" }, { type: \"button\", text: { type: \"plain_text\", text: \"Non-users\", emoji: true }, action_id: \"uxr_audience_non_users\", value: \"non_users\" }, { type: \"button\", text: { type: \"plain_text\", text: \"Cancel\", emoji: true }, style: \"danger\", action_id: \"uxr_cancel\", value: \"cancel\" } ] } ] }) }}",
+        "options": {}
+      },
+      "id": "9572df84-9927-4491-bf71-4e72bcafcb74",
+      "name": "Post Audience Selection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "success",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "message",
+              "name": "message",
+              "value": "Recruiting wizard started. Check the thread for the interactive flow.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f85db505-ec70-4ede-bb56-dfc6c8033093",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        896,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "okcheck-0001",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "85158957-a552-4b48-b905-cedf82808423",
+      "name": "Check Post Succeeded",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "err-success",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "err-message",
+              "name": "message",
+              "value": "={{ 'Failed to start the recruiting wizard: could not post the interactive message to Slack (' + ($json.error || 'unknown error') + '). Tell the user something went wrong and the wizard did not start.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dca563f9-f16c-454d-9f31-e7c23474caf2",
+      "name": "Return Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        896,
+        176
+      ]
+    },
+    {
+      "id": "b514357d-da4a-43b2-a70b-153793e5bee6",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e020f013-3141-44f1-9a1c-8b73e4edede4",
+      "name": "Upsert Session",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        -96
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "uxr_sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Input').item.json.session_key }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_key"
+          ],
+          "value": {
+            "session_key": "={{ $('Validate Input').item.json.session_key }}",
+            "channel": "={{ $('Validate Input').item.json.channel_id }}",
+            "thread_ts": "={{ $('Validate Input').item.json.thread_ts }}",
+            "slack_user": "={{ $('Validate Input').item.json.user_id }}",
+            "state": "audience_select",
+            "audience": "",
+            "filters_json": "{}",
+            "requested_count": 0,
+            "batch_id": "",
+            "email_subject": "",
+            "email_body": "",
+            "calendly_link": "",
+            "last_step_ts": "",
+            "updated_at": "={{ $('Validate Input').item.json.now }}"
+          },
+          "schema": [
+            {
+              "id": "session_key",
+              "displayName": "session_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "slack_user",
+              "displayName": "slack_user",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "audience",
+              "displayName": "audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters_json",
+              "displayName": "filters_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requested_count",
+              "displayName": "requested_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_subject",
+              "displayName": "email_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_body",
+              "displayName": "email_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendly_link",
+              "displayName": "calendly_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_step_ts",
+              "displayName": "last_step_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "57f7160c-7663-4542-8c67-a1f218c0a147",
+      "name": "Return Invalid Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        672,
+        160
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "inv-success",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "inv-message",
+              "name": "message",
+              "value": "={{ $json.error }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Audience Selection": {
+      "main": [
+        [
+          {
+            "node": "Check Post Succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Post Succeeded": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Upsert Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Session": {
+      "main": [
+        [
+          {
+            "node": "Post Audience Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "3a451f37-b455-4354-8785-34129ff78dd1",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "prCy2Gu2VEMt3ALB",
+  "isArchived": false,
+  "nodeGroups": []
+}

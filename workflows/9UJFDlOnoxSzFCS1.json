@@ -35,6 +35,12 @@
               "name": "case",
               "type": "number",
               "value": "={{ $json.case || 0 }}"
+            },
+            {
+              "id": "b1a2c3d4-user-0001-0001-000000000001",
+              "name": "user",
+              "type": "string",
+              "value": "={{ $json.user || $('OnEvent').item.json.user }}"
             }
           ]
         },
@@ -149,6 +155,12 @@
               "name": "channel",
               "value": "={{ $('OnEvent').item.json.channel }}",
               "type": "string"
+            },
+            {
+              "id": "b1a2c3d4-user-0002-0002-000000000002",
+              "name": "user",
+              "value": "={{ $('OnEvent').item.json.user }}",
+              "type": "string"
             }
           ]
         },
@@ -178,7 +190,9 @@
             "chatInput": "={{ $json.chatInput }}",
             "sessionId": "={{ $json.sessionId }}",
             "channel": "={{ $json.channel }}",
-            "env": "slack"
+            "env": "slack",
+            "thread_ts": "={{ $json.sessionId }}",
+            "user": "={{ $json.user }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -1331,7 +1345,7 @@
     "errorWorkflow": "MLxaOYbzMS9DFoIv"
   },
   "triggerCount": 1,
-  "versionId": "2ab259c7-5eb9-48c0-9c67-72bd8e25880f",
+  "versionId": "5b6d09eb-e3b0-41bf-bf06-505d8cc8b2d6",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

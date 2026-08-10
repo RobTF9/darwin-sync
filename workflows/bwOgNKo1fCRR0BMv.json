@@ -1,0 +1,185 @@
+{
+  "id": "bwOgNKo1fCRR0BMv",
+  "name": "UXR Config",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "ad557f02-155f-48da-937a-658a3f57b0a7",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "max-sample",
+              "name": "maxSampleSize",
+              "value": 20,
+              "type": "number"
+            },
+            {
+              "id": "cooldown-days",
+              "name": "cooldownDays",
+              "value": 60,
+              "type": "number"
+            },
+            {
+              "id": "email-subject",
+              "name": "emailSubject",
+              "value": "Invitation: Help us improve n8n",
+              "type": "string"
+            },
+            {
+              "id": "email-body",
+              "name": "emailBody",
+              "value": "Hi there, 👋\n\nWe're running quick research sessions to understand how you work and what would make your experience better.\n\nWhat's involved:\n• A 30-minute video chat (recorded for internal notes)\n• Screen share to show us around your n8n instance\n• $50 gift card as a thank you\n• The interview will be conducted in English\n\nInterested?\nPick a time that works for you: {{calendly_link}}\n\nThank you!",
+              "type": "string"
+            },
+            {
+              "id": "quality-gates",
+              "name": "qualityGates",
+              "value": "={{ ({ \"email_exists\": true, \"unsubscribed_not_true\": true, \"created_n8n_account\": true, \"confirmed\": true }) }}",
+              "type": "object"
+            },
+            {
+              "id": "nuser-filters",
+              "name": "nUserFilters",
+              "value": "={{ ([{ \"id\": \"cloud_plan\", \"label\": \"Cloud plan\", \"type\": \"select\", \"values\": [\"Trial\", \"n8n cloud Start\", \"n8n cloud Pro\", \"n8n cloud Enterprise\"], \"coverage\": \"~95%\", \"coverageWarning\": false, \"source\": \"native\" }, { \"id\": \"cloud_plan_status\", \"label\": \"Plan status\", \"type\": \"select\", \"values\": [\"trialing\", \"active\", \"past_due\", \"canceled\"], \"coverage\": \"~95%\", \"coverageWarning\": false, \"source\": \"native\" }, { \"id\": \"country\", \"label\": \"Country\", \"type\": \"text\", \"values\": [], \"coverage\": \"~70%\", \"coverageWarning\": false, \"source\": \"native\" }, { \"id\": \"utm_user_role\", \"label\": \"Role at signup\", \"type\": \"select\", \"values\": [\"Product & Design\", \"Engineering\", \"IT / Ops\", \"Marketing\", \"Sales\", \"Founder / C-level\", \"Other\"], \"coverage\": \"~60%\", \"coverageWarning\": false, \"source\": \"native\" }, { \"id\": \"company_size\", \"label\": \"Company size\", \"type\": \"select\", \"values\": [\"Only me\", \"<20\", \"20-99\", \"100-499\", \"500-999\", \"1000+\"], \"coverage\": \"~25%\", \"coverageWarning\": true, \"source\": \"webform+bigquery\" }, { \"id\": \"wf_bucket\", \"label\": \"Production workflows\", \"type\": \"select\", \"values\": [\"1-2\", \"3-5\", \"6-20\", \"21-100\", \"100+\"], \"coverage\": \"~12%\", \"coverageWarning\": true, \"source\": \"bigquery\" }, { \"id\": \"services_bucket\", \"label\": \"Connected services\", \"type\": \"select\", \"values\": [\"≤10\", \"11-20\", \"21-40\", \"41-70\", \"70+\"], \"coverage\": \"~12%\", \"coverageWarning\": true, \"source\": \"bigquery\" }, { \"id\": \"ai_wfs_bucket\", \"label\": \"AI workflows\", \"type\": \"select\", \"values\": [\"0\", \"1-2\", \"3-5\", \"6-10\", \"10+\"], \"coverage\": \"~12%\", \"coverageWarning\": true, \"source\": \"bigquery\" }, { \"id\": \"days_bucket\", \"label\": \"Account age\", \"type\": \"select\", \"values\": [\"<30\", \"30-180\", \"180-365\", \"365-540\", \"540+\"], \"coverage\": \"~12%\", \"coverageWarning\": true, \"source\": \"bigquery\" }]) }}",
+              "type": "array"
+            },
+            {
+              "id": "nonuser-filters",
+              "name": "nonUserFilters",
+              "value": "={{ ([{ \"id\": \"n8n_usage\", \"label\": \"n8n familiarity\", \"type\": \"multiselect\", \"values\": [\"aware\", \"new\", \"explorer\"], \"defaultSelected\": [\"aware\", \"new\"], \"coverage\": \"~100%\", \"coverageWarning\": false, \"source\": \"webform\" }, { \"id\": \"tech_skills\", \"label\": \"Technical skills\", \"type\": \"select\", \"values\": [\"tech_high\", \"tech_mid\", \"tech_low\", \"tech_none\"], \"coverage\": \"~90%\", \"coverageWarning\": false, \"source\": \"webform\" }, { \"id\": \"company_size\", \"label\": \"Company size\", \"type\": \"select\", \"values\": [\"Only me\", \"<20\", \"20-99\", \"100-499\", \"500-999\", \"1000+\"], \"coverage\": \"~85%\", \"coverageWarning\": false, \"source\": \"webform\" }]) }}",
+              "type": "array"
+            },
+            {
+              "id": "nonuser-base",
+              "name": "nonUserBaseQuery",
+              "value": "={{ ({ \"origin\": \"user_research_webform\", \"n8n_usage_default\": [\"aware\", \"new\"], \"created_n8n_account_not_true\": true }) }}",
+              "type": "object"
+            },
+            {
+              "id": "cooldown-field",
+              "name": "cooldownField",
+              "value": "last_user_research_invite_date",
+              "type": "string"
+            },
+            {
+              "id": "shard-field",
+              "name": "shardField",
+              "value": "uxr_shard",
+              "type": "string"
+            },
+            {
+              "id": "shard-count",
+              "name": "shardCount",
+              "value": 4096,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "928bbf62-99f3-4465-8654-15d8bb965ac6",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "readme",
+              "name": "readme",
+              "value": "UXR Recruiting configuration. This workflow is called as a sub-workflow by other recruiting workflows to load config values. Do not execute directly. Variables like maxSampleSize and cooldownDays are centralized here so they can be changed in one place.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fadfb673-1a65-411d-9ce8-8c2df8549b89",
+      "name": "Readme",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        240,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## UXR Config\nCentralized configuration for the UXR Recruiting tool. Called as a sub-workflow to load limits, email template, quality gates, filter definitions, cooldown and shard settings.\n\n**Do not execute directly.**",
+        "height": 200,
+        "width": 540,
+        "color": 4
+      },
+      "id": "07d586a5-6a6f-4827-9c4d-b1d672edfc22",
+      "name": "Sticky Note f5c601bf",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -272
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Readme (reference only)\nNot connected to the flow. Documents the purpose of this workflow.",
+        "height": 200,
+        "width": 300,
+        "color": 5
+      },
+      "id": "93f2459e-fbe1-486c-8af8-ec7419fd49a4",
+      "name": "Sticky Note 80a47910",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        96,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "515e56d6-da0e-4d33-8978-1036ba6e2bd8",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "prCy2Gu2VEMt3ALB",
+  "isArchived": false,
+  "nodeGroups": []
+}

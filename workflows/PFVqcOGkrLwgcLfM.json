@@ -1,0 +1,233 @@
+{
+  "id": "PFVqcOGkrLwgcLfM",
+  "name": "RunEval",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "eval-run-one",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "1bf364dd-f30b-4e38-a499-0d8863e24c02",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "c4408cab-cf6a-4bf0-9cc4-9a9edfcce41f",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "case",
+              "name": "case_id",
+              "value": "={{ $json.body?.case_id ?? $json.case_id ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "runs",
+              "name": "runs",
+              "value": "={{ $json.body?.runs ?? $json.runs ?? 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "inst",
+              "name": "instance",
+              "value": "={{ $json.body?.instance ?? $json.instance ?? \"staging\" }}",
+              "type": "string"
+            },
+            {
+              "id": "prun",
+              "name": "parent_run_id",
+              "value": "={{ $json.body?.run_id ?? $json.run_id ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "563a9d4f-c79a-4034-9082-ac1eca7fc2fa",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "test_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "suite",
+              "condition": "eq",
+              "keyValue": "eval"
+            },
+            {
+              "keyName": "case_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.case_id }}"
+            }
+          ]
+        }
+      },
+      "id": "55119324-635b-4e83-a065-862df438d30f",
+      "name": "Load Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const param = $('Normalize Input').item.json;\nconst caseRow = $('Load Case').first().json;\nconst ec = caseRow.eval_config || {};\nconst runs = Math.min(Math.max(parseInt(String(param.runs), 10) || 1, 1), 20);\nconst base = String(param.parent_run_id || ('eval-' + $execution.id));\nconst items = [];\nfor (let i = 0; i < runs; i++) {\n  items.push({ json: { run_id: base + '-' + i, case_id: caseRow.case_id || '', test_case_id: caseRow.id || '', env: 'slack', input: (caseRow.inputs && caseRow.inputs.prompt) || '', context_messages: ec.context_messages || '[]', prohibited_tools: ec.prohibited_tools || '[]', ground_truth: ec.expected_response || '', rubric: '' } });\n}\nreturn items;"
+      },
+      "id": "2b012a21-e03f-4536-bdd0-10526b09e583",
+      "name": "Format Runs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "fPAICfE6SOP5Q2Fa",
+          "cachedResultName": "Darwin — EvalDispatch",
+          "cachedResultUrl": "/workflow/fPAICfE6SOP5Q2Fa"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "b9e6129b-984d-485a-8ed0-6317e6734b93",
+      "name": "Dispatch",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const param = $('Normalize Input').item.json;\nconst base = String(param.parent_run_id || ('eval-' + $execution.id));\nconst runs = Math.min(Math.max(parseInt(String(param.runs), 10) || 1, 1), 20);\nconst childRunIds = [];\nfor (let i = 0; i < runs; i++) { childRunIds.push(base + '-' + i); }\nreturn [{ json: { run_id: base, child_run_ids: childRunIds, case_count: runs } }];"
+      },
+      "id": "ebd051e5-5a0a-49e8-a8cb-bdfaf61e1c33",
+      "name": "Return Runs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Load Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Case": {
+      "main": [
+        [
+          {
+            "node": "Format Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Runs": {
+      "main": [
+        [
+          {
+            "node": "Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch": {
+      "main": [
+        [
+          {
+            "node": "Return Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "f17c777a-9bc0-4ba6-b7e2-7b58655b321d",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "RKV5ONpbyyQkPOeH",
+  "isArchived": false,
+  "nodeGroups": []
+}

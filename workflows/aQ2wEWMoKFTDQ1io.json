@@ -1,0 +1,129 @@
+{
+  "id": "aQ2wEWMoKFTDQ1io",
+  "name": "LinearGetIssue",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "issueId"
+            }
+          ]
+        }
+      },
+      "id": "e1d07ee2-d8be-42d7-b2c7-3a8436fdd1f9",
+      "name": "Sub",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const t = $(\"Sub\").item.json;\nconst query = \"query GetIssue($issueId: String!) { issue(id: $issueId) { id identifier title description url priority priorityLabel labels { nodes { id name } } state { id name type } team { id name key } assignee { id name email } creator { id name email } comments(first: 50) { nodes { id body createdAt user { id name } } } children { nodes { id identifier title state { id name type } } } parent { id identifier title description } attachments { nodes { id url title metadata } } } }\";\nreturn { json: { graphqlBody: JSON.stringify({ query, variables: { issueId: t.issueId } }) } };"
+      },
+      "id": "701400a9-5409-40cb-8b25-d9096a08551c",
+      "name": "Prepare Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "linearOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.graphqlBody }}",
+        "options": {}
+      },
+      "id": "66a9cba0-0e3a-4a8a-b8d5-e1e324174963",
+      "name": "Query Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "linearOAuth2Api": {
+          "id": "10SbbqNOabufmvyV",
+          "name": "Darwin linear"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json;\nconst BOT_USER_ID = \"65049f30-62b1-4061-88a4-f02c572a91ca\";\nconst DEFAULT_STATE = {\"schemaVersion\":1,\"status\":\"IDLE\",\"runId\":null,\"startedAt\":null,\"finishedAt\":null,\"attempts\":0,\"clarificationRounds\":0,\"phase\":null,\"workflowIds\":[],\"lastProcessedCommentId\":null,\"rollingSummary\":\"\",\"pendingFeedback\":[],\"halted\":false};\nif (r.errors) {\n  return { json: { ok: false, errors: r.errors.map(e => e.message).join(\"; \") } };\n}\nif (r.error) {\n  return { json: { ok: false, errors: r.error.message || JSON.stringify(r.error) } };\n}\nconst issue = r.data?.issue;\nif (!issue) {\n  return { json: { ok: false, errors: \"Issue not found\" } };\n}\nlet comments = (issue.comments?.nodes || []).map(c => ({\n  id: c.id,\n  body: c.body || \"\",\n  createdAt: c.createdAt,\n  userId: c.user?.id || \"\",\n  userName: c.user?.name || \"\",\n  isBot: c.user?.id === BOT_USER_ID\n}));\ncomments.sort((a, b) => (a.createdAt || \"\").localeCompare(b.createdAt || \"\"));\nif (comments.length > 20) { comments = comments.slice(-20); }\nconst subIssues = (issue.children?.nodes || []).map(s => ({\n  id: s.id,\n  identifier: s.identifier,\n  title: s.title,\n  state: s.state ? { id: s.state.id, name: s.state.name, type: s.state.type } : null\n}));\nconst attachments = issue.attachments?.nodes || [];\nconst darwinAtt = attachments.find(a => a.url === \"darwin://build-state\");\nlet buildState = { ...DEFAULT_STATE };\nif (darwinAtt?.metadata) {\n  const m = darwinAtt.metadata;\n  if (typeof m === \"object\") { Object.assign(buildState, m); }\n  else if (typeof m === \"string\") { try { Object.assign(buildState, JSON.parse(m)); } catch(e) {} }\n}\nreturn { json: {\n  ok: true,\n  issue: {\n    id: issue.id,\n    identifier: issue.identifier,\n    title: issue.title,\n    description: issue.description || \"\",\n    url: issue.url || \"\",\n    priority: issue.priority,\n    priorityLabel: issue.priorityLabel || \"\",\n    labels: (issue.labels?.nodes || []).map(l => ({ id: l.id, name: l.name })),\n    state: issue.state ? { id: issue.state.id, name: issue.state.name, type: issue.state.type } : null,\n    team: issue.team ? { id: issue.team.id, name: issue.team.name, key: issue.team.key } : null,\n    assignee: issue.assignee ? { id: issue.assignee.id, name: issue.assignee.name, email: issue.assignee.email || \"\" } : null,\n    creator: issue.creator ? { id: issue.creator.id, name: issue.creator.name, email: issue.creator.email || \"\" } : null\n  },\n  comments,\n  subIssues,\n  parent: issue.parent ? {\n    id: issue.parent.id,\n    identifier: issue.parent.identifier,\n    title: issue.parent.title,\n    description: issue.parent.description || \"\"\n  } : null,\n  buildState\n} };"
+      },
+      "id": "e8dcf5a1-558b-42a6-a2b2-832cbafe9f6e",
+      "name": "Format Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Sub": {
+      "main": [
+        [
+          {
+            "node": "Prepare Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Query": {
+      "main": [
+        [
+          {
+            "node": "Query Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Issue": {
+      "main": [
+        [
+          {
+            "node": "Format Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "callerPolicy": "any",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "01d80746-edf1-4f9f-8015-f293f7cf054e",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "dJElKwcqJm9waKSS",
+  "isArchived": false,
+  "nodeGroups": []
+}

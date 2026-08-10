@@ -1,0 +1,55 @@
+{
+  "id": "kg4tyWXVPE6h5pH6",
+  "name": "uxr_candidates",
+  "columns": [
+    {
+      "id": "pLqNynistKJTSsHQ",
+      "name": "batch_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "DfZA1CvDVg979qEC",
+      "name": "email",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "WfxAUSie21Q61PyL",
+      "name": "first_name",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "AfdIYlQEZMrsZdYf",
+      "name": "summary",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "F4sfCObIPL0Mf31p",
+      "name": "attributes_json",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "bJkxA5Z6naKjFZKm",
+      "name": "status",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "QDlSNKlq0St0N496",
+      "name": "sent_at",
+      "type": "string",
+      "index": 6
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-08-07T16:56:48.226Z",
+  "updatedAt": "2026-08-07T18:17:17.242Z"
+}

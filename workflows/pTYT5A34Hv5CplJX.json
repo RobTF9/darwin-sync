@@ -1,0 +1,630 @@
+{
+  "id": "pTYT5A34Hv5CplJX",
+  "name": "UXR Send & Stamp",
+  "nodes": [
+    {
+      "id": "8cf1582e-c31e-4fe4-9a3e-14fbf6cbe308",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "batch_id",
+              "type": "string"
+            },
+            {
+              "name": "email_subject",
+              "type": "string"
+            },
+            {
+              "name": "email_body",
+              "type": "string"
+            },
+            {
+              "name": "calendly_url",
+              "type": "string"
+            },
+            {
+              "name": "test_mode",
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "de68744d-06eb-4c0a-935a-25700bb2bf3d",
+      "name": "Validate Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const j = $input.first().json;\nconst batchId = (j.batch_id || '').toString().trim();\nconst body = (j.email_body || '').toString();\nconst calendly = (j.calendly_url || '').toString().trim();\nconst testMode = j.test_mode === true || j.test_mode === 'true';\nlet error = null;\nif (!batchId) error = 'Missing batch_id.';\nelse if (!body) error = 'Missing email_body.';\nelse if (body.indexOf('{{calendly_link}}') !== -1 && !calendly) error = 'The email body contains {{calendly_link}} but no calendly_url was provided. Refusing to send.';\nreturn [{ json: { valid: !error, error: error, batch_id: batchId, email_subject: (j.email_subject || 'Invitation: Help us improve n8n').toString(), email_body: body, calendly_url: calendly, test_mode: testMode } }];"
+      }
+    },
+    {
+      "id": "ab1ab7c4-aa1b-4510-aee1-d2f51d482c5d",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "73e09aa2-105f-4f8e-afac-5af64609f1bf",
+      "name": "Get Staged Candidates",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        -100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "kg4tyWXVPE6h5pH6",
+          "cachedResultName": "uxr_candidates"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "batch_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Send').first().json.batch_id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "staged"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "3c57736a-6e90-419c-b5d9-c806d24ea72d",
+      "name": "Prepare Recipients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const v = $('Validate Send').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.email);\nlet list = rows;\nif (v.test_mode === true) list = rows.slice(0, 2);\nif (list.length === 0) return [{ json: { __none: true, batch_id: v.batch_id } }];\nreturn list.map(r => {\n  let body = v.email_body || '';\n  body = body.split('{{first_name}}').join(r.first_name || 'there');\n  body = body.split('{{calendly_link}}').join(v.calendly_url || '');\n  const recipient = v.test_mode === true ? 'design@n8n.io, g.andreini@gmail.com' : r.email;\n  return { json: { row_id: r.id, email: r.email, recipient: recipient, subject: v.email_subject, body: body, test_mode: v.test_mode === true } };\n});"
+      }
+    },
+    {
+      "id": "e4ceeb16-bb74-40a7-894a-7dc21255e612",
+      "name": "No Candidates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.__none }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "0adfca7c-0b06-484a-8315-125d3fe41607",
+      "name": "Return No Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        60
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const j = $input.first().json;\nreturn [{ json: { success: false, sent: 0, failed: 0, message: 'No staged candidates found for batch ' + (j.batch_id || '(unknown)') + '.' } }];"
+      }
+    },
+    {
+      "id": "e779d721-358c-44c5-aef4-84d6496f6d56",
+      "name": "Summarize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        -280
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.email);\nconst sent = rows.filter(r => r.status === 'sent').length;\nconst failed = rows.filter(r => r.status === 'failed').length;\nconst details = rows.map(r => ({ email: r.email, status: r.status }));\nconst v = $('Validate Send').first().json;\nreturn [{ json: { success: failed === 0, sent: sent, failed: failed, test_mode: v.test_mode === true, batch_id: v.batch_id, details: details, message: 'Sent ' + sent + ', failed ' + failed + (v.test_mode ? ' (TEST MODE: recipients overridden, no Customer.io stamping)' : '') + '.' } }];"
+      }
+    },
+    {
+      "id": "96b78239-5d5f-48ed-aa0d-e270891f70e7",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1568,
+        -60
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "n8n Research <noreply@info.n8n.io>",
+        "toEmail": "={{ $json.recipient }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "design@n8n.io"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "c4156f6b-a00f-4f71-aa26-effdee5500f3"
+    },
+    {
+      "id": "49699a20-4eb5-4c0f-bb2f-7ed7b4cec8af",
+      "name": "Check Send OK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        -60
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const sent = $input.first().json || {};\nconst item = $('Send Loop').first().json;\nconst ok = !sent.error;\nreturn [{ json: { ...item, send_ok: ok, error: sent.error ? (typeof sent.error === 'string' ? sent.error : (sent.error.message || JSON.stringify(sent.error).slice(0, 200))) : null } }];"
+      }
+    },
+    {
+      "id": "ee35eade-96c2-4e50-9149-4bcc4574e3a0",
+      "name": "Stamp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        -60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.send_ok === true && $json.test_mode !== true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "f7de73b9-513c-4e66-a9ff-853433b56788",
+      "name": "Stamp Customer.io",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2240,
+        -160
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://track.customer.io/api/v1/customers/' + encodeURIComponent($json.email) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "customerIoApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ _update: true, last_user_research_invite_date: $now.toUnixInteger() }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "0fe5eb65-f56f-46c7-b63e-490eac0e38d6",
+      "name": "Record Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        -60
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const chk = $('Check Send OK').first().json;\nconst inp = $input.first().json || {};\nlet ok = chk.send_ok === true;\nlet err = chk.error || null;\nif (ok && inp.statusCode !== undefined && inp.statusCode >= 400) {\n  ok = false;\n  err = 'Customer.io stamp failed (HTTP ' + inp.statusCode + ')';\n}\nreturn [{ json: { row_id: chk.row_id, email: chk.email, final_status: ok ? 'sent' : 'failed', error: err, sent_at: ok ? new Date().toISOString() : '' } }];"
+      }
+    },
+    {
+      "id": "2711280b-71ab-4029-be2b-af91b93c2632",
+      "name": "Update Candidate Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2688,
+        -60
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "kg4tyWXVPE6h5pH6",
+          "cachedResultName": "uxr_candidates"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Record Result').first().json.row_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ],
+          "value": {
+            "status": "={{ $('Record Result').first().json.final_status }}",
+            "sent_at": "={{ $('Record Result').first().json.sent_at }}"
+          },
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sent_at",
+              "displayName": "sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a3ad435e-7f05-4bbf-b57b-9237e749d7f0",
+      "name": "Throttle",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2912,
+        -60
+      ],
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "webhookId": "f5dba3d2-f85b-48ca-9bee-d370bdab3fb9"
+    },
+    {
+      "id": "84555fb7-f1a1-43fc-9d4d-01ccd4e1746b",
+      "name": "Send Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1344,
+        -140
+      ],
+      "parameters": {
+        "batchSize": 1
+      }
+    },
+    {
+      "id": "0018840f-e7e9-4684-bfea-d2dc301e1784",
+      "name": "Return Invalid Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const j = $input.first().json;\nreturn [{ json: { success: false, sent: 0, failed: 0, message: j.error || 'Invalid input.' } }];"
+      }
+    },
+    {
+      "id": "f692e417-7f2b-48cd-956f-f5d357fbe707",
+      "name": "Sticky Note 51598141",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -50,
+        -50
+      ],
+      "parameters": {
+        "content": "## UXR Send & Stamp (Workflow C)\nInputs: batch_id, email_subject, email_body, calendly_url, test_mode.\n\nReads staged candidates from uxr_candidates by batch_id, sends the invite per candidate via SMTP (from noreply@info.n8n.io, reply-to design@n8n.io, plain text, no attribution), stamps last_user_research_invite_date on Customer.io via Track API (_update: true, never creates profiles), updates each candidate row to sent/failed, returns {success, sent, failed, details}.\n\n**test_mode: true** = recipients overridden to design@n8n.io + g.andreini@gmail.com, max 2 candidates, NO stamping. Refuses to run if the body still contains {{calendly_link}} and no calendly_url is given.\n\n**Credentials pending**: SMTP (Mailgun) and Customer.io Track API must be added by Rob before this can actually send.",
+        "color": 4,
+        "width": 524,
+        "height": 200
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Validate Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Send": {
+      "main": [
+        [
+          {
+            "node": "Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Get Staged Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Staged Candidates": {
+      "main": [
+        [
+          {
+            "node": "Prepare Recipients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Recipients": {
+      "main": [
+        [
+          {
+            "node": "No Candidates?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Candidates?": {
+      "main": [
+        [
+          {
+            "node": "Return No Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Check Send OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Send OK": {
+      "main": [
+        [
+          {
+            "node": "Stamp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp?": {
+      "main": [
+        [
+          {
+            "node": "Stamp Customer.io",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp Customer.io": {
+      "main": [
+        [
+          {
+            "node": "Record Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Result": {
+      "main": [
+        [
+          {
+            "node": "Update Candidate Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Candidate Row": {
+      "main": [
+        [
+          {
+            "node": "Throttle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Throttle": {
+      "main": [
+        [
+          {
+            "node": "Send Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Loop": {
+      "main": [
+        [
+          {
+            "node": "Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "46466fac-4d7d-415c-b2c0-864c55eb5660",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "prCy2Gu2VEMt3ALB",
+  "isArchived": false,
+  "nodeGroups": []
+}

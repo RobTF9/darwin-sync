@@ -1,0 +1,544 @@
+{
+  "id": "6uEc2xCDjqeG0OJt",
+  "name": "UXR Search",
+  "nodes": [
+    {
+      "id": "cea4a327-c4e7-4e18-8090-dce308e4cf73",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "mode",
+              "type": "string"
+            },
+            {
+              "name": "filters",
+              "type": "object"
+            },
+            {
+              "name": "sampleSize",
+              "type": "number"
+            },
+            {
+              "name": "excludeRecentDays",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6427ff3e-2548-4e54-8db9-84da83780195",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        128
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "bwOgNKo1fCRR0BMv",
+          "cachedResultName": "UXR Config"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "schema": [],
+          "matchingColumns": []
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "e9bb7847-cbf1-4fe0-96cd-997cc9188690",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $('When Called').first().json || {};\nconst config = $('Load Config').first().json || {};\n\nlet mode = (input.mode || 'n8n_users').toString().trim();\nif (mode !== 'n8n_users' && mode !== 'non_users') mode = 'n8n_users';\n\nlet filters = input.filters || {};\nif (typeof filters === 'string') {\n  try { filters = JSON.parse(filters); } catch (e) { filters = {}; }\n}\nif (typeof filters !== 'object' || Array.isArray(filters) || filters === null) filters = {};\n\nlet sampleSize = Number(input.sampleSize);\nif (!Number.isFinite(sampleSize) || sampleSize <= 0) sampleSize = Number(config.maxSampleSize) || 10;\nconst maxSampleSize = Number(config.maxSampleSize) || 20;\nif (sampleSize > maxSampleSize) sampleSize = maxSampleSize;\nsampleSize = Math.floor(sampleSize);\n\nlet excludeRecentDays = Number(input.excludeRecentDays);\nif (!Number.isFinite(excludeRecentDays) || excludeRecentDays < 0) excludeRecentDays = Number(config.cooldownDays) || 60;\nexcludeRecentDays = Math.floor(excludeRecentDays);\n\nreturn [{ json: { mode, filters, sampleSize, excludeRecentDays, config } }];"
+      }
+    },
+    {
+      "id": "d25f835a-bc5a-47d0-a646-0c7d5db9bdcf",
+      "name": "Build CIO Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $input.first().json;\nconst { mode, filters, sampleSize, excludeRecentDays, config } = data;\n\nconst cooldownField = config.cooldownField || 'last_user_research_invite_date';\nconst shardField = config.shardField || 'uxr_shard';\nconst shardCount = Number(config.shardCount) || 4096;\n\nconst cutoff = new Date(Date.now() - excludeRecentDays * 24 * 60 * 60 * 1000);\nconst cutoffTs = Math.floor(cutoff.getTime() / 1000);\n\nconst filterDefs = mode === 'n8n_users' ? (config.nUserFilters || []) : (config.nonUserFilters || []);\nconst defById = {};\nfor (const d of filterDefs) defById[d.id] = d;\n\n// Cooldown clause: field doesn't exist OR older than cutoff\nconst cooldownClause = {\n  or: [\n    { attribute: { field: cooldownField, operator: 'not_exists' } },\n    { attribute: { field: cooldownField, operator: 'lt', value: String(cutoffTs) } }\n  ]\n};\n\nconst andClauses = [];\n\nif (mode === 'n8n_users') {\n  // Quality gates\n  andClauses.push({ attribute: { field: 'email', operator: 'exists' } });\n  andClauses.push({ not: { attribute: { field: 'unsubscribed', operator: 'eq', value: 'true' } } });\n  andClauses.push({ attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } });\n  andClauses.push({ attribute: { field: 'confirmed', operator: 'eq', value: 'true' } });\n  // Exclude non-user webform signups\n  andClauses.push({ not: { and: [\n    { attribute: { field: 'origin', operator: 'eq', value: 'user_research_webform' } },\n    { or: [\n      { attribute: { field: 'n8n_usage', operator: 'eq', value: 'aware' } },\n      { attribute: { field: 'n8n_usage', operator: 'eq', value: 'new' } }\n    ] },\n    { not: { attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } } }\n  ] } });\n} else {\n  // Non-users base query\n  const base = config.nonUserBaseQuery || {};\n  andClauses.push({ attribute: { field: 'email', operator: 'exists' } });\n  andClauses.push({ attribute: { field: 'origin', operator: 'eq', value: base.origin || 'user_research_webform' } });\n  andClauses.push({ not: { attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } } });\n  // n8n_usage in selected values (default aware+new)\n  let usageVals = filters.n8n_usage;\n  if (!Array.isArray(usageVals) || usageVals.length === 0) {\n    usageVals = (base.n8n_usage_default) || ['aware', 'new'];\n  }\n  andClauses.push({ or: usageVals.map(v => ({ attribute: { field: 'n8n_usage', operator: 'eq', value: String(v) } })) });\n}\n\n// Cooldown always applied\nandClauses.push(cooldownClause);\n\n// User-selected filters (skip n8n_usage in non_users, already handled)\nfor (const [key, val] of Object.entries(filters)) {\n  if (mode === 'non_users' && key === 'n8n_usage') continue;\n  if (val === undefined || val === null || val === '') continue;\n  const def = defById[key];\n  if (Array.isArray(val)) {\n    if (val.length === 0) continue;\n    andClauses.push({ or: val.map(v => ({ attribute: { field: key, operator: 'eq', value: String(v) } })) });\n  } else {\n    andClauses.push({ attribute: { field: key, operator: 'eq', value: String(val) } });\n  }\n}\n\nreturn [{ json: {\n  mode, filters, sampleSize, excludeRecentDays,\n  cooldownField, shardField, shardCount,\n  baseAndClauses: andClauses,\n  attempt: 0,\n  maxAttempts: 3,\n  shardsUsed: [],\n  collected: [],\n  totalMatching: 0\n} }];"
+      }
+    },
+    {
+      "id": "2e172b3d-653b-4da1-9d69-34e59dd8456a",
+      "name": "Pick Shards",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const s = $input.first().json;\n\n// Number of shards to query this attempt. Start with a spread proportional to sampleSize, widen on retries.\nconst shardsPerAttempt = Math.min(s.shardCount, Math.max(4, s.sampleSize) * (s.attempt + 1) * 2);\n\nconst used = new Set(s.shardsUsed || []);\nconst newShards = [];\nlet guard = 0;\nwhile (newShards.length < shardsPerAttempt && used.size < s.shardCount && guard < shardsPerAttempt * 20) {\n  guard++;\n  const shard = Math.floor(Math.random() * s.shardCount);\n  if (!used.has(shard)) { used.add(shard); newShards.push(shard); }\n}\n\n// Build the full CIO filter with a shard OR-clause for the newly picked shards\nconst shardClause = { or: newShards.map(sh => ({ attribute: { field: s.shardField, operator: 'eq', value: String(sh) } })) };\nconst andClauses = s.baseAndClauses.slice();\nif (newShards.length > 0) andClauses.push(shardClause);\n\nconst cioFilter = { filter: { and: andClauses } };\n\nreturn [{ json: { ...s, currentShards: newShards, shardsUsed: Array.from(used), cioFilter } }];"
+      }
+    },
+    {
+      "id": "0b097d52-4ee4-4dbc-a805-5ef0cea8d9d5",
+      "name": "Query Customer.io",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        48
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.customer.io/v1/customers",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "customerIoApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "={{ Math.min(100, ($json.sampleSize || 10) * 5) }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.cioFilter) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "start",
+                    "value": "={{ $response.body.next }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body || !$response.body.next }}",
+              "limitPagesFetched": true,
+              "maxRequests": 20
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "8158af58-0885-4390-b090-4496a2c0cd2a",
+      "name": "Collect & Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        48
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const s = $('Pick Shards').first().json;\nconst pages = $input.all().map(i => i.json);\n\nlet error = null;\nlet rows = [];\nfor (const p of pages) {\n  const status = p.statusCode || 0;\n  const body = p.body || p;\n  if (status >= 400) {\n    error = 'Customer.io API error (HTTP ' + status + '): ' + JSON.stringify(body).slice(0, 300);\n    continue;\n  }\n  const ids = (body && (body.identifiers || body.results || body.customers)) || [];\n  if (Array.isArray(ids)) rows = rows.concat(ids);\n}\n\nconst prior = Array.isArray(s.collected) ? s.collected : [];\nconst byId = new Map();\nfor (const r of prior) { const k = r.cio_id || r.id || r.email; if (k) byId.set(k, r); }\nfor (const r of rows) { const k = r.cio_id || r.id || r.email; if (k && !byId.has(k)) byId.set(k, r); }\nconst collected = Array.from(byId.values());\n\nconst attempt = (s.attempt || 0) + 1;\nconst enough = collected.length >= s.sampleSize;\nconst exhausted = attempt >= (s.maxAttempts || 3);\nconst done = enough || exhausted || !!error;\n\nreturn [{ json: { ...s, attempt, collected, collectedCount: collected.length, totalMatching: collected.length, error, done } }];"
+      }
+    },
+    {
+      "id": "77a306d3-c0fa-4763-9120-f88eab796dda",
+      "name": "Enough Or Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        48
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.done }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "73cb21b0-9cce-4018-a6ed-5b500be9c50c",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const s = $('Collect & Check').first().json;\nconst samples = $('Sample Candidates').all().map(i => i.json).filter(x => x && !x.__empty);\nconst fetched = $input.all().map(i => i.json);\n\nfunction attrsOf(resp) {\n  return (resp && resp.customer && resp.customer.attributes) || {};\n}\n\nconst candidates = samples.map((sm, idx) => {\n  const a = attrsOf(fetched[idx] || {});\n  const wf = a.wf_bucket;\n  const services = a.services_bucket;\n  const ai = a.ai_wfs_bucket;\n  const age = a.days_bucket;\n  const usage_summary = [\n    wf !== undefined ? 'wf: ' + wf : null,\n    services !== undefined ? 'services: ' + services : null,\n    ai !== undefined ? 'ai: ' + ai : null,\n    age !== undefined ? 'age: ' + age : null\n  ].filter(Boolean).join(', ');\n  return {\n    email: a.email || sm.email || null,\n    id: sm.cio_id || sm.cust_id || null,\n    country: a.country || null,\n    cloud_plan: a.cloud_plan || null,\n    cloud_plan_status: a.cloud_plan_status || null,\n    role: a.utm_user_role || null,\n    company_size: a.company_size || null,\n    first_name: a.first_name || null,\n    usage_summary\n  };\n});\n\nconst shardsWalked = Array.isArray(s.shardsUsed) ? s.shardsUsed.length : 0;\nconst poolEstimate = shardsWalked > 0 ? Math.round((s.collectedCount || 0) * (s.shardCount || 4096) / shardsWalked) : (s.collectedCount || 0);\n\nreturn [{ json: {\n  candidates,\n  sampleSize: candidates.length,\n  collectedCount: s.collectedCount || 0,\n  totalMatchingEstimate: poolEstimate,\n  mode: s.mode,\n  filtersApplied: s.filters,\n  shardsUsed: s.shardsUsed || [],\n  error: null\n} }];"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "593cd3a4-5c8b-4251-853c-89677dcc0006",
+      "name": "Prep Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        224
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const s = $input.first().json;\n// Rebuild the state for another Pick Shards pass. baseAndClauses persists.\nreturn [{ json: {\n  mode: s.mode, filters: s.filters, sampleSize: s.sampleSize, excludeRecentDays: s.excludeRecentDays,\n  cooldownField: s.cooldownField, shardField: s.shardField, shardCount: s.shardCount,\n  baseAndClauses: s.baseAndClauses, attempt: s.attempt, maxAttempts: s.maxAttempts,\n  shardsUsed: s.shardsUsed, collected: s.collected, totalMatching: s.totalMatching\n} }];"
+      }
+    },
+    {
+      "id": "e95bc919-6a4d-4f0c-84a5-8ba79949f254",
+      "name": "Sticky Note fc486f84",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -120
+      ],
+      "parameters": {
+        "content": "## UXR Search\nSub-workflow that queries Customer.io for matching candidate profiles.\n\n**Inputs:** mode (n8n_users | non_users), filters (object), sampleSize, excludeRecentDays.\n\n1. Load Config — pulls filter defs, quality gates, cooldown & shard settings from UXR Config.\n2. Build CIO Filter — assembles the base Customer.io filter (quality gates, cooldown, mode-specific base query + user filters).",
+        "color": 4,
+        "width": 300,
+        "height": 500
+      }
+    },
+    {
+      "id": "7e73d2d4-5325-4f8a-84aa-76437afb04b7",
+      "name": "Sticky Note 2119b34f",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        860,
+        -120
+      ],
+      "parameters": {
+        "content": "## Random Shard Sampling\nPick Shards -> Query Customer.io -> Collect & Check runs as a loop (up to maxAttempts=3).\n\nEach pass picks fresh random shard values (from shardCount=4096), appends a shard OR-clause to the filter, and queries. Dedupes results. If enough collected (>= sampleSize) or attempts exhausted, exits to Format Output; otherwise Prep Retry loops back with wider shard coverage.",
+        "color": 3,
+        "width": 300,
+        "height": 200
+      }
+    },
+    {
+      "id": "04f1baab-a010-4f28-aa0b-81ccc8cc8650",
+      "name": "Sticky Note 20fe626d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        -200
+      ],
+      "parameters": {
+        "content": "## Format Output\nRandomly subsamples collected profiles down to sampleSize, maps to candidate objects (email, id, plan, role, usage_summary, ...) and attaches metadata (totalMatching, mode, filtersApplied, shardsUsed).\n\n**Credentials:** Customer.io credential is a placeholder - Rob will add it. Until then Query Customer.io will fail auth.",
+        "color": 5,
+        "width": 300,
+        "height": 200
+      }
+    },
+    {
+      "id": "f0780c5f-4417-4534-a086-7ddc3309d498",
+      "name": "Search Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        -80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.error || '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f7a871e7-8622-4440-b18c-9c6dadd846e0",
+      "name": "Return Search Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        -180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const s = $input.first().json;\nreturn [{ json: { error: s.error, candidates: [], sampleSize: 0, collectedCount: 0, totalMatchingEstimate: 0, mode: s.mode, filtersApplied: s.filters, shardsUsed: s.shardsUsed || [], message: 'Search failed: ' + s.error } }];"
+      }
+    },
+    {
+      "id": "3c18de53-f34d-4a51-a7c6-8a0e8b2cc3c5",
+      "name": "Sample Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const s = $input.first().json;\nfunction shuffle(arr) {\n  const a = arr.slice();\n  for (let i = a.length - 1; i > 0; i--) {\n    const j = Math.floor(Math.random() * (i + 1));\n    [a[i], a[j]] = [a[j], a[i]];\n  }\n  return a;\n}\nconst collected = Array.isArray(s.collected) ? s.collected : [];\nconst sampled = shuffle(collected).slice(0, s.sampleSize);\nif (sampled.length === 0) return [{ json: { __empty: true } }];\nreturn sampled.map(r => ({ json: { cio_id: r.cio_id || null, cust_id: r.id || null, email: r.email || null } }));"
+      }
+    },
+    {
+      "id": "1b874406-a83c-4434-8a5f-7db626a3f132",
+      "name": "Fetch Attributes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.__empty ? 'https://api.customer.io/v1/customers/none/attributes' : ('https://api.customer.io/v1/customers/' + ($json.cio_id ? 'cio_' + $json.cio_id : encodeURIComponent($json.cust_id || $json.email || 'unknown')) + '/attributes') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "customerIoApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Build CIO Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build CIO Filter": {
+      "main": [
+        [
+          {
+            "node": "Pick Shards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Shards": {
+      "main": [
+        [
+          {
+            "node": "Query Customer.io",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Customer.io": {
+      "main": [
+        [
+          {
+            "node": "Collect & Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect & Check": {
+      "main": [
+        [
+          {
+            "node": "Enough Or Done?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enough Or Done?": {
+      "main": [
+        [
+          {
+            "node": "Search Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prep Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Retry": {
+      "main": [
+        [
+          {
+            "node": "Pick Shards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Failed?": {
+      "main": [
+        [
+          {
+            "node": "Return Search Error",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sample Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sample Candidates": {
+      "main": [
+        [
+          {
+            "node": "Fetch Attributes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Attributes": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "c90fd8e3-3acf-4b47-893d-2d9574129ff7",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "prCy2Gu2VEMt3ALB",
+  "isArchived": false,
+  "nodeGroups": []
+}

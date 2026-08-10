@@ -1,0 +1,2068 @@
+{
+  "id": "Domz943gXmQLejtF",
+  "name": "UXR Interaction Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recruiting-interaction",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ed12708f-dff2-4836-95eb-f719883035ef",
+      "name": "Slack Interaction Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        192
+      ],
+      "webhookId": "c6bb7055-bca3-4d86-ab5d-b2843ec29691"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.body && $input.first().json.body.payload;\nconst payload = JSON.parse(raw);\nlet action_id = null;\nlet action_type = payload.type || null;\nlet action_value = null;\nlet channel_id = (payload.channel && payload.channel.id) || null;\nlet thread_ts = null;\nlet message_ts = null;\nif (payload.type === 'view_submission') {\n  const view = payload.view || {};\n  action_id = view.callback_id || null;\n  action_value = view.state || null;\n  channel_id = channel_id || (view.private_metadata || null);\n} else {\n  const act = (payload.actions && payload.actions[0]) || {};\n  action_id = act.action_id || null;\n  action_value = (act.selected_option && act.selected_option.value) || act.value || null;\n  const msg = payload.message || {};\n  thread_ts = msg.thread_ts || msg.ts || null;\n  message_ts = msg.ts || null;\n}\nconst threadKey = thread_ts || message_ts || null;\nconst session_key = channel_id && threadKey ? channel_id + '_' + threadKey : null;\nreturn [{ json: {\n  action_id,\n  action_type,\n  action_value,\n  trigger_id: payload.trigger_id || null,\n  user_id: (payload.user && payload.user.id) || null,\n  user_name: (payload.user && payload.user.username) || null,\n  channel_id,\n  thread_ts,\n  message_ts,\n  session_key,\n  response_url: payload.response_url || null,\n  full_payload: payload\n} }];"
+      },
+      "id": "82b28f85-3030-4551-83f4-f9933cb115ad",
+      "name": "Parse Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/plain"
+              }
+            ]
+          }
+        }
+      },
+      "id": "fff97fd7-11f2-49a0-b02f-44310c270ee6",
+      "name": "Ack Slack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Session State\").item.json.session_expired }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "rightValue": ""
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Expired Session"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Parse Payload\").item.json.action_id }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "uxr_audience_"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Audience Selection"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Parse Payload\").item.json.action_id }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "uxr_filter_"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Filter Selection"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Parse Payload\").item.json.action_id }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "uxr_sample_"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Sample Size"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Parse Payload\").item.json.action_id }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "uxr_approve_list_"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approve List"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Parse Payload\").item.json.action_id }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "uxr_email_"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Email Approval"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Parse Payload\").item.json.action_id }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "uxr_send_"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Send"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $(\"Parse Payload\").item.json.action_id }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "uxr_cancel"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cancel"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown Action"
+        }
+      },
+      "id": "5c5e7d8b-bee8-45b6-8f9c-3ec48928c690",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2016,
+        464
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c721af2c-dbac-412b-801f-6d2dd6a9f916",
+      "name": "Handle Audience",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a06124bb-b349-45a6-b068-593e0bf1fd89",
+      "name": "Handle Filters",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        192
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "6111d85a-bea3-4ec7-825d-a4a519309521",
+      "name": "Handle Sample Size",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        384
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "eac6d160-4774-446b-a184-d8d794fe81e9",
+      "name": "Handle Approve List",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        576
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "86730a28-838a-4e88-a47b-c4e8a7a9d7d2",
+      "name": "Handle Email",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        768
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "704a5e97-fb77-4e8d-acf0-4ee45a05aecd",
+      "name": "Handle Send",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        960
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "6e35c719-5aba-4b78-ba6b-dd365a91b1b4",
+      "name": "Handle Cancel",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Parse Payload').first().json.channel_id, thread_ts: $('Parse Payload').first().json.thread_ts, text: \"✅ Recruiting session cancelled. Start a new one anytime by asking Darwin to recruit participants.\", unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "34223b29-9151-4e38-b0cf-b2922f84c28c",
+      "name": "Post Cancel Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2464,
+        1152
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "67a2108c-8117-49af-82f5-0f75429bf0f0",
+      "name": "Handle Unknown",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Parse Payload').first().json.channel_id, thread_ts: $('Parse Payload').first().json.thread_ts, text: \"⚠️ Received an unrecognized action. This might be from an outdated message — try starting a new recruiting session.\", unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "94a098ea-5279-4381-8486-3d244d174f95",
+      "name": "Post Unknown Action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2464,
+        1344
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\nvar TTL_MS = 30 * 60 * 1000;\nfunction isFresh(row) {\n  return !!(row && row.updated_at && (Date.now() - Date.parse(row.updated_at) <= TTL_MS));\n}\n\nconst WIZARD_STEPS = ['audience_select', 'filters', 'sample_size', 'review_candidates', 'review_email', 'sending', 'complete'];\n\nconst p = $input.first().json;\nconst actionId = p.action_id || '';\nconst isUxr = typeof actionId === 'string' && actionId.startsWith('uxr_');\n\nconst row = getSessionRow();\nconst fresh = isFresh(row);\n\nlet sessionExpired = false;\nif (isUxr && p.session_key && !actionId.startsWith('uxr_audience_') && !actionId.startsWith('uxr_cancel') && !fresh) {\n  sessionExpired = true;\n}\n\nlet sessionState = null;\nif (fresh) {\n  let filters = {};\n  try { filters = JSON.parse(row.filters_json || '{}'); } catch (e) { filters = {}; }\n  sessionState = {\n    step: row.state,\n    audience_type: row.audience || null,\n    filters: filters,\n    sample_size: row.requested_count || null,\n    batch_id: row.batch_id || null,\n    calendly_link: row.calendly_link || null,\n    email_subject: row.email_subject || null,\n    email_body: row.email_body || null\n  };\n}\n\nreturn [{ json: {\n  ...p,\n  is_uxr: isUxr,\n  session_expired: sessionExpired,\n  session_state: sessionState,\n  wizard_steps: WIZARD_STEPS\n} }];"
+      },
+      "id": "ace4a11c-4408-479c-bf82-f905b4a051a9",
+      "name": "Session State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        576
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "be5c6cba-39be-40a3-9560-35f0ff9a3eed",
+      "name": "Handle Expired",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Parse Payload').first().json.channel_id, thread_ts: $('Parse Payload').first().json.thread_ts, text: \"⏳ This recruiting session has expired or is no longer active (it may have timed out). Please start a new one by asking Darwin to recruit participants.\", unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "70e0d29d-b723-4b3b-b893-109d7825f91e",
+      "name": "Post Expired Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2464,
+        -192
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse Payload').first().json;\nconst audienceType = parsed.action_value;\nconst nowIso = new Date().toISOString();\n\nconst nUserFilters = [\n  { id: 'cloud_plan', label: 'Cloud plan', coverage: '~95%', warn: false, options: ['Trial', 'n8n cloud Start', 'n8n cloud Pro', 'n8n cloud Enterprise'] },\n  { id: 'cloud_plan_status', label: 'Plan status', coverage: '~95%', warn: false, options: ['trialing', 'active', 'past_due', 'canceled'] },\n  { id: 'country', label: 'Country', coverage: '~70%', warn: false, type: 'text' },\n  { id: 'utm_user_role', label: 'Role at signup', coverage: '~60%', warn: false, options: ['Product & Design', 'Engineering', 'IT / Ops', 'Marketing', 'Sales', 'Founder / C-level', 'Other'] },\n  { id: 'company_size', label: 'Company size', coverage: '~25%', warn: true, options: ['Only me', '<20', '20-99', '100-499', '500-999', '1000+'] },\n  { id: 'wf_bucket', label: 'Production workflows', coverage: '~12%', warn: true, options: ['1-2', '3-5', '6-20', '21-100', '100+'] },\n  { id: 'services_bucket', label: 'Connected services', coverage: '~12%', warn: true, options: ['≤10', '11-20', '21-40', '41-70', '70+'] },\n  { id: 'ai_wfs_bucket', label: 'AI workflows', coverage: '~12%', warn: true, options: ['0', '1-2', '3-5', '6-10', '10+'] },\n  { id: 'days_bucket', label: 'Account age', coverage: '~12%', warn: true, options: ['<30', '30-180', '180-365', '365-540', '540+'] }\n];\n\nconst nonUserFilters = [\n  { id: 'n8n_usage', label: 'n8n familiarity', coverage: '~100%', warn: false, options: ['aware', 'new', 'explorer'] },\n  { id: 'tech_skills', label: 'Technical skills', coverage: '~90%', warn: false, options: ['tech_high', 'tech_mid', 'tech_low', 'tech_none'] },\n  { id: 'company_size', label: 'Company size', coverage: '~85%', warn: false, options: ['Only me', '<20', '20-99', '100-499', '500-999', '1000+'] }\n];\n\nconst filters = audienceType === 'n8n_users' ? nUserFilters : nonUserFilters;\nconst audienceLabel = audienceType === 'n8n_users' ? 'n8n users' : 'Non-users';\n\nconst blocks = [\n  { type: 'section', text: { type: 'mrkdwn', text: ':busts_in_silhouette: *Audience: ' + audienceLabel + '*\\n\\nSelect any filters you want to apply. All are optional — skip any you don’t need.' } },\n  { type: 'divider' }\n];\n\nfor (const f of filters) {\n  if (f.type === 'text') {\n    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*' + f.label + '* · ' + f.coverage + (f.warn ? ' :warning:' : '') + '\\n_Type the country name in the thread after applying other filters, or skip._' } });\n  } else {\n    const options = f.options.map(o => ({ text: { type: 'plain_text', text: o, emoji: true }, value: o }));\n    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*' + f.label + '* · ' + f.coverage + (f.warn ? ' :warning:' : '') }, accessory: { type: 'static_select', placeholder: { type: 'plain_text', text: 'Any', emoji: true }, action_id: 'uxr_filter_' + f.id, options: options } });\n  }\n}\n\nblocks.push({ type: 'divider' });\nblocks.push({ type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Apply Filters', emoji: true }, style: 'primary', action_id: 'uxr_filter_apply', value: 'apply' }, { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, style: 'danger', action_id: 'uxr_cancel', value: 'cancel' } ] });\n\nreturn [{ json: {\n  channel_id: parsed.channel_id,\n  thread_ts: parsed.thread_ts,\n  text: 'Filters for ' + audienceLabel,\n  blocks: JSON.stringify(blocks),\n  sess: {\n    session_key: parsed.session_key || '__none__',\n    channel: parsed.channel_id || '',\n    thread_ts: parsed.thread_ts || '',\n    slack_user: parsed.user_id || '',\n    state: 'filters',\n    audience: audienceType || '',\n    filters_json: '{}',\n    requested_count: 0,\n    batch_id: '',\n    email_subject: '',\n    email_body: '',\n    calendly_link: '',\n    last_step_ts: '',\n    updated_at: nowIso\n  }\n} }];"
+      },
+      "id": "77452a3d-4224-48d0-a31d-83b75b2af88d",
+      "name": "Build Audience Filters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Build Audience Filters').first().json.channel_id, thread_ts: $('Build Audience Filters').first().json.thread_ts, text: $('Build Audience Filters').first().json.text, blocks: JSON.parse($('Build Audience Filters').first().json.blocks), unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "0acffd5a-e433-4280-a1df-3825681944b7",
+      "name": "Post Filters",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2688,
+        0
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\n\nconst parsed = $('Parse Payload').first().json;\nconst row = getSessionRow();\nconst nowIso = new Date().toISOString();\nif (!row) return [{ json: { skip: true, post_message: false, sess: { session_key: '__none__', state: '', filters_json: '{}', updated_at: nowIso } } }];\n\nlet filters = {};\ntry { filters = JSON.parse(row.filters_json || '{}'); } catch (e) { filters = {}; }\n\nconst actionId = parsed.action_id;\nif (actionId === 'uxr_filter_apply') {\n  const filterEntries = Object.entries(filters);\n  const filterSummary = filterEntries.length > 0\n    ? filterEntries.map(([k, v]) => '• *' + k + '*: ' + v).join('\\n')\n    : '_No filters applied — sampling from the full pool._';\n\n  const audienceLabel = row.audience === 'n8n_users' ? 'n8n users' : 'Non-users';\n\n  const blocks = [\n    { type: 'section', text: { type: 'mrkdwn', text: ':1234: *How many people do you want to contact?*\\n\\n*Audience:* ' + audienceLabel + '\\n*Filters:*\\n' + filterSummary } },\n    { type: 'input', block_id: 'sample_size_block', element: { type: 'number_input', is_decimal_allowed: false, action_id: 'uxr_sample_size_input', min_value: '1', max_value: '20', placeholder: { type: 'plain_text', text: 'e.g. 10' } }, label: { type: 'plain_text', text: 'Number of people to contact (1-20)' } },\n    { type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Draw Sample', emoji: true }, style: 'primary', action_id: 'uxr_sample_draw', value: 'draw' }, { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, style: 'danger', action_id: 'uxr_cancel', value: 'cancel' } ] }\n  ];\n\n  return [{ json: { channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, text: 'How many people do you want to contact?', blocks: JSON.stringify(blocks), post_message: true, sess: { session_key: row.session_key, state: 'sample_size', filters_json: JSON.stringify(filters), updated_at: nowIso } } }];\n} else {\n  const filterId = actionId.replace('uxr_filter_', '');\n  filters[filterId] = parsed.action_value;\n  return [{ json: { skip: true, stored_filter: filterId, value: parsed.action_value, post_message: false, sess: { session_key: row.session_key, state: row.state, filters_json: JSON.stringify(filters), updated_at: nowIso } } }];\n}"
+      },
+      "id": "fa634fab-0455-455c-ab05-0421050013ce",
+      "name": "Process Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Process Filter').first().json.post_message }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "20bfa190-818f-4ba1-bdcb-902563683e97",
+      "name": "Filter Needs Post?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2688,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Process Filter').first().json.channel_id, thread_ts: $('Process Filter').first().json.thread_ts, text: $('Process Filter').first().json.text, blocks: JSON.parse($('Process Filter').first().json.blocks), unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "b34f1cce-dd80-4351-9111-0a5997ee629b",
+      "name": "Post Sample Size",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2912,
+        192
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\n\nconst parsed = $('Parse Payload').first().json;\nconst row = getSessionRow();\nconst nowIso = new Date().toISOString();\nconst expiredBlocks = [{ type: 'section', text: { type: 'mrkdwn', text: ':hourglass: This recruiting session is no longer active. Please start a new one by asking Darwin to recruit participants.' } }];\nif (!row) return [{ json: { channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, text: 'Session no longer active.', blocks: JSON.stringify(expiredBlocks), candidates: [], batch_id: '', sess: { session_key: '__none__', state: '', requested_count: 0, batch_id: '', updated_at: nowIso } } }];\n\nlet sampleSize = NaN;\ntry {\n  const payload = typeof parsed.full_payload === 'string' ? JSON.parse(parsed.full_payload) : parsed.full_payload;\n  const block = payload && payload.state && payload.state.values && payload.state.values.sample_size_block;\n  if (block) {\n    if (block.uxr_sample_size_input && block.uxr_sample_size_input.value != null) {\n      sampleSize = parseInt(block.uxr_sample_size_input.value, 10);\n    } else if (block.uxr_sample_size_select && block.uxr_sample_size_select.selected_option) {\n      sampleSize = parseInt(block.uxr_sample_size_select.selected_option.value, 10);\n    }\n  }\n} catch (e) {}\nif (!Number.isFinite(sampleSize)) sampleSize = row.requested_count || 5;\nif (!Number.isFinite(sampleSize) || sampleSize < 1) sampleSize = 5;\nif (sampleSize > 20) sampleSize = 20;\n\nconst batchId = 'batch_' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);\n\nconst mockDomains = ['acme.com', 'globex.io', 'initech.co', 'umbrella.dev', 'wayne.tech', 'stark.io', 'oscorp.net', 'lexcorp.com'];\nconst mockRoles = ['Engineering', 'Product & Design', 'IT / Ops', 'Marketing', 'Founder / C-level'];\nconst mockPlans = ['n8n cloud Start', 'n8n cloud Pro', 'Trial'];\nconst mockCountries = ['US', 'Germany', 'UK', 'Brazil', 'India'];\nconst mockCandidates = [];\nfor (let i = 0; i < sampleSize; i++) {\n  const email = 'user' + (i + 1) + '@' + mockDomains[i % mockDomains.length];\n  const plan = mockPlans[i % mockPlans.length];\n  const role = mockRoles[i % mockRoles.length];\n  const country = mockCountries[i % 5];\n  mockCandidates.push({ email: email, first_name: 'user' + (i + 1), plan: plan, role: role, country: country, summary: plan + ' · ' + role + ' · ' + country });\n}\n\nconst audienceLabel = row.audience === 'n8n_users' ? 'n8n users' : 'Non-users';\nlet filters = {};\ntry { filters = JSON.parse(row.filters_json || '{}'); } catch (e) { filters = {}; }\nconst filterEntries = Object.entries(filters);\nconst candidateList = mockCandidates.map((c, i) => (i + 1) + '. `' + c.email + '` · ' + c.plan + ' · ' + c.role + ' · ' + c.country).join('\\n');\n\nconst blocks = [\n  { type: 'section', text: { type: 'mrkdwn', text: ':clipboard: *Candidate List* (' + sampleSize + ' people)\\n\\n*Audience:* ' + audienceLabel + '\\n*Filters:* ' + (filterEntries.length > 0 ? filterEntries.map(([k, v]) => k + '=' + v).join(', ') : 'none') + '\\n\\n:warning: _Phase 1: These are mock candidates. Real Customer.io search coming in Phase 2._' } },\n  { type: 'section', text: { type: 'mrkdwn', text: candidateList } },\n  { type: 'divider' },\n  { type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Approve List', emoji: true }, style: 'primary', action_id: 'uxr_approve_list_yes', value: 'approve' }, { type: 'button', text: { type: 'plain_text', text: ':arrows_counterclockwise: New Sample', emoji: true }, action_id: 'uxr_sample_redraw', value: 'redraw' }, { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, style: 'danger', action_id: 'uxr_cancel', value: 'cancel' } ] }\n];\n\nreturn [{ json: {\n  channel_id: parsed.channel_id,\n  thread_ts: parsed.thread_ts,\n  text: 'Candidate list (' + sampleSize + ' people)',\n  blocks: JSON.stringify(blocks),\n  candidates: mockCandidates,\n  batch_id: batchId,\n  sess: { session_key: row.session_key, state: 'review_candidates', requested_count: sampleSize, batch_id: batchId, updated_at: nowIso }\n} }];"
+      },
+      "id": "d45ab846-89c9-4e89-a755-9942dcc721a1",
+      "name": "Build Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Build Candidates').first().json.channel_id, thread_ts: $('Build Candidates').first().json.thread_ts, text: $('Build Candidates').first().json.text, blocks: JSON.parse($('Build Candidates').first().json.blocks), unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "826b0ee5-e62b-4b08-a2e2-cbeb0218e909",
+      "name": "Post Candidates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2688,
+        384
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\n\nconst parsed = $('Parse Payload').first().json;\nconst row = getSessionRow();\nconst nowIso = new Date().toISOString();\nconst expiredBlocks = [{ type: 'section', text: { type: 'mrkdwn', text: ':hourglass: This recruiting session is no longer active. Please start a new one by asking Darwin to recruit participants.' } }];\nif (!row) return [{ json: { channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, text: 'Session no longer active.', blocks: JSON.stringify(expiredBlocks), sess: { session_key: '__none__', state: '', email_subject: '', email_body: '', updated_at: nowIso } } }];\n\nconst emailSubject = 'Invitation: Help us improve n8n';\nconst emailBody = 'Hi there, 👋\\n\\nWe’re running quick research sessions to understand how you work and what would make your experience better.\\n\\nWhat’s involved:\\n• A 30-minute video chat (recorded for internal notes)\\n• Screen share to show us around your n8n instance\\n• $50 gift card as a thank you\\n• The interview will be conducted in English\\n\\nInterested?\\nPick a time that works for you: {{calendly_link}}\\n\\nThank you!';\n\nconst candidateCount = row.requested_count || 0;\n\nconst blocks = [\n  { type: 'section', text: { type: 'mrkdwn', text: ':email: *Email Preview*\\n\\nThis email will be sent to *' + candidateCount + ' people*. Review and approve, or edit before sending.' } },\n  { type: 'divider' },\n  { type: 'section', text: { type: 'mrkdwn', text: '*Subject:* ' + emailSubject + '\\n\\n' + emailBody.replace('{{calendly_link}}', '_[Calendly link will be inserted]_') } },\n  { type: 'divider' },\n  { type: 'input', block_id: 'calendly_block', element: { type: 'url_text_input', action_id: 'uxr_email_calendly_url', placeholder: { type: 'plain_text', text: 'https://calendly.com/your-link' } }, label: { type: 'plain_text', text: 'Your Calendly booking URL' } },\n  { type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Approve & Send', emoji: true }, style: 'primary', action_id: 'uxr_send_approve', value: 'send' }, { type: 'button', text: { type: 'plain_text', text: ':pencil: Edit Email', emoji: true }, action_id: 'uxr_email_edit', value: 'edit' }, { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, style: 'danger', action_id: 'uxr_cancel', value: 'cancel' } ] }\n];\n\nreturn [{ json: {\n  channel_id: parsed.channel_id,\n  thread_ts: parsed.thread_ts,\n  text: 'Email preview — review and approve',\n  blocks: JSON.stringify(blocks),\n  sess: { session_key: row.session_key, state: 'review_email', email_subject: emailSubject, email_body: emailBody, updated_at: nowIso }\n} }];"
+      },
+      "id": "0511f935-c8da-4031-ac7d-ad32575799db",
+      "name": "Build Email Preview",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Build Email Preview').first().json.channel_id, thread_ts: $('Build Email Preview').first().json.thread_ts, text: $('Build Email Preview').first().json.text, blocks: JSON.parse($('Build Email Preview').first().json.blocks), unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "0e425779-88cb-4079-8663-42137f65a7d1",
+      "name": "Post Email Preview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2688,
+        576
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse Payload').first().json;\nconst blocks = [ { type: 'section', text: { type: 'mrkdwn', text: ':construction: *Email editing coming soon*\\n\\nFor now, you can approve the default template or cancel and start over. The buttons on the email preview above still work.' } } ];\nreturn [{ json: { channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, text: 'Email editing coming soon', blocks: JSON.stringify(blocks) } }];"
+      },
+      "id": "922428fd-6792-4cc5-943d-ba1407c98d78",
+      "name": "Build Email Edit Notice",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Build Email Edit Notice').first().json.channel_id, thread_ts: $('Build Email Edit Notice').first().json.thread_ts, text: $('Build Email Edit Notice').first().json.text, blocks: JSON.parse($('Build Email Edit Notice').first().json.blocks), unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "2676073a-f828-4d73-96be-85ec35e176b8",
+      "name": "Post Email Edit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2688,
+        768
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\n\nconst parsed = $('Parse Payload').first().json;\nconst row = getSessionRow();\nconst nowIso = new Date().toISOString();\nconst expiredBlocks = [{ type: 'section', text: { type: 'mrkdwn', text: ':hourglass: This recruiting session is no longer active. Please start a new one by asking Darwin to recruit participants.' } }];\nif (!row) return [{ json: { channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, text: 'Session no longer active.', blocks: JSON.stringify(expiredBlocks), sess: { session_key: '__none__', state: '', calendly_link: '', updated_at: nowIso } } }];\n\nlet calendlyUrl = '';\ntry {\n  const payload = typeof parsed.full_payload === 'string' ? JSON.parse(parsed.full_payload) : parsed.full_payload;\n  const url = payload && payload.state && payload.state.values && payload.state.values.calendly_block && payload.state.values.calendly_block.uxr_email_calendly_url && payload.state.values.calendly_block.uxr_email_calendly_url.value;\n  if (url) calendlyUrl = url;\n} catch (e) {}\nconst calendlyDisplay = calendlyUrl || '(not provided — the real send will refuse to run without it)';\n\nconst candidateRows = $('Load Batch Candidates').all().map(i => i.json).filter(r => r && r.email);\nconst candidateCount = candidateRows.length || row.requested_count || 0;\nconst audienceLabel = row.audience === 'n8n_users' ? 'n8n users' : 'Non-users';\nlet filters = {};\ntry { filters = JSON.parse(row.filters_json || '{}'); } catch (e) { filters = {}; }\nconst filterEntries = Object.entries(filters);\nconst filterSummary = filterEntries.length > 0 ? filterEntries.map(([k, v]) => k + '=' + v).join(', ') : 'none';\nconst emailList = candidateRows.length > 0 ? candidateRows.map((c, i) => (i + 1) + '. `' + c.email + '`').join('\\n') : '_(no staged candidates found for this batch)_';\n\nconst blocks = [\n  { type: 'section', text: { type: 'mrkdwn', text: ':white_check_mark: *Recruiting Complete!*\\n\\n:warning: _Phase 1: No emails were actually sent. This is a simulation._\\n\\n*Summary:*\\n• *Audience:* ' + audienceLabel + '\\n• *Filters:* ' + filterSummary + '\\n• *Candidates:* ' + candidateCount + '\\n• *Calendly:* ' + calendlyDisplay + '\\n• *Status:* Simulated send (Phase 1)' } },\n  { type: 'divider' },\n  { type: 'section', text: { type: 'mrkdwn', text: '*Would have emailed:*\\n' + emailList } },\n  { type: 'context', elements: [ { type: 'mrkdwn', text: ':information_source: The real send goes through the UXR Send & Stamp workflow (Mailgun + Customer.io stamp) once its credentials are in place.' } ] }\n];\n\nreturn [{ json: {\n  channel_id: parsed.channel_id,\n  thread_ts: parsed.thread_ts,\n  text: 'Recruiting complete — ' + candidateCount + ' candidates (simulated)',\n  blocks: JSON.stringify(blocks),\n  sess: { session_key: row.session_key, state: 'complete', calendly_link: calendlyUrl, updated_at: nowIso }\n} }];"
+      },
+      "id": "aca6d90a-36e8-4066-934e-16332f44900b",
+      "name": "Complete Send",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        960
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Complete Send').first().json.channel_id, thread_ts: $('Complete Send').first().json.thread_ts, text: $('Complete Send').first().json.text, blocks: JSON.parse($('Complete Send').first().json.blocks), unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "id": "74418e6a-66e7-4472-aed6-382c0763e146",
+      "name": "Post Complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2688,
+        960
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Parse Payload').first().json;\nconst actionId = p.action_id || '';\nconst fullPayload = typeof p.full_payload === 'string' ? JSON.parse(p.full_payload) : (p.full_payload || {});\nconst message = fullPayload.message || {};\nconst originalBlocks = Array.isArray(message.blocks) ? message.blocks : [];\n\nconst CONFIRMATION_MAP = {\n  'uxr_audience_n8n_users': '✅ Audience: n8n users',\n  'uxr_audience_non_users': '✅ Audience: Non-users',\n  'uxr_filter_apply': '✅ Filters applied',\n  'uxr_filter_skip': '✅ No filters applied',\n  'uxr_sample_draw': '✅ Drawing sample...',\n  'uxr_approve_list_yes': '✅ Candidate list approved',\n  'uxr_approve_list_no': '✅ Candidate list rejected — redrawing',\n  'uxr_email_approve': '✅ Email approved',\n  'uxr_send_approve': '✅ Sending invitations...'\n};\n\nfunction isFreezeAction(id) {\n  if (id.startsWith('uxr_audience_')) return true;\n  if (id === 'uxr_filter_apply' || id === 'uxr_filter_skip') return true;\n  if (id === 'uxr_sample_draw') return true;\n  if (id.startsWith('uxr_approve_list_')) return true;\n  if (id.startsWith('uxr_email_')) return id !== 'uxr_email_edit';\n  if (id.startsWith('uxr_send_')) return true;\n  return false;\n}\n\nconst shouldFreeze = isFreezeAction(actionId) && originalBlocks.length > 0 && !!p.message_ts;\n\nlet confirmationText = CONFIRMATION_MAP[actionId];\nif (!confirmationText) confirmationText = '✅ Selection confirmed';\n\nconst keepTypes = ['section', 'header', 'context', 'divider'];\nconst frozenBlocks = originalBlocks.filter(b => b && keepTypes.includes(b.type));\nfrozenBlocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: confirmationText }] });\n\nreturn [{ json: {\n  ...p,\n  shouldFreeze,\n  frozenBlocks,\n  confirmationText,\n  message_ts: p.message_ts,\n  channel_id: p.channel_id\n} }];"
+      },
+      "id": "f4a24475-6845-40d7-8e1c-eb06bea3a30e",
+      "name": "Freeze Clicked Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldFreeze }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5e158a6a-f97e-49c7-b327-3414f973a842",
+      "name": "Should Freeze?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.update",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $json.channel_id, ts: $json.message_ts, blocks: $json.frozenBlocks }) }}",
+        "options": {}
+      },
+      "id": "b61146e1-94c0-4a41-a7aa-12c142d63c5a",
+      "name": "Update Frozen Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1120,
+        128
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\nvar TTL_MS = 30 * 60 * 1000;\nfunction isFresh(row) {\n  return !!(row && row.updated_at && (Date.now() - Date.parse(row.updated_at) <= TTL_MS));\n}\n\nconst p = $('Freeze Clicked Message').first().json;\nconst actionId = p.action_id || '';\n\nconst STEP_ACTION_MAP = {\n  'uxr_audience_': 'audience_select',\n  'uxr_filter_apply': 'filters',\n  'uxr_filter_skip': 'filters',\n  'uxr_sample_draw': 'sample_size',\n  'uxr_sample_redraw': 'review_candidates',\n  'uxr_approve_list_yes': 'review_candidates',\n  'uxr_approve_list_no': 'review_candidates',\n  'uxr_email_approve': 'review_email',\n  'uxr_email_edit': 'review_email',\n  'uxr_send_approve': 'review_email'\n};\n\nconst row = getSessionRow();\nconst fresh = isFresh(row);\nconst currentStep = fresh ? row.state : null;\n\nlet stepValid;\nlet expectedStep = null;\n\nif (actionId.startsWith('uxr_cancel')) {\n  stepValid = true;\n} else if (actionId.startsWith('uxr_audience_')) {\n  stepValid = true;\n  expectedStep = 'audience_select';\n} else if (!fresh) {\n  stepValid = true;\n} else {\n  let matchedPrefix = null;\n  for (const key of Object.keys(STEP_ACTION_MAP)) {\n    if (actionId === key || actionId.startsWith(key)) {\n      if (matchedPrefix === null || key.length > matchedPrefix.length) matchedPrefix = key;\n    }\n  }\n  if (matchedPrefix) {\n    expectedStep = STEP_ACTION_MAP[matchedPrefix];\n    stepValid = currentStep === expectedStep;\n  } else {\n    stepValid = true;\n  }\n}\n\nreturn [{ json: {\n  ...p,\n  step_valid: stepValid,\n  current_step: currentStep,\n  expected_step: expectedStep\n} }];"
+      },
+      "id": "d0732c1c-864c-41bc-b790-79d62d64fd37",
+      "name": "Validate Step",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.step_valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ceac0110-3879-4b3f-88ac-6bb7db8690b9",
+      "name": "Step Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postEphemeral",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $json.channel_id, user: $json.user_id, thread_ts: $json.thread_ts, text: \"\\u26a0\\ufe0f That step has already been completed. Please scroll down to the latest message in this thread to continue.\" }) }}",
+        "options": {}
+      },
+      "id": "3e2788d2-5279-4641-bbf5-d5d019ff7390",
+      "name": "Post Out-of-Order Notice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1792,
+        96
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "a0455061-99f6-4307-bc3e-1fae19ea1b26",
+      "name": "Load Session",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        592
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "uxr_sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $('Parse Payload').item.json.session_key }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a01dcbde-c4df-492a-b123-7eb82c542dbb",
+      "name": "Save Session (Audience)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        150
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "uxr_sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $json.sess.session_key }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_key"
+          ],
+          "value": {
+            "session_key": "={{ $json.sess.session_key }}",
+            "channel": "={{ $json.sess.channel }}",
+            "thread_ts": "={{ $json.sess.thread_ts }}",
+            "slack_user": "={{ $json.sess.slack_user }}",
+            "state": "={{ $json.sess.state }}",
+            "audience": "={{ $json.sess.audience }}",
+            "filters_json": "={{ $json.sess.filters_json }}",
+            "requested_count": "={{ $json.sess.requested_count }}",
+            "batch_id": "={{ $json.sess.batch_id }}",
+            "email_subject": "={{ $json.sess.email_subject }}",
+            "email_body": "={{ $json.sess.email_body }}",
+            "calendly_link": "={{ $json.sess.calendly_link }}",
+            "last_step_ts": "={{ $json.sess.last_step_ts }}",
+            "updated_at": "={{ $json.sess.updated_at }}"
+          },
+          "schema": [
+            {
+              "id": "session_key",
+              "displayName": "session_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "slack_user",
+              "displayName": "slack_user",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "audience",
+              "displayName": "audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters_json",
+              "displayName": "filters_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requested_count",
+              "displayName": "requested_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_subject",
+              "displayName": "email_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_body",
+              "displayName": "email_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendly_link",
+              "displayName": "calendly_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_step_ts",
+              "displayName": "last_step_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b273c900-bdb7-404c-93b4-92269b54864e",
+      "name": "Save Session (Filter)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        300
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "uxr_sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $json.sess.session_key }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_key"
+          ],
+          "value": {
+            "state": "={{ $json.sess.state }}",
+            "filters_json": "={{ $json.sess.filters_json }}",
+            "updated_at": "={{ $json.sess.updated_at }}"
+          },
+          "schema": [
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters_json",
+              "displayName": "filters_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4c251b0b-5270-479c-9c64-1c8c973c6026",
+      "name": "Save Session (Candidates)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        450
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "uxr_sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $json.sess.session_key }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_key"
+          ],
+          "value": {
+            "state": "={{ $json.sess.state }}",
+            "requested_count": "={{ $json.sess.requested_count }}",
+            "batch_id": "={{ $json.sess.batch_id }}",
+            "updated_at": "={{ $json.sess.updated_at }}"
+          },
+          "schema": [
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requested_count",
+              "displayName": "requested_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4fec7b96-a10a-4f08-9421-cb702d851cf4",
+      "name": "Stage Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        520
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const b = $('Build Candidates').first().json;\nconst batchId = b.batch_id || '';\nconst candidates = Array.isArray(b.candidates) ? b.candidates : [];\nif (!batchId || candidates.length === 0) return [];\nreturn candidates.map(c => ({ json: {\n  batch_id: batchId,\n  email: c.email || '',\n  first_name: c.first_name || '',\n  summary: c.summary || '',\n  attributes_json: JSON.stringify(c),\n  status: 'staged',\n  sent_at: ''\n} }));"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "0c35ab0b-1718-4a5a-9461-fd2959a88a07",
+      "name": "Insert Candidates",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3152,
+        520
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "kg4tyWXVPE6h5pH6",
+          "cachedResultName": "uxr_candidates"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "batch_id": "={{ $json.batch_id }}",
+            "email": "={{ $json.email }}",
+            "first_name": "={{ $json.first_name }}",
+            "summary": "={{ $json.summary }}",
+            "attributes_json": "={{ $json.attributes_json }}",
+            "status": "={{ $json.status }}",
+            "sent_at": "={{ $json.sent_at }}"
+          },
+          "schema": [
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "first_name",
+              "displayName": "first_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "attributes_json",
+              "displayName": "attributes_json",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sent_at",
+              "displayName": "sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bb2e0586-f65f-4df5-9136-f9888e4c6c97",
+      "name": "Save Session (Email Preview)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        600
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "uxr_sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $json.sess.session_key }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_key"
+          ],
+          "value": {
+            "state": "={{ $json.sess.state }}",
+            "email_subject": "={{ $json.sess.email_subject }}",
+            "email_body": "={{ $json.sess.email_body }}",
+            "updated_at": "={{ $json.sess.updated_at }}"
+          },
+          "schema": [
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_subject",
+              "displayName": "email_subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_body",
+              "displayName": "email_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "bd21a921-2764-4e35-b57b-af16f96f0d9d",
+      "name": "Load Batch Candidates",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2480,
+        900
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "kg4tyWXVPE6h5pH6",
+          "cachedResultName": "uxr_candidates"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "batch_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Session State').item.json.session_state ? ($('Session State').item.json.session_state.batch_id || '__none__') : '__none__' }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "9710f6c5-9e3f-401e-a1bd-14e3587849c1",
+      "name": "Save Session (Complete)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2928,
+        900
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "uxr_sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $json.sess.session_key }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_key"
+          ],
+          "value": {
+            "state": "={{ $json.sess.state }}",
+            "calendly_link": "={{ $json.sess.calendly_link }}",
+            "updated_at": "={{ $json.sess.updated_at }}"
+          },
+          "schema": [
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "calendly_link",
+              "displayName": "calendly_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "13dba6ae-b01e-4aca-96f6-e2e6fab1cc08",
+      "name": "Save Session (Cancel)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2480,
+        1050
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "uxr_sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $('Parse Payload').item.json.session_key || '__none__' }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_key"
+          ],
+          "value": {
+            "state": "cancelled",
+            "updated_at": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Slack Interaction Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Payload": {
+      "main": [
+        [
+          {
+            "node": "Ack Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Unknown": {
+      "main": [
+        [
+          {
+            "node": "Post Unknown Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session State": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Expired": {
+      "main": [
+        [
+          {
+            "node": "Post Expired Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Handle Expired",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Audience",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Filters",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Sample Size",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Approve List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Send",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Cancel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Audience": {
+      "main": [
+        [
+          {
+            "node": "Build Audience Filters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Filters": {
+      "main": [
+        [
+          {
+            "node": "Process Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Needs Post?": {
+      "main": [
+        [
+          {
+            "node": "Post Sample Size",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Sample Size": {
+      "main": [
+        [
+          {
+            "node": "Build Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Approve List": {
+      "main": [
+        [
+          {
+            "node": "Build Email Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Email": {
+      "main": [
+        [
+          {
+            "node": "Build Email Edit Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Edit Notice": {
+      "main": [
+        [
+          {
+            "node": "Post Email Edit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Freeze Clicked Message": {
+      "main": [
+        [
+          {
+            "node": "Should Freeze?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Freeze?": {
+      "main": [
+        [
+          {
+            "node": "Update Frozen Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Frozen Message": {
+      "main": [
+        [
+          {
+            "node": "Validate Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Step": {
+      "main": [
+        [
+          {
+            "node": "Step Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step Valid?": {
+      "main": [
+        [
+          {
+            "node": "Session State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Out-of-Order Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack Slack": {
+      "main": [
+        [
+          {
+            "node": "Load Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Session": {
+      "main": [
+        [
+          {
+            "node": "Freeze Clicked Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Audience Filters": {
+      "main": [
+        [
+          {
+            "node": "Save Session (Audience)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session (Audience)": {
+      "main": [
+        [
+          {
+            "node": "Post Filters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Filter": {
+      "main": [
+        [
+          {
+            "node": "Save Session (Filter)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session (Filter)": {
+      "main": [
+        [
+          {
+            "node": "Filter Needs Post?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Candidates": {
+      "main": [
+        [
+          {
+            "node": "Save Session (Candidates)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session (Candidates)": {
+      "main": [
+        [
+          {
+            "node": "Post Candidates",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Stage Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stage Candidates": {
+      "main": [
+        [
+          {
+            "node": "Insert Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Preview": {
+      "main": [
+        [
+          {
+            "node": "Save Session (Email Preview)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session (Email Preview)": {
+      "main": [
+        [
+          {
+            "node": "Post Email Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Send": {
+      "main": [
+        [
+          {
+            "node": "Load Batch Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Batch Candidates": {
+      "main": [
+        [
+          {
+            "node": "Complete Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete Send": {
+      "main": [
+        [
+          {
+            "node": "Save Session (Complete)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session (Complete)": {
+      "main": [
+        [
+          {
+            "node": "Post Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Cancel": {
+      "main": [
+        [
+          {
+            "node": "Save Session (Cancel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session (Cancel)": {
+      "main": [
+        [
+          {
+            "node": "Post Cancel Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "3af70dae-35cc-40ad-b28d-21428687b815",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "prCy2Gu2VEMt3ALB",
+  "isArchived": false,
+  "nodeGroups": []
+}

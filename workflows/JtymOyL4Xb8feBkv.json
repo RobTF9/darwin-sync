@@ -91,6 +91,26 @@
               "canBeUsedToMatch": true,
               "type": "string",
               "removed": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "user",
+              "displayName": "user",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -127,7 +147,7 @@
     "availableInMCP": false
   },
   "triggerCount": 1,
-  "versionId": "b29e407f-e824-43b3-be94-3e022763567f",
+  "versionId": "2a63567b-7efd-48c6-988f-00cb3bb1b91a",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

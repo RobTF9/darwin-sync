@@ -1,0 +1,109 @@
+{
+  "id": "7mGw5O7wj4r3QMz0",
+  "name": "UXR Recruiting History",
+  "columns": [
+    {
+      "id": "ncbWOWQTxNW0rMtN",
+      "name": "researcher_slack_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "EDKwS3Y7GBbsdN7W",
+      "name": "researcher_name",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "89af1UpVtK8VeBZD",
+      "name": "channel_id",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "5RJVfpO42FX76wtk",
+      "name": "thread_ts",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "fqzz0sQuV8PsEiKc",
+      "name": "audience_type",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "hzJG05jhoyCRrKUW",
+      "name": "filters_applied",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "vpfahY25AIwbCtsG",
+      "name": "sample_size_requested",
+      "type": "number",
+      "index": 6
+    },
+    {
+      "id": "Sqemnix9duKjgUNl",
+      "name": "calendly_link",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "LziKd3GygWd9axsB",
+      "name": "email_subject",
+      "type": "string",
+      "index": 8
+    },
+    {
+      "id": "whG7B9D0emauko8a",
+      "name": "email_body",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "s6S3xxuDybuJJMCo",
+      "name": "status",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "O2QNCeuSIVcrMJ4Y",
+      "name": "notes",
+      "type": "string",
+      "index": 11
+    },
+    {
+      "id": "lMysj7fGwhblWiXZ",
+      "name": "candidate_emails",
+      "type": "string",
+      "index": 12
+    },
+    {
+      "id": "ks0ZoDrmYwVlmEdh",
+      "name": "sample_size_sent",
+      "type": "number",
+      "index": 13
+    },
+    {
+      "id": "ud2xfqXszmuKZokB",
+      "name": "sample_size_failed",
+      "type": "number",
+      "index": 14
+    },
+    {
+      "id": "4t030Kma1xhKOBZ8",
+      "name": "created_at",
+      "type": "date",
+      "index": 15
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-08-07T14:13:47.722Z",
+  "updatedAt": "2026-08-07T14:43:30.381Z"
+}

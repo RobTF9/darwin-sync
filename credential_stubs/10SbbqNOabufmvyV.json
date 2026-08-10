@@ -1,9 +1,13 @@
 {
-  "id": "iixAIGCkIqUZq83L",
-  "name": "Linear account",
-  "type": "linearApi",
+  "id": "10SbbqNOabufmvyV",
+  "name": "Darwin linear",
+  "type": "linearOAuth2Api",
   "data": {
-    "apiKey": ""
+    "clientId": "",
+    "clientSecret": "",
+    "actor": "",
+    "includeAdminScope": true,
+    "signingSecret": ""
   },
   "ownedBy": {
     "type": "team",

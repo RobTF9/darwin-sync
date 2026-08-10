@@ -1,0 +1,97 @@
+{
+  "id": "WiCU0xKx5UzjGWkS",
+  "name": "uxr_sessions",
+  "columns": [
+    {
+      "id": "efhFZvkVeJ1zE0jS",
+      "name": "session_key",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "uHUtT8xL4cm51ZYw",
+      "name": "channel",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "GtSbCLKOXAircL7d",
+      "name": "thread_ts",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "BWT1Of1dDhZu6ax4",
+      "name": "slack_user",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "Au41iMVtFFpyVP9B",
+      "name": "state",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "5GUfLdHRiAqVEcH3",
+      "name": "audience",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "Hprv5UkULnaXCVGs",
+      "name": "filters_json",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "VFfF2XSfYUuk3cea",
+      "name": "requested_count",
+      "type": "number",
+      "index": 7
+    },
+    {
+      "id": "fD37G47G2eTXLxB3",
+      "name": "batch_id",
+      "type": "string",
+      "index": 8
+    },
+    {
+      "id": "cTxjO4T6yX3SOvvg",
+      "name": "email_subject",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "hVFTZcQw4L1s0DZr",
+      "name": "email_body",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "PcL4Kw0tg9wYUNL4",
+      "name": "calendly_link",
+      "type": "string",
+      "index": 11
+    },
+    {
+      "id": "Jl4w0rQPcSylPJ6I",
+      "name": "last_step_ts",
+      "type": "string",
+      "index": 12
+    },
+    {
+      "id": "c8vPXAyDyQHBjRUf",
+      "name": "updated_at",
+      "type": "string",
+      "index": 13
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-08-07T16:56:45.637Z",
+  "updatedAt": "2026-08-07T18:17:16.842Z"
+}

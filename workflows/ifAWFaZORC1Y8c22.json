@@ -1,0 +1,22 @@
+{
+  "id": "ifAWFaZORC1Y8c22",
+  "name": "My workflow",
+  "nodes": [],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "triggerCount": 0,
+  "versionId": "2df5c039-eb55-4924-b177-240154019633",
+  "owner": {
+    "type": "personal",
+    "projectId": "gaAiXT3wHyNP6mrE",
+    "projectName": "Robert Squires <robert+darwin@n8n.io>",
+    "personalEmail": "robert+darwin@n8n.io"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}

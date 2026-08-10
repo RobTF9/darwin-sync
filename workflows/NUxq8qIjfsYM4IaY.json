@@ -1,0 +1,68 @@
+{
+  "id": "NUxq8qIjfsYM4IaY",
+  "name": "Wait Tool",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "seconds",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "43b6164e-c31c-48c4-800b-62d072a7c62d",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.seconds }}.00"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "7aaba815-a4db-4619-b0d7-998e9ee997cb",
+      "name": "Wait",
+      "webhookId": "4137e21e-8f20-4962-9ace-d293c227b2a7"
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "9a605abc-6a56-4189-bc8b-68da0b140702",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

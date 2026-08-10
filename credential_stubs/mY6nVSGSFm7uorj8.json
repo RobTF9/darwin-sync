@@ -1,0 +1,16 @@
+{
+  "id": "mY6nVSGSFm7uorj8",
+  "name": "Rob linear",
+  "type": "linearApi",
+  "data": {
+    "apiKey": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}
