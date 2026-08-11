@@ -1,0 +1,17 @@
+{
+  "id": "v6k4sCkcI2H8FdyR",
+  "name": "Firecrawl API",
+  "type": "firecrawlApi",
+  "data": {
+    "apiKey": "",
+    "allowedHttpRequestDomains": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

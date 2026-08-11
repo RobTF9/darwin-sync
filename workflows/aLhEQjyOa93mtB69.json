@@ -42,27 +42,6 @@
         "rules": {
           "values": [
             {
-              "outputKey": "SlackMarkdown",
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.target }}",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    },
-                    "rightValue": "SlackMarkdown"
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
               "outputKey": "SanitizeMemory",
               "conditions": {
                 "options": {
@@ -90,48 +69,6 @@
           "renameFallbackOutput": "Unknown"
         }
       }
-    },
-    {
-      "id": "e7d353b9-5fca-4b81-943e-b19f51b8a3fa",
-      "name": "Call SlackMarkdown",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        120,
-        180
-      ],
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "1VtBcx3zHBLVXrec"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "output": "={{ $('Parse Case').item.json.inputs.output ?? '' }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "output",
-              "displayName": "output",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {
-          "waitForSubWorkflow": true
-        }
-      },
-      "onError": "continueRegularOutput"
     },
     {
       "id": "2db54a4c-607f-4f7e-8390-72200dd636fe",
@@ -314,42 +251,6 @@
         ]
       ]
     },
-    "Route Target": {
-      "main": [
-        [
-          {
-            "node": "Call SlackMarkdown",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Call SanitizeMemory",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Unknown Target",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Call SlackMarkdown": {
-      "main": [
-        [
-          {
-            "node": "Evaluate Assertions",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Call SanitizeMemory": {
       "main": [
         [
@@ -393,6 +294,24 @@
           }
         ]
       ]
+    },
+    "Route Target": {
+      "main": [
+        [
+          {
+            "node": "Call SanitizeMemory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -400,7 +319,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "0889775e-b731-445d-ab2b-2e1c0b115766",
+  "versionId": "777d6a6d-eb1c-493d-bdaf-5952d43ef5e5",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
