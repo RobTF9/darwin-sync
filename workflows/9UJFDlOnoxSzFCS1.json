@@ -270,7 +270,7 @@
           "mode": "id"
         },
         "messageType": "block",
-        "blocksUi": "={{ $('format').item.json.blocksJson }}",
+        "blocksUi": "={{ $json.blocksJson }}",
         "otherOptions": {
           "includeLinkToWorkflow": false,
           "thread_ts": {
@@ -285,7 +285,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        2896,
+        3120,
         -80
       ],
       "id": "afc3fda6-60e9-4120-9f3f-42fe24e43efc",
@@ -969,7 +969,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Build a Block Kit markdown block from the agent's raw markdown output.\n// Slack translates standard markdown natively (headers, tables, code fences,\n// mentions). Cumulative markdown-block limit is 12,000 chars per message.\nconst LIMIT = 12000;\nlet text = $json.output ?? '';\nif (text.length > LIMIT) {\n  text = text.slice(0, LIMIT - 120) + '\\n\\n_…truncated — reply exceeded Slack’s 12,000-character markdown block limit_';\n}\n// SlackReply's blocksUi must be an object shaped { blocks: [...] } — a bare\n// array spreads into the request body without a `blocks` key, and Slack\n// rejects chat.postMessage with \"no_text\".\nconst content = { blocks: [{ type: 'markdown', text }] };\nreturn [{ json: { blocksJson: JSON.stringify(content), output: text } }];"
+        "jsCode": "// Build Slack Block Kit markdown blocks from the agent's raw markdown output.\n// Splits long text across multiple mrkdwn blocks (3,000-char limit each),\n// up to ~90KB total serialized JSON payload to stay within Slack API limits.\n// Splits on newlines where possible.\n\nconst PER_BLOCK = 2900;  // leave margin under Slack's 3000-char limit\nconst MAX_BLOCKS = 50;   // hard cap: Slack max 50 blocks\nconst MAX_PAYLOAD_BYTES = 90000;  // ~90KB budget for serialized { blocks: [...] }\nconst TRUNCATION_NOTE = '\\n\\n_… (truncated: response too long for a single Slack message)_';\n\nlet text = $json.output ?? '';\nconst fullText = text;  // preserve original for downstream use\n\n// --- Helper: estimate serialized size of a blocks array ---\nfunction estimatePayloadSize(blocksArr) {\n  // Serialize just the blocks array; the outer { \"blocks\": [...] } wrapper adds ~15 chars\n  return JSON.stringify(blocksArr).length + 20;\n}\n\n// --- Split text into chunks ---\nfunction splitIntoChunks(str, chunkSize, maxBlocks, maxBytes) {\n  const chunks = [];\n  // Build a trial blocks array as we go so we can measure real serialized size\n  const trialBlocks = [];\n  \n  while (str.length > 0 && chunks.length < maxBlocks) {\n    if (str.length <= chunkSize) {\n      chunks.push(str);\n      trialBlocks.push({ type: 'markdown', text: str });\n      // Check payload budget after adding this block\n      if (estimatePayloadSize(trialBlocks) > maxBytes) {\n        // This block pushed us over — remove it, re-add truncated chunk\n        const removed = chunks.pop();\n        trialBlocks.pop();\n        // Truncate the removed text so it fits under budget\n        const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n        // remaining characters estimate: at LEAST 40 chars overhead per block\n        const maxTextLen = Math.max(0, remaining - 60);\n        if (maxTextLen > 50) {\n          const truncated = removed.slice(0, maxTextLen) + TRUNCATION_NOTE;\n          chunks.push(truncated);\n        }\n      }\n      break;\n    }\n    \n    // Try to find last newline within the chunk boundary\n    const sliceTarget = str.slice(0, chunkSize);\n    const lastNewline = sliceTarget.lastIndexOf('\\n');\n    let chunk;\n    if (lastNewline > chunkSize - 500) {\n      chunk = str.slice(0, lastNewline);\n      str = str.slice(lastNewline + 1);\n    } else {\n      chunk = sliceTarget;\n      str = str.slice(chunkSize);\n    }\n    \n    // Tentatively add this chunk\n    const tentativeBlocks = [...trialBlocks, { type: 'markdown', text: chunk }];\n    if (estimatePayloadSize(tentativeBlocks) > maxBytes) {\n      // This block would exceed budget — truncate current chunk to fit\n      // How much room do we have?\n      const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n      const maxTextLen = Math.max(0, remaining - 60);  // leave margin for block json wrapper\n      if (maxTextLen > 50) {\n        chunks.push(chunk.slice(0, maxTextLen) + TRUNCATION_NOTE);\n      }\n      // Either way, stop here\n      break;\n    }\n    \n    chunks.push(chunk);\n    trialBlocks.push({ type: 'markdown', text: chunk });\n  }\n  \n  // If we hit MAX_BLOCKS and there's still text, append truncation note to last\n  if (str.length > 0 && chunks.length === maxBlocks) {\n    chunks[chunks.length - 1] = chunks[chunks.length - 1].replace(/\\n*$/, '') + TRUNCATION_NOTE;\n  }\n  \n  return chunks;\n}\n\nconst chunks = splitIntoChunks(text, PER_BLOCK, MAX_BLOCKS, MAX_PAYLOAD_BYTES);\n\n// --- Build blocks array ---\nconst blocks = chunks.map(t => ({ type: 'markdown', text: t }));\nconst content = { blocks };\n\nreturn [{ json: { blocksJson: JSON.stringify(content), output: fullText } }];\n"
       },
       "id": "3636feef-8692-4103-a639-e42fba425957",
       "name": "format",
@@ -977,6 +977,19 @@
       "typeVersion": 2,
       "position": [
         2224,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Group the formatted blocks into message-sized chunks so no single Slack\n// message exceeds Slack's cumulative block-text limit (~13k chars, undocumented —\n// see slackapi/bolt-js#2509). Emits one item per message; SlackReply then posts\n// one threaded reply per item.\nconst MSG_BUDGET = 8000; // chars of block text per message, safe margin under ~13k\n\nconst blocksJson = $('format').first().json.blocksJson;\n\nlet blocks;\ntry {\n  blocks = JSON.parse(blocksJson).blocks;\n  if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('no blocks');\n} catch (e) {\n  // Fall back to previous single-message behaviour if parsing fails\n  return [{ json: { blocksJson, part: 1, totalParts: 1 } }];\n}\n\nconst messages = [];\nlet current = [];\nlet currentLen = 0;\n\nfor (const block of blocks) {\n  const len = (block.text || '').length;\n  if (current.length > 0 && currentLen + len > MSG_BUDGET) {\n    messages.push(current);\n    current = [];\n    currentLen = 0;\n  }\n  current.push(block);\n  currentLen += len;\n}\nif (current.length > 0) messages.push(current);\n\nreturn messages.map((msgBlocks, i) => ({\n  json: {\n    blocksJson: JSON.stringify({ blocks: msgBlocks }),\n    part: i + 1,\n    totalParts: messages.length,\n  },\n}));"
+      },
+      "id": "b5e156b3-95d9-4a9d-9f3a-b28c91363c5e",
+      "name": "ChunkBlocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2896,
         -80
       ]
     }
@@ -1020,17 +1033,6 @@
         [
           {
             "node": "Add Check Reaction",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Add Check Reaction": {
-      "main": [
-        [
-          {
-            "node": "SlackReply",
             "type": "main",
             "index": 0
           }
@@ -1306,16 +1308,41 @@
           }
         ]
       ]
+    },
+    "Add Check Reaction": {
+      "main": [
+        [
+          {
+            "node": "ChunkBlocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChunkBlocks": {
+      "main": [
+        [
+          {
+            "node": "SlackReply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": true,
-    "errorWorkflow": "MLxaOYbzMS9DFoIv"
+    "errorWorkflow": "MLxaOYbzMS9DFoIv",
+    "timeSavedMode": "fixed",
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner"
   },
   "triggerCount": 1,
-  "versionId": "48afb3c6-c37f-4bf6-88d5-48cf64111bba",
+  "versionId": "fbb0c27e-48d0-460f-9dbf-cbf123643614",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -1357,7 +1384,8 @@
       "nodeIds": [
         "afc3fda6-60e9-4120-9f3f-42fe24e43efc",
         "28986a16-b51c-4a3b-8387-559822e859c8",
-        "9ac50b15-a043-405d-995d-ea41274b817b"
+        "9ac50b15-a043-405d-995d-ea41274b817b",
+        "b5e156b3-95d9-4a9d-9f3a-b28c91363c5e"
       ]
     }
   ]
