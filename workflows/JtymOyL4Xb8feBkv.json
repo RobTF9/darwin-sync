@@ -13,7 +13,7 @@
       "typeVersion": 2.1,
       "position": [
         -288,
-        0
+        -64
       ],
       "id": "0b8a57f5-7ad5-48eb-8161-1bef5ad7f162",
       "name": "Webhook",
@@ -122,10 +122,84 @@
       "typeVersion": 1.3,
       "position": [
         -64,
-        0
+        -64
       ],
       "id": "c35eac09-b193-4ffe-ba32-66847e78bb02",
       "name": "Call 'Darwin'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c21d154a-4bf5-4149-9ee0-c02ee3da30fe",
+              "name": "output",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        384,
+        -160
+      ],
+      "id": "1658ebf9-3e47-486f-9ec3-9e74f86729c0",
+      "name": "Return Output only"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a3340981-952c-45f2-8794-870afbbde92e",
+              "leftValue": "={{ $('Webhook').item.json.body.outputOnly }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        160,
+        -64
+      ],
+      "id": "1f29eaec-7996-4767-8e3c-16ab5ef53b99",
+      "name": "If Output only"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": []
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        384,
+        32
+      ],
+      "id": "105dce20-4be5-4d4e-944e-a9b57520c72c",
+      "name": "Return All"
     }
   ],
   "connections": {
@@ -139,6 +213,35 @@
           }
         ]
       ]
+    },
+    "Call 'Darwin'": {
+      "main": [
+        [
+          {
+            "node": "If Output only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Output only": {
+      "main": [
+        [
+          {
+            "node": "Return Output only",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return All",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -147,7 +250,7 @@
     "availableInMCP": false
   },
   "triggerCount": 1,
-  "versionId": "2a63567b-7efd-48c6-988f-00cb3bb1b91a",
+  "versionId": "f108f451-1baf-42ef-ad60-ef9cec9d397d",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

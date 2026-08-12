@@ -27,7 +27,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "\nlet contentIds = $input.item.json.sessionIds.split(',')\n\nif (contentIds.length === 0 || contentIds[0] === '') {\n  contentIds = undefined\n}\n\n\n\nreturn {\n  contentIds,\n  prompt: $input.item.json.prompt\n}"
+        "jsCode": "const raw = $input.item.json.sessionIds || '';\nconst parts = raw.split(',').map(s => s.trim()).filter(Boolean);\nconst contentIds = parts.length ? parts : undefined;\n\nreturn {\n  contentIds,\n  prompt: $input.item.json.prompt\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -261,7 +261,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "87183e1e-3fec-432e-a6a3-815bc7ef23df",
+  "versionId": "ee430480-abae-4b83-8116-a10c82de88ac",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

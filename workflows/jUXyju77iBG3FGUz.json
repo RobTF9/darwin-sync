@@ -45,13 +45,13 @@
       "credentials": {
         "supabaseApi": {
           "id": "gBIPPKjo4dshypxE",
-          "name": "Darwin Supabase"
+          "name": "Supabase API"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "  const words = $input.first().json.transcript_object;\n  const MARKER_EVERY = 20; // timestamp marker every N words\n\n  const lines = [];\n  let currentSpeaker = null;\n  let wordCount = 0;\n  let lineWords = [];\n\n  for (const w of words) {\n    // New speaker turn\n    if (w.speaker !== currentSpeaker) {\n      if (lineWords.length) {\n        lines.push(lineWords.join(' '));\n      }\n      currentSpeaker = w.speaker;\n      wordCount = 0;\n      lineWords = [`\\nS${w.speaker} [${w.start.toFixed(2)}]:`];\n    }\n\n    // Insert timestamp marker every N words\n    if (wordCount > 0 && wordCount % MARKER_EVERY === 0) {\n      lineWords.push(`[${w.start.toFixed(2)}]`);\n    }\n\n    lineWords.push(w.punctuated_word);\n    wordCount++;\n  }\n\n  if (lineWords.length) {\n    lines.push(lineWords.join(' '));\n  }\n\n  // Also pass the last word's end time so the agent knows the total duration\n  const lastWord = words[words.length - 1];\n\n  return {\n    transcript: lines.join('').trim(),\n    duration: lastWord.end,\n  };"
+        "jsCode": "// Flatten Deepgram words into timestamped lines the agent can cite directly.\n// Contract: one line per sentence — \"S<speaker> [start]: text\" — where [start]\n// is the EXACT audio time (seconds) of the first word on that line. Lines break\n// at sentence ends, speaker changes, and silences > SILENCE_GAP, so a quote's\n// timestamp is copied, never interpolated.\nconst words = $input.first().json.transcript_object ?? [];\nconst SILENCE_GAP = 3; // seconds\n\nconst lines = [];\nlet sentence = null;\nlet currentSpeaker = null;\nlet prevEnd = null;\n\nconst flush = () => {\n  if (sentence && sentence.words.length) {\n    lines.push(`S${sentence.speaker} [${sentence.start.toFixed(2)}]: ${sentence.words.join(' ')}`);\n  }\n  sentence = null;\n};\n\nfor (const w of words) {\n  const text = w.punctuated_word ?? w.word;\n  const speaker = w.speaker ?? '?';\n  const breaksLine =\n    speaker !== currentSpeaker ||\n    (prevEnd !== null && w.start - prevEnd > SILENCE_GAP);\n\n  if (breaksLine) flush();\n  if (!sentence) sentence = { speaker, start: w.start, words: [] };\n\n  sentence.words.push(text);\n  currentSpeaker = speaker;\n  prevEnd = w.end;\n\n  // sentence end: terminal ., !, or ? (allowing trailing closing quotes/brackets)\n  if (/[.!?][\"')\\]]*$/.test(text)) flush();\n}\nflush();\n\n// Also pass the last word's end time so the agent knows the total duration\nconst lastWord = words[words.length - 1];\nreturn { transcript: lines.join('\\n'), duration: lastWord ? lastWord.end : 0 };"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -93,7 +93,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "32834b03-2bf9-4d16-a88c-3c0e8c41639e",
+  "versionId": "6e5fc034-b3c1-4986-9947-88dbbd16fc0d",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

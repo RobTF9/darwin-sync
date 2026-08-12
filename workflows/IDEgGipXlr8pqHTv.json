@@ -575,19 +575,6 @@
     },
     {
       "parameters": {
-        "jsCode": "const paragraphs = $input.first().json.results.channels[0].alternatives[0].paragraphs.paragraphs;\n\nconst CHUNK_TOKENS = 1000;\nconst OVERLAP_TOKENS = 100;\n\nfunction estimateTokens(text) {\n  return Math.ceil(text.length / 4);\n}\n\nfunction getText(para) {\n  const text = para.sentences.map(s => s.text.trim()).join(' ');\n  return `Speaker ${para.speaker}: ${text}`;\n}\n\nconst paras = paragraphs.map(p => {\n  const text = getText(p);\n  return { text, tokens: estimateTokens(text), start: p.start, end: p.end, speaker: p.speaker };\n});\n\nconst chunks = [];\nlet i = 0;\n\nwhile (i < paras.length) {\n  let tokenCount = 0;\n  let j = i;\n\n  while (j < paras.length && tokenCount + paras[j].tokens <= CHUNK_TOKENS) {\n    tokenCount += paras[j].tokens;\n    j++;\n  }\n  if (j === i) j = i + 1;\n\n  const window = paras.slice(i, j);\n\n  chunks.push({\n    json: {\n      session_id: $('create_session').first().json.id,\n      index: chunks.length,\n      text: window.map(p => p.text).join('\\n'),\n      start: window[0].start,\n      end: window[window.length - 1].end,\n      speakers: [...new Set(window.map(p => p.speaker))],\n      duration_seconds: Math.round((window[window.length - 1].end - window[0].start) * 100) / 100,\n      token_estimate: tokenCount,\n    }\n  });\n\n  let overlapTokens = 0;\n  let nextStart = j;\n  while (nextStart > i + 1 && overlapTokens < OVERLAP_TOKENS) {\n    nextStart--;\n    overlapTokens += paras[nextStart].tokens;\n  }\n\n  i = Math.max(nextStart, i + 1);\n}\n\nreturn chunks;"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1008,
-        1808
-      ],
-      "id": "5dd54dc7-4eff-464a-bd50-91f4f240bf94",
-      "name": "chunks"
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "https://api.deepgram.com/v1/listen",
         "authentication": "genericCredentialType",
@@ -653,23 +640,11 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "text": "={{ $json.text }}",
             "session_id": "={{ $('create_session').item.json.id }}",
-            "start": "={{ $json.start }}",
-            "end": "={{ $json.end }}"
+            "words": "={{ $('deepgram').item.json.results.channels[0].alternatives[0].words }}"
           },
           "matchingColumns": [],
           "schema": [
-            {
-              "id": "text",
-              "displayName": "text",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
             {
               "id": "session_id",
               "displayName": "session_id",
@@ -681,28 +656,18 @@
               "removed": false
             },
             {
-              "id": "start",
-              "displayName": "start",
+              "id": "words",
+              "displayName": "words",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "canBeUsedToMatch": true,
-              "type": "number",
-              "removed": false
-            },
-            {
-              "id": "end",
-              "displayName": "end",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "number",
+              "type": "array",
               "removed": false
             }
           ],
           "attemptToConvertTypes": false,
-          "convertFieldsToString": true
+          "convertFieldsToString": false
         },
         "options": {
           "waitForSubWorkflow": false
@@ -1008,27 +973,16 @@
         ]
       ]
     },
-    "chunks": {
-      "main": [
-        [
-          {
-            "node": "sesh_vectors",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "deepgram": {
       "main": [
         [
           {
-            "node": "chunks",
+            "node": "update",
             "type": "main",
             "index": 0
           },
           {
-            "node": "update",
+            "node": "sesh_vectors",
             "type": "main",
             "index": 0
           }
@@ -1066,7 +1020,7 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "triggerCount": 0,
-  "versionId": "3a157473-b71b-42b2-b9bd-80dd394beaaf",
+  "versionId": "4baece9a-5de0-4214-a519-d8a3b0dd9055",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -1092,7 +1046,6 @@
       "nodeIds": [
         "cd15e01d-462b-4a2f-b5ab-9bf8f2ebeb9a",
         "a811c04b-c108-4469-935c-6680b35987ce",
-        "5dd54dc7-4eff-464a-bd50-91f4f240bf94",
         "f9ca9285-eaed-407b-9581-a0ed47b66458",
         "fdece905-b51d-47d3-865a-02b8355d4d8c",
         "41410801-02d2-4f50-9643-59f722b856dc",

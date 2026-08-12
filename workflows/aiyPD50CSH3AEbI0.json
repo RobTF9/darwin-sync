@@ -7,18 +7,11 @@
         "workflowInputs": {
           "values": [
             {
-              "name": "text"
-            },
-            {
               "name": "session_id"
             },
             {
-              "name": "start",
-              "type": "number"
-            },
-            {
-              "name": "end",
-              "type": "number"
+              "name": "words",
+              "type": "array"
             }
           ]
         }
@@ -26,8 +19,8 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        256,
-        176
+        240,
+        0
       ],
       "id": "c9d390e6-139d-4aad-bf02-7f6770d2334b",
       "name": "sub_trigger"
@@ -40,8 +33,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
       "typeVersion": 1.2,
       "position": [
-        496,
-        400
+        656,
+        240
       ],
       "id": "453d86ee-5543-4f41-85f9-e4b31abbbeae",
       "name": "model",
@@ -79,8 +72,8 @@
       "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
       "typeVersion": 1.1,
       "position": [
-        640,
-        400
+        784,
+        240
       ],
       "id": "337685b6-3aad-4f78-afcb-0118c3b8170e",
       "name": "loader"
@@ -101,8 +94,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
       "typeVersion": 1.3,
       "position": [
-        528,
-        176
+        672,
+        0
       ],
       "id": "1e4b409f-d0de-4cf9-8b45-513cfdd0e12c",
       "name": "vector_store",
@@ -115,32 +108,164 @@
     },
     {
       "parameters": {
-        "chunkSize": 10000,
-        "chunkOverlap": 500,
+        "jsCode": "// Words (Deepgram transcript_object) → timestamped sentence lines → chunks.\n// One line per sentence: \"S<speaker> [start]: text\" — [start] is the exact audio\n// time of the line's first word. Lines break at sentence ends, speaker changes,\n// and silences > SILENCE_GAP. Lines pack into chunks of ~CHUNK_TOKENS estimated\n// tokens with OVERLAP_TOKENS overlap, hard-capped at MAX_CHUNK_CHARS so the\n// vector store never needs to re-split (which would corrupt start/end metadata).\nconst sessionId = $('sub_trigger').item.json.session_id;\nlet words = $('sub_trigger').item.json.words ?? [];\n// Defensive: callers that stringify the array (e.g. convertFieldsToString) still work\nif (typeof words === 'string') {\n  try { words = JSON.parse(words); } catch { words = []; }\n}\nif (!Array.isArray(words)) words = [];\n\nconst CHUNK_TOKENS = 1000;\nconst OVERLAP_TOKENS = 100;\nconst MAX_CHUNK_CHARS = 9000;\nconst SILENCE_GAP = 3; // seconds\n\nconst estimateTokens = (text) => Math.ceil(text.length / 4);\n\n// 1. words → sentence lines\nconst sentences = [];\nlet line = null;\nlet prevEnd = null;\n\nconst flush = () => {\n  if (line && line.words.length) {\n    sentences.push({\n      line: `S${line.speaker} [${line.start.toFixed(2)}]: ${line.words.join(' ')}`,\n      start: line.start,\n      end: line.end,\n      speaker: line.speaker,\n    });\n  }\n  line = null;\n};\n\nfor (const w of words) {\n  const text = w.punctuated_word ?? w.word;\n  const speaker = w.speaker ?? '?';\n  const breaksLine =\n    (line && speaker !== line.speaker) ||\n    (prevEnd !== null && w.start - prevEnd > SILENCE_GAP);\n\n  if (breaksLine) flush();\n  if (!line) line = { speaker, start: w.start, words: [], end: w.end };\n\n  line.words.push(text);\n  line.end = w.end;\n  prevEnd = w.end;\n\n  if (/[.!?][\"')\\]]*$/.test(text)) flush();\n}\nflush();\n\n// 2. pack sentence lines into chunks\nconst chunks = [];\nlet i = 0;\n\nwhile (i < sentences.length) {\n  let tokens = 0;\n  let chars = 0;\n  let j = i;\n\n  while (\n    j < sentences.length &&\n    tokens + estimateTokens(sentences[j].line) <= CHUNK_TOKENS &&\n    chars + sentences[j].line.length <= MAX_CHUNK_CHARS\n  ) {\n    tokens += estimateTokens(sentences[j].line);\n    chars += sentences[j].line.length;\n    j++;\n  }\n  if (j === i) j = i + 1; // a single oversized sentence still progresses\n\n  const win = sentences.slice(i, j);\n\n  chunks.push({\n    json: {\n      session_id: sessionId,\n      index: chunks.length,\n      text: win.map(s => s.line).join('\\n'),\n      start: win[0].start,\n      end: win[win.length - 1].end,\n      speakers: [...new Set(win.map(s => s.speaker))],\n      duration_seconds: Math.round((win[win.length - 1].end - win[0].start) * 100) / 100,\n      token_estimate: tokens,\n    }\n  });\n\n  if (j >= sentences.length) break; // final chunk emitted — no trailing overlap-only chunks\n\n  let overlap = 0;\n  let next = j;\n  while (next > i + 1 && overlap < OVERLAP_TOKENS) {\n    next--;\n    overlap += estimateTokens(sentences[next].line);\n  }\n\n  i = Math.max(next, i + 1);\n}\n\nreturn chunks;"
+      },
+      "id": "f25e176e-fe52-4f12-a9e3-e94654ea753f",
+      "name": "chunk",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chunkSize": 100000,
         "options": {}
       },
+      "id": "a47a3d0c-cdcf-4bd1-8537-0b9b8880c5b4",
+      "name": "No-Split Pass-Through",
       "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
       "typeVersion": 1,
       "position": [
-        736,
-        608
+        864,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "project",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -688
       ],
-      "id": "fa7544ed-efcb-4db9-9a84-ec18131dde6f",
-      "name": "Recursive Character Text Splitter"
+      "id": "b2caa486-8302-4955-a646-8b4087ce2379",
+      "name": "Projects",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "aiyPD50CSH3AEbI0",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/aiyPD50CSH3AEbI0",
+          "cachedResultName": "Darwin — SessionVectors"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "words": "={{ $json.transcript_object }}",
+            "session_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "words",
+              "displayName": "words",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        768,
+        -592
+      ],
+      "id": "7fb3f306-b975-4400-ad55-7ec910add173",
+      "name": "Vectors",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -688
+      ],
+      "id": "24c88823-da9f-418f-ac84-4ac4daeb4a2f",
+      "name": "Backfill"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        304,
+        -688
+      ],
+      "id": "387686df-1d54-45c5-a0c9-2664c021d381",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "project_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        528,
+        -592
+      ],
+      "id": "1fc5c5d9-0ed8-4587-b3e8-41057021d860",
+      "name": "Get many rows",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
     }
   ],
   "connections": {
-    "sub_trigger": {
-      "main": [
-        [
-          {
-            "node": "vector_store",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "model": {
       "ai_embedding": [
         [
@@ -163,7 +288,29 @@
         ]
       ]
     },
-    "Recursive Character Text Splitter": {
+    "sub_trigger": {
+      "main": [
+        [
+          {
+            "node": "chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chunk": {
+      "main": [
+        [
+          {
+            "node": "vector_store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No-Split Pass-Through": {
       "ai_textSplitter": [
         [
           {
@@ -173,15 +320,71 @@
           }
         ]
       ]
+    },
+    "Projects": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backfill": {
+      "main": [
+        [
+          {
+            "node": "Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vectors": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false,
+    "availableInMCP": true,
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "0350fcbe-95c9-436b-950c-d544f985d6a6",
+  "versionId": "7005e820-b931-462c-b3f0-4c8f89d37503",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

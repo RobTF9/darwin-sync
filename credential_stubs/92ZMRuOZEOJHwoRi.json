@@ -1,0 +1,18 @@
+{
+  "id": "92ZMRuOZEOJHwoRi",
+  "name": "Nik's Big Query",
+  "type": "googleBigQueryOAuth2Api",
+  "data": {
+    "clientId": "",
+    "clientSecret": ""
+  },
+  "ownedBy": {
+    "type": "personal",
+    "projectId": "SNnWNznlDv5oCHXk",
+    "projectName": "Niklas Hatje <niklas@n8n.io>",
+    "personalEmail": "niklas@n8n.io"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

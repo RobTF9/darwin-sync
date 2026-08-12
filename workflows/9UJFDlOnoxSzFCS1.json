@@ -367,7 +367,7 @@
           "conditions": [
             {
               "keyName": "SessionId",
-              "keyValue": "={{ $json.thread_ts }}"
+              "keyValue": "={{ $('OnEvent').item.json.thread_ts }}"
             }
           ]
         },
@@ -796,11 +796,11 @@
           "values": [
             {
               "key": "channel",
-              "value": "={{ $json.channel }}"
+              "value": "={{ $('OnEvent').item.json.channel }}"
             },
             {
               "key": "sessionId",
-              "value": "={{ $json.thread_ts || $json.ts }}"
+              "value": "={{$('OnEvent').item.json.thread_ts || $('OnEvent').item.json.ts }}"
             },
             {
               "key": "msgTs",
@@ -861,7 +861,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -3056,
+        -2912,
         -512
       ]
     },
@@ -1315,7 +1315,7 @@
     "errorWorkflow": "MLxaOYbzMS9DFoIv"
   },
   "triggerCount": 1,
-  "versionId": "b84da691-4f9a-468d-a156-50c9b5486456",
+  "versionId": "48afb3c6-c37f-4bf6-88d5-48cf64111bba",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

@@ -1,0 +1,381 @@
+{
+  "id": "9iNGrdHbR51CUc0R",
+  "name": "WaitForExecution",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "execution_id"
+            },
+            {
+              "name": "poll_seconds",
+              "type": "number"
+            },
+            {
+              "name": "max_wait_seconds",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "0195c125-d25d-41b8-8af1-8c73152f16b2",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-exec",
+              "name": "execution_id",
+              "value": "={{ $json.execution_id }}",
+              "type": "string"
+            },
+            {
+              "id": "cfg-poll",
+              "name": "poll_seconds",
+              "value": "={{ $json.poll_seconds || 10 }}",
+              "type": "number"
+            },
+            {
+              "id": "cfg-max",
+              "name": "max_wait_seconds",
+              "value": "={{ $json.max_wait_seconds || 300 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dfe2caa8-f466-4c19-b499-9336480fb3ab",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $('Config').item.json.execution_id }}",
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "68a8b2a9-10a7-487f-8e7c-4676e41a6c8c",
+      "name": "Get Execution",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        448,
+        80
+      ],
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "trk-polls",
+              "name": "polls",
+              "value": "={{ $runIndex + 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "trk-poll",
+              "name": "poll_seconds",
+              "value": "={{ $('Config').item.json.poll_seconds }}",
+              "type": "number"
+            },
+            {
+              "id": "trk-max",
+              "name": "max_wait_seconds",
+              "value": "={{ $('Config').item.json.max_wait_seconds }}",
+              "type": "number"
+            },
+            {
+              "id": "trk-exec",
+              "name": "execution_id",
+              "value": "={{ $('Config').item.json.execution_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "b832067e-040a-43ec-a215-894c896e2446",
+      "name": "Track",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-finished",
+              "leftValue": "={{ $json.finished === true || ['success', 'error', 'crashed', 'canceled'].includes($json.status) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "64eae808-6b8e-457d-bf6e-3db02bc46d43",
+      "name": "Finished?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "res-fin",
+              "name": "finished",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "res-to",
+              "name": "timed_out",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "6415d71c-a2d8-482d-9269-6222dacd71c3",
+      "name": "Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-cap",
+              "leftValue": "={{ $json.polls * $json.poll_seconds < $json.max_wait_seconds }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "53cafa0e-636a-4375-9b05-aa98afcec964",
+      "name": "Under Cap?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.poll_seconds }}"
+      },
+      "id": "cafd39d6-f3db-4181-a01d-aaa5f2a38c7c",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        176
+      ],
+      "webhookId": "8805b653-92f1-4e6b-ba79-c89832e40ca5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "to-fin",
+              "name": "finished",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "to-to",
+              "name": "timed_out",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "28e1b4a6-73f2-411d-881e-c271d3323924",
+      "name": "Timeout Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1344,
+        368
+      ]
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Execution": {
+      "main": [
+        [
+          {
+            "node": "Track",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track": {
+      "main": [
+        [
+          {
+            "node": "Finished?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finished?": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Under Cap?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Under Cap?": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Timeout Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Get Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "b7df59f3-7496-4f6e-98f7-77db985c3fbc",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}
