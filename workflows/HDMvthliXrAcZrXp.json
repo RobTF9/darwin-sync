@@ -1089,102 +1089,13 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.5,
       "position": [
-        -3488,
-        384
+        -3280,
+        400
       ],
       "credentials": {
         "anthropicApi": {
           "id": "KjwErAoYcKCgdksp",
           "name": "Anthropic"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "rules": {
-          "rule": [
-            {
-              "modelIndex": 2,
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "6af5849f-0f58-4f14-92f1-fd6e76e14918",
-                    "leftValue": "={{ $vars.env === 'prod' }}",
-                    "rightValue": "",
-                    "operator": {
-                      "type": "boolean",
-                      "operation": "true",
-                      "singleValue": true
-                    }
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "a78f305c-dceb-4d9e-bd40-ad62fa0bf43c",
-                    "leftValue": "={{ true }}",
-                    "rightValue": "",
-                    "operator": {
-                      "type": "boolean",
-                      "operation": "true",
-                      "singleValue": true
-                    }
-                  }
-                ],
-                "combinator": "and"
-              }
-            }
-          ]
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.modelSelector",
-      "typeVersion": 1,
-      "position": [
-        -3216,
-        160
-      ],
-      "id": "39358756-f03e-4c82-a3b8-5fd2805c717d",
-      "name": "Model Selector"
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "deepseek-ai/DeepSeek-V4-Flash-0731",
-          "mode": "list",
-          "cachedResultName": "deepseek-ai/DeepSeek-V4-Flash-0731"
-        },
-        "builtInTools": {},
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.3,
-      "position": [
-        -3360,
-        384
-      ],
-      "id": "d48cd9d6-cdc9-4749-bdac-c2a74f721ecb",
-      "name": "Doubleword API",
-      "credentials": {
-        "openAiApi": {
-          "id": "MMyYvc5TiwlyxHXw",
-          "name": "DoublewordAPI"
         }
       }
     },
@@ -1520,31 +1431,9 @@
       "ai_languageModel": [
         [
           {
-            "node": "Model Selector",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Model Selector": {
-      "ai_languageModel": [
-        [
-          {
             "node": "darwin",
             "type": "ai_languageModel",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Doubleword API": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Model Selector",
-            "type": "ai_languageModel",
-            "index": 1
           }
         ]
       ]
@@ -1582,7 +1471,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "abafcb3c-d63f-468e-bd57-f8bf67a05d35",
+  "versionId": "afed774c-0927-4f90-b154-cde3705cd069",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

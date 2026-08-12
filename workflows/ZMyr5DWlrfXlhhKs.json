@@ -141,69 +141,6 @@
     },
     {
       "parameters": {
-        "rules": {
-          "rule": [
-            {
-              "modelIndex": 2,
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "e11640d9-a3ca-4571-a10c-aa0bb241f160",
-                    "leftValue": "={{ $vars.env === 'staging' }}",
-                    "rightValue": "",
-                    "operator": {
-                      "type": "boolean",
-                      "operation": "true",
-                      "singleValue": true
-                    }
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "d4426770-492e-4248-967c-76eb39e05533",
-                    "leftValue": "={{ $vars.env === 'prod' }}",
-                    "rightValue": "",
-                    "operator": {
-                      "type": "boolean",
-                      "operation": "true",
-                      "singleValue": true
-                    }
-                  }
-                ],
-                "combinator": "and"
-              }
-            }
-          ]
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.modelSelector",
-      "typeVersion": 1,
-      "position": [
-        672,
-        224
-      ],
-      "id": "385d9666-39ba-4602-82bd-6ff7bc39f58e",
-      "name": "Model Selector"
-    },
-    {
-      "parameters": {
         "model": {
           "__rl": true,
           "value": "claude-opus-4-8",
@@ -216,8 +153,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.5,
       "position": [
-        624,
-        400
+        848,
+        224
       ],
       "id": "255e942a-f796-4722-8d29-9c0bdb735fcf",
       "name": "Opus 4.8",
@@ -336,39 +273,6 @@
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "deepseek-ai/DeepSeek-V4-Flash",
-          "mode": "list"
-        },
-        "builtInTools": {},
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.3,
-      "position": [
-        752,
-        400
-      ],
-      "id": "48adcb0f-bad0-48b0-9286-8f02c14900fb",
-      "name": "Doubleword API",
-      "credentials": {
-        "openAiApi": {
-          "id": "MMyYvc5TiwlyxHXw",
-          "name": "DoublewordAPI"
-        }
-      }
-    },
-    {
-      "id": "08db2837-9914-450a-b8a8-175aa955d23f",
-      "name": "wait_for_execution",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        1232,
-        368
-      ],
-      "parameters": {
         "description": "Waits for an n8n execution to finish. Polls the n8n API directly (not MCP) every poll_seconds (default 10) until the execution reaches a terminal status or max_wait_seconds (default 300) elapses. Returns the execution status with finished/timed_out flags. Use after execute_workflow instead of polling get_workflow_execution yourself.",
         "workflowId": {
           "__rl": true,
@@ -420,7 +324,15 @@
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         }
-      }
+      },
+      "id": "08db2837-9914-450a-b8a8-175aa955d23f",
+      "name": "wait_for_execution",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1232,
+        368
+      ]
     }
   ],
   "connections": {
@@ -479,22 +391,11 @@
         ]
       ]
     },
-    "Model Selector": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Builder Agent",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Opus 4.8": {
       "ai_languageModel": [
         [
           {
-            "node": "Model Selector",
+            "node": "Builder Agent",
             "type": "ai_languageModel",
             "index": 0
           }
@@ -556,17 +457,6 @@
         ]
       ]
     },
-    "Doubleword API": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Model Selector",
-            "type": "ai_languageModel",
-            "index": 1
-          }
-        ]
-      ]
-    },
     "wait_for_execution": {
       "ai_tool": [
         [
@@ -588,7 +478,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "33d02e55-6fc5-402e-95c3-57ea1fe71f98",
+  "versionId": "99e2d384-a751-4d9d-98cd-095821fc0ece",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
