@@ -1,0 +1,25 @@
+{
+  "id": "sZjl3a1tHTiiRv0I",
+  "name": "gong_sync_ledger",
+  "columns": [
+    {
+      "id": "hJKsKOPdHLCr3p0r",
+      "name": "call_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "h6bILArbL2SuxOlf",
+      "name": "synced_at",
+      "type": "string",
+      "index": 1
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-08-12T18:56:18.158Z",
+  "updatedAt": "2026-08-12T21:49:38.261Z"
+}

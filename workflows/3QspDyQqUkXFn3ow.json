@@ -1,0 +1,606 @@
+{
+  "id": "3QspDyQqUkXFn3ow",
+  "name": "GongIngestion",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "6c7aa8f3-8041-4ef7-89ae-66a34fb6f8d2",
+      "name": "Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1200,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "channel",
+        "operation": "history",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0AN85ZNGLS"
+        },
+        "returnAll": true,
+        "filters": {}
+      },
+      "id": "052a0eef-227d-47ea-bb49-49b8d235d93b",
+      "name": "Fetch Sync Reports",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -1200,
+        480
+      ],
+      "webhookId": "af895969-81b3-453e-a77a-3a2a5f8e245b",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nconst results = [];\n\nfor (const item of $input.all()) {\n  const blocks = item.json.blocks || [];\n  const tables = blocks.filter(b => b.type === 'table');\n\n  for (const table of tables) {\n    const rows = table.rows || [];\n    for (let i = 1; i < rows.length; i++) {\n      const row = rows[i];\n      const cell = (c) => {\n        try {\n          return (c?.elements || []).flatMap(el => (el?.elements || []).map(e => e.text || '')).join('');\n        } catch { return ''; }\n      };\n\n      const call_id = cell(row[0]).trim();\n      if (!call_id || seen.has(call_id)) continue;\n      seen.add(call_id);\n\n      results.push({\n        json: {\n          call_id,\n          title: cell(row[1]).trim(),\n          parties: cell(row[2]).trim(),\n          sync_status: cell(row[3]).trim(),\n          sync_time: cell(row[4]).trim(),\n        }\n      });\n    }\n  }\n}\n\nif (results.length === 0) {\n  return [{ json: { _empty: true } }];\n}\nreturn results;"
+      },
+      "id": "f502e533-ee02-4ae0-9d69-5d1aa93008d2",
+      "name": "Parse Calls",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "06904abb-98a5-481d-9548-ba527c76b6b5",
+      "name": "Has Calls",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -752,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "sZjl3a1tHTiiRv0I"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "call_id",
+              "keyValue": "={{ $json.call_id }}"
+            }
+          ]
+        }
+      },
+      "id": "bae79b19-06d1-405d-86f1-c5d5d4356878",
+      "name": "Check New",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -528,
+        480
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1456,
+        480
+      ],
+      "id": "2150717a-5fe3-4a68-963b-5f1b933fdf2f",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {},
+      "id": "61132461-f510-4481-83ab-a6bd90a05e26",
+      "name": "State",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "projectId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "n8n-telemetry"
+        },
+        "sqlQuery": "{{ \"SELECT * FROM `n8n-telemetry.gong.gong_calls` WHERE call_id = '\" + $('State').item.json.call_id + \"' LIMIT 1\" }}",
+        "options": {
+          "location": "EU"
+        }
+      },
+      "id": "bdfd382c-4bbd-4366-8cb9-1d59fe273e25",
+      "name": "Fetch Call Data",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        -752,
+        912
+      ],
+      "credentials": {
+        "googleBigQueryOAuth2Api": {
+          "id": "92ZMRuOZEOJHwoRi",
+          "name": "Nik's Big Query"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const r = item.json;\n  const meta = Array.isArray(r.metaData) ? (r.metaData[0] || {}) : (r.metaData || {});\n  const content = Array.isArray(r.content) ? (r.content[0] || {}) : (r.content || {});\n  const parties = r.parties || [];\n  const transcript = r.transcript || [];\n\n  // Build anonymized speaker map: speakerId -> \"Speaker N (Affiliation)\"\n  // N is 1-indexed by array position; Affiliation from parties[i].affiliation.\n  const speakerLabels = {};   // keyed by speakerId\n  const nameToLabel = {};      // real name -> label, for scrubbing summary text\n  parties.forEach((p, i) => {\n    const affiliation = p.affiliation || 'Unknown';\n    const label = 'Speaker ' + (i + 1) + ' (' + affiliation + ')';\n    if (p.speakerId !== undefined && p.speakerId !== null) {\n      speakerLabels[p.speakerId] = label;\n    }\n    if (p.name) {\n      nameToLabel[p.name] = label;\n    }\n  });\n\n  // Helper: replace any real participant name occurrences with the anon label.\n  const scrub = (text) => {\n    if (!text) return text;\n    let out = String(text);\n    for (const [name, label] of Object.entries(nameToLabel)) {\n      if (!name) continue;\n      const escaped = name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n      out = out.replace(new RegExp(escaped, 'g'), label);\n    }\n    return out;\n  };\n\n  // Participants line uses anonymized labels only (no names/emails).\n  const participantLabels = parties.map((p, i) => 'Speaker ' + (i + 1) + ' (' + (p.affiliation || 'Unknown') + ')');\n\n  const keyPointsText = (content.keyPoints || []).map(k => \"- \" + (k.text || \"\")).join(\"\\n\");\n\n  const outlineText = (content.outline || []).map(s => {\n    const items = (s.items || []).map(i => \"  - \" + (i.text || \"\")).join(\"\\n\");\n    return \"### \" + (s.section || \"\") + \"\\n\" + items;\n  }).join(\"\\n\\n\");\n\n  const highlightsText = (content.highlights || []).map(h => {\n    const items = (h.items || []).map(i => \"  - \" + (i.text || \"\")).join(\"\\n\");\n    return \"### \" + (h.title || \"\") + \"\\n\" + items;\n  }).join(\"\\n\\n\");\n\n  const trackersText = (content.trackers || [])\n    .filter(t => Number(t.count) > 0)\n    .map(t => t.name + \" (\" + t.count + \")\")\n    .join(\", \");\n\n  const summaryParts = [\n    \"# \" + (meta.title || \"Untitled call\"),\n    \"Date: \" + r.scheduled_at,\n    \"Participants: \" + participantLabels.join(\", \"),\n  ];\n  if (meta.url) summaryParts.push(\"URL: \" + meta.url);\n  summaryParts.push(\"\", \"## Brief\", content.brief || \"\");\n  if (keyPointsText) summaryParts.push(\"\", \"## Key Points\", keyPointsText);\n  if (outlineText) summaryParts.push(\"\", \"## Outline\", outlineText);\n  if (highlightsText) summaryParts.push(\"\", \"## Highlights\", highlightsText);\n  if (trackersText) summaryParts.push(\"\", \"## Trackers triggered\", trackersText);\n  const summaryText = scrub(summaryParts.join(\"\\n\"));\n\n  const transcriptText = transcript.map(turn => {\n    const speaker = speakerLabels[turn.speakerId] || (\"Speaker \" + turn.speakerId);\n    const sentences = (turn.sentences || []).map(s => s.text).join(\" \");\n    const topic = turn.topic ? \" [\" + turn.topic + \"]\" : \"\";\n    return speaker + topic + \": \" + sentences;\n  }).join(\"\\n\\n\");\n\n  return {\n    json: {\n      call_id: r.call_id,\n      scheduled_at: r.scheduled_at,\n      primary_user_id: r.primary_user_id || null,\n      meeting_system: r.meeting_system || null,\n      title: meta.title || \"\",\n      duration: meta.duration ? Number(meta.duration) : null,\n      url: meta.url || \"\",\n      embed_url_base: `https://us-29262.app.gong.io/embedded-call?call-id=${r.call_id}`,\n      summary_text: summaryText,\n      transcript_text: transcriptText,\n    }\n  };\n});"
+      },
+      "id": "20fc4f6b-7c71-4ad9-95ff-0fceaaf72b02",
+      "name": "Prepare Calls",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $('Prepare Calls').item.json;\nconst out = [];\n\n// Extract clean date from scheduled_at\nconst date = j.scheduled_at ? j.scheduled_at.substring(0, 10) : null;\n\nout.push({\n  json: {\n    call_id: j.call_id,\n    scheduled_at: j.scheduled_at,\n    date: date,\n    primary_user_id: j.primary_user_id,\n    meeting_system: j.meeting_system,\n    title: j.title,\n    url: j.url,\n    embed_url_base: j.embed_url_base,\n    doc_type: \"summary\",\n    content: j.summary_text,\n  }\n});\n\nif (j.transcript_text && j.transcript_text.trim().length > 0) {\n  out.push({\n    json: {\n      call_id: j.call_id,\n      scheduled_at: j.scheduled_at,\n      date: date,\n      primary_user_id: j.primary_user_id,\n      meeting_system: j.meeting_system,\n      title: j.title,\n      url: j.url,\n      embed_url_base: j.embed_url_base,\n      doc_type: \"transcript\",\n      content: j.transcript_text,\n    }\n  });\n}\n\nreturn out;"
+      },
+      "id": "53265f8d-c108-439f-8539-e110c62b002d",
+      "name": "Explode Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gong"
+        },
+        "embeddingBatchSize": 100,
+        "options": {
+          "queryName": "match_gong"
+        }
+      },
+      "id": "3eb96707-8b4d-4b2a-a801-458253440bfc",
+      "name": "Embed & Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        176,
+        912
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {
+          "dimensions": 3072,
+          "batchSize": 256
+        }
+      },
+      "id": "3e7b00fb-c460-4652-b727-04e675deaf0e",
+      "name": "OpenAI Embedding",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        1152
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.content }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "call_id",
+                "value": "={{ $json.call_id }}"
+              },
+              {
+                "name": "scheduled_at",
+                "value": "={{ $json.scheduled_at }}"
+              },
+              {
+                "name": "date",
+                "value": "={{ $json.date }}"
+              },
+              {
+                "name": "primary_user_id",
+                "value": "={{ $json.primary_user_id }}"
+              },
+              {
+                "name": "meeting_system",
+                "value": "={{ $json.meeting_system }}"
+              },
+              {
+                "name": "doc_type",
+                "value": "={{ $json.doc_type }}"
+              },
+              {
+                "name": "title",
+                "value": "={{ $json.title }}"
+              },
+              {
+                "name": "url",
+                "value": "={{ $json.url }}"
+              },
+              {
+                "name": "embed_url_base",
+                "value": "={{ $json.embed_url_base }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "65c5136d-3737-4fa4-aa1e-d678a3d0c912",
+      "name": "Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        288,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "chunkSize": 10000,
+        "chunkOverlap": 500,
+        "options": {}
+      },
+      "id": "96c6d1d3-16b1-4132-9db9-32a2cee65106",
+      "name": "Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        368,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "sZjl3a1tHTiiRv0I"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "call_id": "={{ $('Prepare Calls').item.json.call_id }}",
+            "synced_at": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            {
+              "id": "call_id",
+              "displayName": "call_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "synced_at",
+              "displayName": "synced_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3200fc7b-4681-42a8-9205-87399e6112b4",
+      "name": "Mark Ingested",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM public.gong WHERE call_id = $1;",
+        "options": {
+          "queryBatching": "independently",
+          "queryReplacement": "={{ $('Prepare Calls').item.json.call_id }}"
+        }
+      },
+      "id": "a7d2cc13-c860-490b-8ce2-319925e962c2",
+      "name": "Delete Vectors",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -304,
+        912
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "3QspDyQqUkXFn3ow",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/3QspDyQqUkXFn3ow",
+          "cachedResultName": "Darwin — GongIngestion"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -304,
+        480
+      ],
+      "id": "313ad3af-b7f4-4816-868f-b87c55c64cdf",
+      "name": "Call 'GongIngestion'"
+    }
+  ],
+  "connections": {
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sync Reports": {
+      "main": [
+        [
+          {
+            "node": "Parse Calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Calls": {
+      "main": [
+        [
+          {
+            "node": "Has Calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Calls": {
+      "main": [
+        [
+          {
+            "node": "Check New",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check New": {
+      "main": [
+        [
+          {
+            "node": "Call 'GongIngestion'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sync Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "State": {
+      "main": [
+        [
+          {
+            "node": "Fetch Call Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Call Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Calls": {
+      "main": [
+        [
+          {
+            "node": "Delete Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Explode Documents": {
+      "main": [
+        [
+          {
+            "node": "Embed & Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed & Store": {
+      "main": [
+        [
+          {
+            "node": "Mark Ingested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embedding": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Embed & Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Embed & Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Vectors": {
+      "main": [
+        [
+          {
+            "node": "Explode Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'GongIngestion'": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "31d650c5-b6db-4fd6-bbb7-4eafacd1a117",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "Ht5UYVPQwt80dZHr",
+  "isArchived": false,
+  "nodeGroups": []
+}

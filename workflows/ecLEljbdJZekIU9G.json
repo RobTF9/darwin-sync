@@ -66,11 +66,11 @@
           "conditions": [
             {
               "id": "2fb705a5-3579-42d1-afd6-951a20b8debb",
-              "leftValue": "={{ $json.isEmpty() }}",
+              "leftValue": "={{ $json.output }}",
               "rightValue": "",
               "operator": {
-                "type": "boolean",
-                "operation": "false",
+                "type": "string",
+                "operation": "notEmpty",
                 "singleValue": true
               }
             }
@@ -126,6 +126,12 @@
               "name": "status",
               "value": 202,
               "type": "number"
+            },
+            {
+              "id": "84e8e264-530a-43b5-ab8f-ce9cb3d48497",
+              "name": "message",
+              "value": "Results are not ready yet",
+              "type": "string"
             }
           ]
         },
@@ -189,7 +195,7 @@
     "availableInMCP": false
   },
   "triggerCount": 1,
-  "versionId": "4d6eead5-a76c-4b1f-b62c-99be9babb274",
+  "versionId": "8fe0f933-53cf-4708-8d58-a506df0bb367",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

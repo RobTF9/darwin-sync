@@ -44,7 +44,7 @@
       "credentials": {
         "postgres": {
           "id": "Av2ehn3RdLrlzohO",
-          "name": "Darwin Supabase"
+          "name": "Supabase Postgres"
         }
       }
     },
@@ -111,10 +111,11 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "79b0d01c-d94e-45ce-a97b-eefd19cbf738",
+  "versionId": "d4737399-9805-43e5-81e8-f5395a29ec75",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

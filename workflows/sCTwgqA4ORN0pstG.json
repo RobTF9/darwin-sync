@@ -181,16 +181,17 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "16ba1e84-f4eb-4fcd-b5a6-79ae0b03d1ce",
+  "versionId": "d902def7-6ae9-4450-b7e8-f55eb8c348cd",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
   "parentFolderId": "fxhuxPGdNIHdYUsf",
-  "isArchived": false,
+  "isArchived": true,
   "nodeGroups": []
 }

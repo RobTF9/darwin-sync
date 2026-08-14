@@ -1,0 +1,104 @@
+{
+  "id": "TvvDElh9iRoPoU7B",
+  "name": "GongCallDetail",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "call_id"
+            }
+          ]
+        }
+      },
+      "id": "0175ba96-5aa0-485e-880b-89d503778be4",
+      "name": "Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "projectId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "n8n-telemetry"
+        },
+        "sqlQuery": "{{ \"SELECT * FROM `n8n-telemetry.gong.gong_calls` WHERE call_id = '\" + $json.call_id + \"' LIMIT 1\" }}",
+        "options": {
+          "location": "US"
+        }
+      },
+      "id": "77d0f7a8-59a9-41ee-ad13-367f6b62a982",
+      "name": "BigQuery Fetch",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "googleBigQueryOAuth2Api": {
+          "id": "92ZMRuOZEOJHwoRi",
+          "name": "Nik's Big Query"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter the BigQuery row down to a PII-safe payload for the agent.\nconst items = $input.all();\nif (items.length === 0) {\n  return [{ json: { error: 'No call found for the given call_id.' } }];\n}\n\nconst r = items[0].json;\nconst meta = Array.isArray(r.metaData) ? (r.metaData[0] || {}) : (r.metaData || {});\nconst parties = Array.isArray(r.parties) ? r.parties : [];\n\n// Parties: keep ONLY speakerId and affiliation. Strip name/email/phone/all else.\nconst safeParties = parties.map((p) => ({\n  speakerId: p.speakerId ?? null,\n  affiliation: p.affiliation ?? null,\n}));\n\nreturn [{\n  json: {\n    call_id: r.call_id ?? null,\n    scheduled_at: r.scheduled_at ?? null,\n    meeting_system: r.meeting_system ?? null,\n    parties: safeParties,\n    content: r.content ?? null,\n    transcript: r.transcript ?? null,\n    title: meta.title ?? null,\n    duration: meta.duration ?? null,\n    url: meta.url ?? null,\n  }\n}];"
+      },
+      "id": "bb483661-ed67-44a4-8be5-12f656fe8f5f",
+      "name": "Filter PII",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "BigQuery Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BigQuery Fetch": {
+      "main": [
+        [
+          {
+            "node": "Filter PII",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "c2e530be-c706-4ee1-971a-bf80a498eabc",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

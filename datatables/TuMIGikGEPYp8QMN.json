@@ -1,0 +1,25 @@
+{
+  "id": "TuMIGikGEPYp8QMN",
+  "name": "Plain Ledger",
+  "columns": [
+    {
+      "id": "RUmseE7EwYnvqChm",
+      "name": "thread_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "70nOS0n8cNovTOIy",
+      "name": "synced_at",
+      "type": "string",
+      "index": 1
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-08-12T20:11:34.289Z",
+  "updatedAt": "2026-08-13T08:21:23.307Z"
+}

@@ -388,16 +388,17 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "timezone": "Europe/London"
+    "timezone": "Europe/London",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "e55b1ac4-c634-46ec-a99f-097debff606f",
+  "versionId": "d7badc0e-b3d1-40c9-9fc2-4c05b91ddc11",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
-  "parentFolderId": "3zWRx6NwTt4fnCuu",
-  "isArchived": false,
+  "parentFolderId": null,
+  "isArchived": true,
   "nodeGroups": []
 }

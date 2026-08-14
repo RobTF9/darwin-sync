@@ -1,0 +1,21 @@
+{
+  "id": "eOzrb3rELoBFXFwJ",
+  "name": "PlainSearch",
+  "nodes": [],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "ad497678-995d-4078-b427-2e94de9fa64b",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": true,
+  "nodeGroups": []
+}

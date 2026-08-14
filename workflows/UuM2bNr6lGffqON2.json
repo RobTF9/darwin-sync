@@ -4,166 +4,118 @@
   "nodes": [
     {
       "parameters": {
-        "inputSource": "passthrough"
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "case_id"
+            }
+          ]
+        }
       },
       "id": "1dd42c88-be56-4c03-8279-f0aef77a3ca3",
       "name": "Case Input",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.2,
       "position": [
-        -608,
+        -288,
         304
       ]
     },
     {
       "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const c = $json;\nlet inputs = {}; let assertions = [];\nif (typeof c.inputs === 'object') { inputs = c.inputs; } else { try { inputs = JSON.parse(c.inputs || '{}'); } catch (e) { inputs = {}; } }\nif (Array.isArray(c.assertions)) { assertions = c.assertions; } else { try { assertions = JSON.parse(c.assertions || '[]'); } catch (e) { assertions = []; } }\nreturn { json: { run_id: c.run_id || '', test_case_id: c.id || '', case_id: c.case_id, target: c.target, agent: c.agent || '', description: c.description || '', inputs, assertions } };"
+        "operation": "getAll",
+        "tableId": "integration_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Case Input').item.json.case_id }}"
+            }
+          ]
+        }
       },
-      "id": "6bb6eaac-4a07-4078-a97a-37d41e9ce974",
-      "name": "Parse Case",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "243a334b-922c-4643-a115-bb7ee0245ec5",
+      "name": "Load Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
       "position": [
-        -384,
+        -64,
         304
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const caseData = $('Parse Case').first().json;\nconst rows = $input.all().map((i) => i.json);\nconst details = [];\nlet status = 'pass';\nfunction getPath(obj, path) { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }\nif (rows.length === 0) {\n  status = 'error';\n  details.push({ assertion: 'execution', pass: false, detail: 'Target returned no output items' });\n} else if (rows[0] && rows[0].error) {\n  status = 'error';\n  details.push({ assertion: 'execution', pass: false, detail: JSON.stringify(rows[0].error).slice(0, 600) });\n} else {\n  for (const a of caseData.assertions) {\n    let pass = false; let got;\n    try {\n      if (a.type === 'row_count') {\n        got = rows.length;\n        const v = Number(a.value);\n        pass = a.op === '>=' ? got >= v : a.op === '<=' ? got <= v : got === v;\n      } else if (a.type === 'field_exists') {\n        got = getPath(rows[0], a.path);\n        pass = got !== undefined && got !== null;\n      } else if (a.type === 'contains') {\n        got = '(substring search)';\n        pass = JSON.stringify(rows).includes(a.value);\n      } else if (a.type === 'exact') {\n        got = a.path ? getPath(rows[0], a.path) : (rows.length === 1 ? rows[0] : rows);\n        pass = JSON.stringify(got) === JSON.stringify(a.value);\n      } else if (a.type === 'tool_called') {\n        got = rows[0].tools_used || [];\n        pass = got.includes(a.value);\n      } else {\n        status = 'fail';\n        details.push({ assertion: String(a.type), pass: false, detail: 'unknown assertion type' });\n        continue;\n      }\n    } catch (e) {\n      status = 'fail';\n      details.push({ assertion: String(a.type), pass: false, detail: String(e).slice(0, 300) });\n      continue;\n    }\n    if (!pass) status = 'fail';\n    details.push({ assertion: a.type + (a.path ? ' ' + a.path : ''), pass, expected: a.value, got: typeof got === 'string' ? got.slice(0, 200) : got });\n  }\n}\nreturn [{ json: { run_id: caseData.run_id || '', case_id: caseData.case_id, target: caseData.target, status, actual_output: JSON.stringify(rows).slice(0, 3500), assertion_detail: JSON.stringify(details).slice(0, 3500) } }];"
-      },
-      "id": "2190f608-7202-42c3-b4ca-5ba2df107f10",
-      "name": "Evaluate Assertions",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        432,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const r = $('Evaluate Assertions').first().json;\nreturn [{ json: { case_id: r.case_id, target: r.target, status: r.status, assertion_detail: r.assertion_detail } }];"
-      },
-      "id": "7e3929e1-7e80-411e-b13e-a96dbb084968",
-      "name": "Done",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1104,
-        304
-      ]
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
           "mode": "id",
-          "value": "HDMvthliXrAcZrXp"
+          "value": "={{ $json.agent === 'builder' ? 'ZMyr5DWlrfXlhhKs' : 'HDMvthliXrAcZrXp' }}"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "chatInput": "={{ $('Parse Case').item.json.inputs.prompt }}",
-            "sessionId": "={{ 'integration-' + $('Parse Case').item.json.run_id + '-' + $('Parse Case').item.json.case_id }}",
+            "chatInput": "={{ $json.prompt }}",
+            "task": "={{ $json.prompt }}",
+            "sessionId": "={{ 'integration-' + $('Case Input').item.json.run_id + '-' + $('Case Input').item.json.case_id }}",
+            "session_id": "={{ 'integration-' + $('Case Input').item.json.run_id + '-' + $('Case Input').item.json.case_id }}",
             "channel": "integration-test",
-            "baseline": "",
-            "env": "test"
+            "env": "test",
+            "slack_channel": ""
           },
           "matchingColumns": [],
-          "schema": [
-            {
-              "id": "chatInput",
-              "displayName": "chatInput",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "sessionId",
-              "displayName": "sessionId",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "channel",
-              "displayName": "channel",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "baseline",
-              "displayName": "baseline",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "env",
-              "displayName": "env",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
+          "schema": []
         },
+        "mode": "each",
         "options": {
           "waitForSubWorkflow": true
         }
       },
-      "id": "27610bb1-55a2-4635-8a8d-f0f1fdfb87c7",
-      "name": "Call Darwin",
+      "id": "e5fd4c49-1761-465f-8009-a463c6616f5b",
+      "name": "Call Agent",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        -80,
+        160,
         304
-      ]
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const d = $json;\nconst answer = (d.output ?? d.text ?? d.response ?? '').toString();\nconst steps = Array.isArray(d.intermediateSteps) ? d.intermediateSteps : [];\nconst tools = [...new Set(steps.map((s) => s && s.action && s.action.tool).filter(Boolean))];\nreturn { json: { answer, tools_used: tools } };"
+        "jsCode": "const c = $('Load Case').item.json;\nconst runId = $('Case Input').item.json.run_id;\nconst r = $input.first().json;\nlet status = 'pass';\nlet answer = '';\nlet called = [];\n\nif (r && r.error) {\n  status = 'error';\n  answer = typeof r.error === 'string' ? r.error : JSON.stringify(r.error);\n} else {\n  if (typeof r.output === 'string') {\n    answer = r.output;\n  } else if (r.output !== undefined) {\n    answer = JSON.stringify(r.output);\n  } else {\n    answer = JSON.stringify(r);\n  }\n  if (Array.isArray(r.tools_used)) {\n    called = r.tools_used;\n  } else if (Array.isArray(r.intermediateSteps)) {\n    for (const s of r.intermediateSteps) {\n      const t = s && s.action && s.action.tool;\n      if (t) called.push(t);\n    }\n  }\n  if (!answer) status = 'error';\n}\n\nconst norm = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); };\nconst calledN = [];\nfor (const t of called) { const n = norm(t); if (!calledN.includes(n)) calledN.push(n); }\n\n// Full intermediate steps (action + observation) so we can judge tool OUTCOMES,\n// not just names. n8n records a failed tool call as an observation of the shape\n// [{\"error\": \"...\"}] (or {\"error\": \"...\"}); successful calls carry the real output.\nconst steps = Array.isArray(r.intermediateSteps) ? r.intermediateSteps : [];\n\nconst isErrorObs = function (obs) {\n  if (obs == null) return true;\n  const s = String(obs).trim();\n  if (s === '') return true;\n  let parsed;\n  try { parsed = JSON.parse(s); } catch (e) { return false; }\n  const arr = Array.isArray(parsed) ? parsed : [parsed];\n  return arr.length > 0 && arr.every(x => x && typeof x === 'object' && 'error' in x);\n};\n\n// 'ok' | 'failed' | 'not_called' — ok if ANY call to the tool returned real output.\nconst toolOutcome = function (toolRaw) {\n  const n = norm(toolRaw);\n  const hits = steps.filter(s => s && s.action && norm(s.action.tool) === n);\n  if (!hits.length) return 'not_called';\n  return hits.every(s => isErrorObs(s.observation)) ? 'failed' : 'ok';\n};\n\nlet assertions = [];\ntry {\n  assertions = typeof c.assertions === 'string' ? JSON.parse(c.assertions) : (c.assertions || []);\n} catch (e) {\n  status = 'error';\n}\n\nconst answerN = answer.toLowerCase();\nconst results = [];\nif (status !== 'error') {\n  for (const a of assertions) {\n    let pass = false;\n    if (a.type === 'tool_called') pass = calledN.includes(norm(a.value));\n    else if (a.type === 'tool_not_called') pass = !calledN.includes(norm(a.value));\n    else if (a.type === 'contains') pass = answerN.includes(String(a.value).toLowerCase());\n    else if (a.type === 'not_contains') pass = !answerN.includes(String(a.value).toLowerCase());\n    else if (a.type === 'tool_succeeded') pass = toolOutcome(a.value) === 'ok';\n    else if (a.type === 'tool_failed') pass = toolOutcome(a.value) === 'failed';\n    if (!pass) status = 'fail';\n    results.push({ type: a.type, value: a.value, pass: pass });\n  }\n}\n\nreturn [{ json: {\n  run_id: runId,\n  case_id: c.id,\n  slug: c.slug,\n  status: status,\n  called_tools: calledN,\n  output: answer.slice(0, 4000),\n  assertion_results: results,\n  session_id: 'integration-' + runId + '-' + c.id\n} }];"
       },
-      "id": "61ef0a27-c518-4879-a3ec-7fcad51368db",
-      "name": "Extract",
+      "id": "5f2705b3-a3ef-4a72-b1d1-f403f1256efc",
+      "name": "Evaluate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        192,
+        400,
         304
       ]
     },
     {
       "parameters": {
-        "tableId": "test_results",
+        "tableId": "integration_results",
         "fieldsUi": {
           "fieldValues": [
             {
-              "fieldId": "test_case_id",
-              "fieldValue": "={{ $('Parse Case').item.json.test_case_id }}"
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
             },
             {
               "fieldId": "case_id",
-              "fieldValue": "={{ $('Parse Case').item.json.case_id }}"
-            },
-            {
-              "fieldId": "target",
-              "fieldValue": "={{ $('Parse Case').item.json.target }}"
-            },
-            {
-              "fieldId": "run_id",
-              "fieldValue": "={{ $('Evaluate Assertions').first().json.run_id }}"
+              "fieldValue": "={{ $json.case_id }}"
             },
             {
               "fieldId": "instance",
@@ -171,29 +123,33 @@
             },
             {
               "fieldId": "status",
-              "fieldValue": "={{ $('Evaluate Assertions').first().json.status }}"
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "called_tools",
+              "fieldValue": "={{ JSON.stringify($json.called_tools) }}"
+            },
+            {
+              "fieldId": "assertion_results",
+              "fieldValue": "={{ JSON.stringify($json.assertion_results) }}"
             },
             {
               "fieldId": "output",
-              "fieldValue": "={{ JSON.stringify($('Evaluate Assertions').first().json) }}"
+              "fieldValue": "={{ $json.output }}"
             },
             {
-              "fieldId": "assertion_detail",
-              "fieldValue": "={{ $('Evaluate Assertions').first().json.assertion_detail }}"
-            },
-            {
-              "fieldId": "run_date",
-              "fieldValue": "={{ $now.toISO() }}"
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.session_id }}"
             }
           ]
         }
       },
-      "id": "44010087-6ba4-4427-ab9a-0b9f175d45e1",
+      "id": "483f0ea8-ae4d-42e7-88b3-03a134ed18c1",
       "name": "Save Result",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        720,
+        640,
         304
       ],
       "credentials": {
@@ -209,62 +165,40 @@
       "main": [
         [
           {
-            "node": "Parse Case",
+            "node": "Load Case",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse Case": {
+    "Load Case": {
       "main": [
         [
           {
-            "node": "Call Darwin",
+            "node": "Call Agent",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Call Darwin": {
+    "Call Agent": {
       "main": [
         [
           {
-            "node": "Extract",
+            "node": "Evaluate",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract": {
-      "main": [
-        [
-          {
-            "node": "Evaluate Assertions",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Evaluate Assertions": {
+    "Evaluate": {
       "main": [
         [
           {
             "node": "Save Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save Result": {
-      "main": [
-        [
-          {
-            "node": "Done",
             "type": "main",
             "index": 0
           }
@@ -275,10 +209,11 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "af7c31be-bc7e-4934-b460-a487d68d3a86",
+  "versionId": "15fb77d2-f3ff-440d-a353-a2f7fa6948de",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

@@ -7,35 +7,73 @@
         "workflowInputs": {
           "values": [
             {
-              "name": "slack_channel"
-            },
-            {
-              "name": "slack_thread_ts"
+              "name": "requested_by"
             }
           ]
         }
       },
-      "id": "6b6d0d12-69ba-4d9e-b00b-44ba21883275",
-      "name": "Manual Input",
+      "id": "b5cc642f-93d7-4caf-9563-726e8c91d0ba",
+      "name": "Input",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.2,
       "position": [
-        -608,
-        304
+        -640,
+        768
       ]
     },
     {
       "parameters": {
-        "jsCode": "const runId = $execution.id;\nreturn $input.all().map((item) => ({ json: { ...item.json, run_id: runId } }));"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "run-id",
+              "name": "run_id",
+              "value": "={{ 'integration-' + $now.toFormat('yyyyLLdd-HHmmss') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "6706529c-85a8-42e0-9413-cfee17428083",
-      "name": "Format Cases",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "bb143001-883d-4461-bdb5-b1f220d4522a",
+      "name": "Run Id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
       "position": [
-        -144,
-        304
+        -416,
+        768
       ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "integration_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "enabled",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "id": "bc01d111-04d6-4dd0-ab09-c42d53fa25a3",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        768
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
     },
     {
       "parameters": {
@@ -46,71 +84,9 @@
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "mode": "each",
-        "options": {
-          "waitForSubWorkflow": false
-        }
-      },
-      "id": "0aafcece-a61e-455c-8df1-317149cde75d",
-      "name": "Dispatch Case",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        80,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $('Manual Input').isExecuted ? $('Manual Input').item.json.slack_channel : '' }}",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "2d98dbc7-ed99-4dc6-b9e8-08bcb871a596",
-      "name": "Has Slack Thread?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        320,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "ddTn14clNhuZSR1D"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
           "value": {
-            "run_id": "={{ $('Format Cases').first().json.run_id }}",
-            "expected_count": "={{ String($('Format Cases').all().length) }}",
-            "slack_channel": "={{ $('Manual Input').item.json.slack_channel }}",
-            "slack_thread_ts": "={{ $('Manual Input').item.json.slack_thread_ts }}"
+            "run_id": "={{ $('Run Id').item.json.run_id }}",
+            "case_id": "={{ $json.id }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -121,116 +97,359 @@
               "defaultMatch": false,
               "display": true,
               "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
+              "type": "string"
             },
             {
-              "id": "expected_count",
-              "displayName": "expected_count",
+              "id": "case_id",
+              "displayName": "case_id",
               "required": false,
               "defaultMatch": false,
               "display": true,
               "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "slack_channel",
-              "displayName": "slack_channel",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "slack_thread_ts",
-              "displayName": "slack_thread_ts",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
+              "type": "string"
             }
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": true
         },
+        "mode": "each",
         "options": {
           "waitForSubWorkflow": false
         }
       },
-      "id": "638f51fe-e796-4893-bd6e-cf77e9e37094",
-      "name": "Start Notifier",
+      "id": "5493fac5-7d28-4452-8c96-aa3f94a03fbb",
+      "name": "Dispatch Case",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        560,
-        224
-      ],
-      "executeOnce": true
-    },
-    {
-      "parameters": {},
-      "id": "68463dc2-843d-4a2f-8891-bb1fabc107f0",
-      "name": "Merge Branches",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        800,
-        304
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const runId = $(\"Format Cases\").first().json.run_id;\nconst caseCount = $(\"Format Cases\").all().length;\nlet channel = ''; let threadTs = '';\ntry { channel = $(\"Manual Input\").first().json.slack_channel || ''; threadTs = $(\"Manual Input\").first().json.slack_thread_ts || ''; } catch (e) {}\nconst hasThread = Boolean(channel) && Boolean(threadTs);\nconst message = hasThread\n  ? (`Dispatched ${caseCount} integration cases in parallel. Results will be posted to the thread when complete.`)\n  : (`Dispatched ${caseCount} integration cases in parallel. Results available via integration_read tool.`);\nreturn [{ json: { run_id: runId, case_count: caseCount, status: 'dispatched', message } }];"
-      },
-      "id": "0868f070-1113-4599-8e5b-96d2326e4c35",
-      "name": "Return Summary",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1040,
-        304
+        256,
+        768
       ]
     },
     {
       "parameters": {
         "operation": "getAll",
-        "tableId": "test_cases",
+        "tableId": "integration_results",
         "returnAll": true,
         "matchType": "allFilters",
         "filters": {
           "conditions": [
             {
-              "keyName": "suite",
+              "keyName": "run_id",
               "condition": "eq",
-              "keyValue": "integration"
+              "keyValue": "={{ $('Run Id').first().json.run_id }}"
             }
           ]
         }
       },
-      "id": "1ce9a6c2-9878-457c-93c5-343ca163735f",
-      "name": "Load Cases",
+      "id": "c4b9d801-ff58-42f8-bc8f-a83d3ee20f30",
+      "name": "Load Results",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -368,
-        304
+        304,
+        448
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
           "id": "gjrMKYK5nCbL3TLf",
           "name": "Supabase Tests"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "const runId = $('Run Id').first().json.run_id;\nconst expected = $('Load Cases').all().length;\nconst rows = $input.all().map(i => i.json).filter(r => r.run_id === runId);\nconst slugs = {};\nfor (const c of $('Load Cases').all()) slugs[c.json.id] = c.json.slug;\n// Load Results' getAll() overlaps pages while sub-workflows are still writing,\n// so it can emit the same row multiple times. Dedupe by case_id.\nconst seen = new Set();\nconst unique = [];\nfor (const r of rows) {\n  if (!r.case_id || seen.has(r.case_id)) continue;\n  seen.add(r.case_id);\n  unique.push(r);\n}\nconst counts = { pass: 0, fail: 0, error: 0 };\nconst cases = unique.map(r => {\n  counts[r.status] = (counts[r.status] || 0) + 1;\n  return { slug: slugs[r.case_id] || r.case_id, status: r.status, called_tools: r.called_tools };\n});\ncases.sort((a, b) => (a.slug < b.slug ? -1 : 1));\nconst poll = ($runIndex || 0) + 1;\nreturn [{ json: {\n  run_id: runId,\n  expected: expected,\n  landed: unique.length,\n  polls: poll,\n  complete: unique.length >= expected,\n  timeout: poll >= 20,\n  pass: counts.pass,\n  fail: counts.fail,\n  error: counts.error,\n  cases: cases\n} }];"
+      },
+      "id": "bfa99986-c09a-4b5a-8da8-5c11c9d6d081",
+      "name": "Poll Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.complete }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "id": "3c630eef-8f76-4e31-b451-89e320d289fb"
+            },
+            {
+              "leftValue": "={{ $json.timeout }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "id": "2ef694c5-7b7a-461d-a042-cc232ab4c65d"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "253b3fee-9c1d-4a0b-a797-a9378b2f9f2c",
+      "name": "Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        752,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "id": "8690d05f-39e7-458a-93d4-ac31185c2af3",
+      "name": "Pace Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        976,
+        544
+      ],
+      "webhookId": "bfd48c63-b598-4406-93e2-5b86a373da65"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node — \"Run Once for All Items\"\n// Input:  one or more items containing run objects (or arrays of them)\n// Output: a single item with the whole report as one markdown string\n\nconst CONFIG = {\n  useEmoji: true,       // ✅ / ❌ / 💥 / ⏭️ vs plain text labels\n};\n\nconst STATUS_ICON = { pass: '✅', fail: '❌', error: '💥', skip: '⏭️' };\nconst STATUS_RANK = { fail: 0, error: 1, pass: 2, skip: 3 };\n\nconst icon = (s) => (CONFIG.useEmoji ? `${STATUS_ICON[s] || '•'} ${s}` : s);\nconst rankOf = (s) => (Object.prototype.hasOwnProperty.call(STATUS_RANK, String(s).toLowerCase()) ? STATUS_RANK[String(s).toLowerCase()] : 4);\n\n// called_tools arrives as a JSON-encoded string, but tolerate arrays/null too.\nfunction parseTools(raw) {\n  if (Array.isArray(raw)) return raw.map(String);\n  if (typeof raw !== 'string' || raw.trim() === '') return [];\n  try {\n    const parsed = JSON.parse(raw);\n    return Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];\n  } catch {\n    return [raw];\n  }\n}\n\n// Pipes and newlines break markdown tables.\nconst cell = (t) => String(t).replace(/\\|/g, '\\\\|').replace(/\\n+/g, ' ');\n\nfunction table(headers, rows) {\n  const lines = [\n    `| ${headers.join(' | ')} |`,\n    `| ${headers.map(() => '---').join(' | ')} |`,\n  ];\n  for (const row of rows) lines.push(`| ${row.map(cell).join(' | ')} |`);\n  return lines.join('\\n');\n}\n\nconst pct = (part, total) => (total ? `${((part / total) * 100).toFixed(1)}%` : 'n/a');\n\n// Runs may arrive one-per-item, all nested in one item, or under a wrapper key.\nfunction collectRuns(items) {\n  const runs = [];\n  const push = (v) => {\n    if (Array.isArray(v)) v.forEach(push);\n    else if (v && typeof v === 'object' && Array.isArray(v.cases)) runs.push(v);\n  };\n  for (const item of items) {\n    const json = item.json ?? item;\n    if (Array.isArray(json) || (json && Array.isArray(json.cases))) {\n      push(json);\n    } else if (json && typeof json === 'object') {\n      // e.g. { data: [...] } or { runs: [...] } from an upstream HTTP node\n      Object.values(json).forEach(push);\n    }\n  }\n  return runs;\n}\n\nfunction renderRun(run, index, totalRuns) {\n  const cases = Array.isArray(run.cases) ? run.cases : [];\n  const out = [];\n\n  // Count from the cases themselves rather than trusting the summary fields.\n  const counts = {};\n  for (const c of cases) {\n    const status = String(c.status || 'unknown').toLowerCase();\n    counts[status] = (counts[status] || 0) + 1;\n  }\n  const passed = counts.pass || 0;\n\n  out.push(totalRuns > 1 ? `## Run ${index + 1}: \\`${run.run_id}\\`` : `## \\`${run.run_id}\\``, '');\n  out.push(\n    `**${run.complete ? 'Complete' : 'Incomplete'}** · ${run.landed}/${run.expected} cases landed · ` +\n      `${run.polls} poll${run.polls === 1 ? '' : 's'} · **${pct(passed, cases.length)} pass rate**`,\n    ''\n  );\n\n  if (!cases.length) {\n    out.push('No cases recorded for this run.', '');\n    return { markdown: out.join('\\n'), counts, total: cases.length, passed };\n  }\n\n  const order = ['pass', 'fail', 'error', 'skip'];\n  const rank = (s) => (order.indexOf(s) === -1 ? order.length : order.indexOf(s));\n  out.push(\n    table(\n      ['Result', 'Count', 'Share'],\n      Object.keys(counts)\n        .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))\n        .map((s) => [icon(s), counts[s], pct(counts[s], cases.length)])\n    ),\n    ''\n  );\n\n  // Discrepancies between the reported summary and the actual cases.\n  const warnings = [];\n  for (const key of ['pass', 'fail', 'error']) {\n    const reported = run[key];\n    const actual = counts[key] || 0;\n    if (typeof reported === 'number' && reported !== actual) {\n      warnings.push(`\\`${key}\\` reported as ${reported}, counted ${actual} in cases`);\n    }\n  }\n  if (typeof run.landed === 'number' && run.landed !== cases.length) {\n    warnings.push(`\\`landed\\` reported as ${run.landed}, but ${cases.length} cases present`);\n  }\n  if (typeof run.expected === 'number' && run.expected !== run.landed) {\n    warnings.push(`${run.expected - run.landed} case(s) never landed`);\n  }\n  if (warnings.length) {\n    out.push('> [!WARNING]');\n    out.push('> Summary counts do not match the case list:');\n    warnings.forEach((w) => out.push(`> - ${w}`));\n    out.push('');\n  }\n\n  // Cases, sorted with failures first.\n  out.push('### Cases', '');\n  out.push(\n    table(\n      ['Case', 'Status', 'Tools called'],\n      [...cases]\n        .sort(\n          (a, b) =>\n            rankOf(a.status) - rankOf(b.status) ||\n            String(a.slug).localeCompare(String(b.slug))\n        )\n        .map((c) => {\n          const tools = parseTools(c.called_tools);\n          return [\n            `\\`${c.slug}\\``,\n            icon(String(c.status || 'unknown').toLowerCase()),\n            tools.length ? tools.map((t) => `\\`${t}\\``).join(', ') : '—',\n          ];\n        })\n    ),\n    ''\n  );\n\n  return { markdown: out.join('\\n'), counts, total: cases.length, passed };\n}\n\n// --- main -------------------------------------------------------------------\n\nconst runs = collectRuns($input.all());\n\nif (!runs.length) {\n  throw new Error('No run objects found in input — expected objects with a `cases` array.');\n}\n\n// This workflow IS the dispatcher, so the current execution is the dispatcher run.\nconst baseUrl = $vars.instance_url || 'https://darwin-staging.app.n8n.cloud';\nconst wfId = ($workflow && $workflow.id) || 'xs39cdr3D4dEtLOX';\nconst executionUrl = `${baseUrl}/workflow/${wfId}/executions/${$execution.id}`;\n\nconst generatedAt = new Date().toISOString();\nconst rendered = runs.map((run, i) => renderRun(run, i, runs.length));\n\nconst totalCases = rendered.reduce((n, r) => n + r.total, 0);\nconst totalPass = rendered.reduce((n, r) => n + r.passed, 0);\nconst totalFailing = rendered.reduce(\n  (n, r) => n + (r.counts.fail || 0) + (r.counts.error || 0),\n  0\n);\n\nconst parts = [];\nif (runs.length > 1) {\n  parts.push(\n    `${runs.length} runs · ${totalCases} cases · ${pct(totalPass, totalCases)} overall pass rate`,\n    ''\n  );\n}\nrendered.forEach((r) => parts.push(r.markdown));\nparts.push(`_Generated ${generatedAt}_ · [Dispatcher execution](${executionUrl})`);\n\nconst markdown = parts.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trimEnd() + '\\n';\n\n// Single item out. Extra fields are there so downstream IF/Switch nodes don't\n// have to re-parse the markdown to decide whether to alert.\nreturn [\n  {\n    json: {\n      markdown,\n      generated_at: generatedAt,\n      execution_url: executionUrl,\n      run_ids: runs.map((r) => r.run_id),\n      run_count: runs.length,\n      total_cases: totalCases,\n      total_pass: totalPass,\n      total_failing: totalFailing,\n      pass_rate: totalCases ? Number(((totalPass / totalCases) * 100).toFixed(1)) : null,\n      all_passed: totalFailing === 0,\n      char_count: markdown.length,\n    },\n  },\n];"
+      },
+      "id": "cd6b02e8-0add-4013-97fa-f4ef420b7824",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09DRCJLQCE",
+          "mode": "id"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ $json.blocksJson }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1648,
+        320
+      ],
+      "id": "82cf6d6d-298e-4734-a913-d534b66ba4c9",
+      "name": "Send a message",
+      "webhookId": "bdc71eb9-5681-4ab8-860d-89e7f0d6547e",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Slack Block Kit markdown blocks from the Summary node's markdown output.\n// Splits long text across multiple mrkdwn blocks (3,000-char limit each),\n// up to ~90KB total serialized JSON payload to stay within Slack API limits.\n// Splits on newlines where possible. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\n\nconst PER_BLOCK = 2900;  // leave margin under Slack's 3000-char limit\nconst MAX_BLOCKS = 50;   // hard cap: Slack max 50 blocks\nconst MAX_PAYLOAD_BYTES = 90000;  // ~90KB budget for serialized { blocks: [...] }\nconst TRUNCATION_NOTE = '\\n\\n_… (truncated: response too long for a single Slack message)_';\n\nlet text = $json.markdown ?? '';\nconst fullText = text;  // preserve original for downstream use\n\n// --- Helper: estimate serialized size of a blocks array ---\nfunction estimatePayloadSize(blocksArr) {\n  // Serialize just the blocks array; the outer { \"blocks\": [...] } wrapper adds ~15 chars\n  return JSON.stringify(blocksArr).length + 20;\n}\n\n// --- Split text into chunks ---\nfunction splitIntoChunks(str, chunkSize, maxBlocks, maxBytes) {\n  const chunks = [];\n  const trialBlocks = [];\n\n  while (str.length > 0 && chunks.length < maxBlocks) {\n    if (str.length <= chunkSize) {\n      chunks.push(str);\n      trialBlocks.push({ type: 'markdown', text: str });\n      if (estimatePayloadSize(trialBlocks) > maxBytes) {\n        const removed = chunks.pop();\n        trialBlocks.pop();\n        const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n        const maxTextLen = Math.max(0, remaining - 60);\n        if (maxTextLen > 50) {\n          chunks.push(removed.slice(0, maxTextLen) + TRUNCATION_NOTE);\n        }\n      }\n      break;\n    }\n\n    // Try to find last newline within the chunk boundary\n    const sliceTarget = str.slice(0, chunkSize);\n    const lastNewline = sliceTarget.lastIndexOf('\\n');\n    let chunk;\n    if (lastNewline > chunkSize - 500) {\n      chunk = str.slice(0, lastNewline);\n      str = str.slice(lastNewline + 1);\n    } else {\n      chunk = sliceTarget;\n      str = str.slice(chunkSize);\n    }\n\n    const tentativeBlocks = [...trialBlocks, { type: 'markdown', text: chunk }];\n    if (estimatePayloadSize(tentativeBlocks) > maxBytes) {\n      const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n      const maxTextLen = Math.max(0, remaining - 60);\n      if (maxTextLen > 50) {\n        chunks.push(chunk.slice(0, maxTextLen) + TRUNCATION_NOTE);\n      }\n      break;\n    }\n\n    chunks.push(chunk);\n    trialBlocks.push({ type: 'markdown', text: chunk });\n  }\n\n  if (str.length > 0 && chunks.length === maxBlocks) {\n    chunks[chunks.length - 1] = chunks[chunks.length - 1].replace(/\\n*$/, '') + TRUNCATION_NOTE;\n  }\n\n  return chunks;\n}\n\nconst chunks = splitIntoChunks(text, PER_BLOCK, MAX_BLOCKS, MAX_PAYLOAD_BYTES);\nconst blocks = chunks.map(t => ({ type: 'markdown', text: t }));\nconst content = { blocks };\n\nreturn [{ json: { blocksJson: JSON.stringify(content), output: fullText } }];"
+      },
+      "id": "3636feef-8692-4103-a639-e42fba425957",
+      "name": "format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Group the formatted blocks into message-sized chunks so no single Slack\n// message exceeds Slack's cumulative block-text limit (~13k chars, undocumented —\n// see slackapi/bolt-js#2509). Emits one item per message; Send a message then posts\n// one message per item. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\nconst MSG_BUDGET = 8000; // chars of block text per message, safe margin under ~13k\n\nconst blocksJson = $('format').first().json.blocksJson;\n\nlet blocks;\ntry {\n  blocks = JSON.parse(blocksJson).blocks;\n  if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('no blocks');\n} catch (e) {\n  // Fall back to previous single-message behaviour if parsing fails\n  return [{ json: { blocksJson, part: 1, totalParts: 1 } }];\n}\n\nconst messages = [];\nlet current = [];\nlet currentLen = 0;\n\nfor (const block of blocks) {\n  const len = (block.text || '').length;\n  if (current.length > 0 && currentLen + len > MSG_BUDGET) {\n    messages.push(current);\n    current = [];\n    currentLen = 0;\n  }\n  current.push(block);\n  currentLen += len;\n}\nif (current.length > 0) messages.push(current);\n\nreturn messages.map((msgBlocks, i) => ({\n  json: {\n    blocksJson: JSON.stringify({ blocks: msgBlocks }),\n    part: i + 1,\n    totalParts: messages.length,\n  },\n}));"
+      },
+      "id": "b5e156b3-95d9-4a9d-9f3a-b28c91363c5e",
+      "name": "ChunkBlocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 6,
+        "options": {}
+      },
+      "id": "wave-batch-0001-0001-0001-000000000001",
+      "name": "Batch",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        32,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "id": "wave-pace-0001-0001-0001-000000000001",
+      "name": "Pace",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        848
+      ],
+      "webhookId": "082822d9-7148-4ccd-a027-176d02b8ecee"
     }
   ],
   "connections": {
-    "Format Cases": {
+    "Input": {
       "main": [
+        [
+          {
+            "node": "Run Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Id": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Results": {
+      "main": [
+        [
+          {
+            "node": "Poll Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Check": {
+      "main": [
+        [
+          {
+            "node": "Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete?": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pace Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace Poll": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary": {
+      "main": [
+        [
+          {
+            "node": "format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format": {
+      "main": [
+        [
+          {
+            "node": "ChunkBlocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChunkBlocks": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Dispatch Case",
@@ -244,69 +463,18 @@
       "main": [
         [
           {
-            "node": "Has Slack Thread?",
+            "node": "Pace",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Has Slack Thread?": {
+    "Pace": {
       "main": [
         [
           {
-            "node": "Start Notifier",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Merge Branches",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Start Notifier": {
-      "main": [
-        [
-          {
-            "node": "Merge Branches",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge Branches": {
-      "main": [
-        [
-          {
-            "node": "Return Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Manual Input": {
-      "main": [
-        [
-          {
-            "node": "Load Cases",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Load Cases": {
-      "main": [
-        [
-          {
-            "node": "Format Cases",
+            "node": "Batch",
             "type": "main",
             "index": 0
           }
@@ -318,10 +486,11 @@
     "executionOrder": "v1",
     "availableInMCP": true,
     "timezone": "Europe/London",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "33799ec1-4591-402b-ba83-ccc2e6dfce3c",
+  "versionId": "30949192-e4e6-4681-927e-0599f41b4b42",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

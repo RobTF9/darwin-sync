@@ -1,0 +1,25 @@
+{
+  "id": "9MB0qfWs7veeeuoj",
+  "name": "SlackIngestedThreads",
+  "columns": [
+    {
+      "id": "fUxpoTJejf4oh7rR",
+      "name": "thread_ts",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "J5LPhC9G4ShqbguK",
+      "name": "channel",
+      "type": "string",
+      "index": 1
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-08-12T18:29:22.303Z",
+  "updatedAt": "2026-08-12T18:29:22.303Z"
+}

@@ -1,0 +1,587 @@
+{
+  "id": "OupKSoKX2mR2B8qY",
+  "name": "SlackThreadIngestion",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "\n\n// Resolve the channel ID for this thread dynamically from upstream data\nconst channelId = $('GetChannel').item.json.channel || $('Channels').first().json.channel;\n\n// Get all thread messages and corresponding user profiles\nconst threadMessages = $('GetThread').all();\nconst userProfiles = $('GetUser').all();\n\n// Build a map of user id -> profile for reliable lookup (order-independent)\nconst profileMap = {};\nfor (const p of userProfiles) {\n  const prof = p.json || {};\n  const uid = prof.id || prof.user;\n  if (uid) profileMap[uid] = prof;\n}\n\n// Format each message with username, looked up by the message's author id\nconst formattedThread = threadMessages.map((msg) => {\n  const profile = profileMap[msg.json.user];\n  const userName = profile?.real_name || msg.json.user;\n  const userTitle = profile?.title || '';\n\n  return `<message>\n  <author>${userName}${userTitle ? ` (${userTitle})` : ''}</author>\n  <content>${msg.json.text}</content>\n  <timestamp>${msg.json.ts}</timestamp>\n</message>`;\n}).join('\\n');\n\n// Get thread metadata from first message\nconst firstMsg = threadMessages[0]?.json;\nconst threadTs = firstMsg?.thread_ts || firstMsg?.ts;\n\nreturn {\n  json: {\n    chunk: `<slack-thread id=\"${threadTs}\">\\n${formattedThread}\\n</slack-thread>`,\n    metadata: {\n      url: threadTs\n        ? `https://n8nio.slack.com/archives/${channelId}/p${threadTs.replaceAll('.', '')}`\n        : undefined,\n      message_count: threadMessages.length,\n      timestamp: $('GetThread').first().json.ts\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -80
+      ],
+      "id": "baa846e3-2d27-4de4-9a1d-7a1b92e483e0",
+      "name": "PrepChunk"
+    },
+    {
+      "parameters": {
+        "resource": "user",
+        "operation": "getProfile",
+        "user": {
+          "__rl": true,
+          "value": "={{ $json.user }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -336,
+        -80
+      ],
+      "id": "08978cf5-2bc7-41b5-92b3-62bf28c68403",
+      "name": "GetUser",
+      "webhookId": "e7fa0959-9ef3-410f-ab97-8b74761c9785",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1088,
+        -224
+      ],
+      "id": "c0992fbf-cd9e-4de5-ade9-74bee21f8451",
+      "name": "Loop"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "State",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        -80
+      ],
+      "id": "2638988f-5a7e-4d11-ab4d-cd3d09c42af3"
+    },
+    {
+      "parameters": {
+        "resource": "channel",
+        "operation": "replies",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('GetChannel').item.json.channel || $('Channels').first().json.channel }}"
+        },
+        "ts": "={{ $json.ts }}",
+        "returnAll": true,
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -560,
+        -80
+      ],
+      "id": "0ac5ab87-2ca3-43bf-835a-37146939b625",
+      "name": "GetThread",
+      "webhookId": "4a9321df-c280-48f9-945a-cf44cc34ff7a",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "slack",
+          "mode": "list",
+          "cachedResultName": "slack"
+        },
+        "options": {
+          "queryName": "match_slack"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        144,
+        -80
+      ],
+      "id": "ea14d291-739c-497a-8496-fb2c902355de",
+      "name": "Load",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('PrepChunk').item.json.chunk }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "url",
+                "value": "={{ $('PrepChunk').item.json.metadata.url }}"
+              },
+              {
+                "name": "ts",
+                "value": "={{ $('PrepChunk').item.json.metadata.timestamp }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        248,
+        152
+      ],
+      "id": "4383d0b8-11da-48b5-853c-091b9813a63c",
+      "name": "Doc"
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        152
+      ],
+      "id": "0842ba5e-c186-4adc-8814-02a4f84d79f0",
+      "name": "Embed",
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chunkSize": 3000,
+        "chunkOverlap": 300,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        328,
+        360
+      ],
+      "id": "d2204c98-1ebe-4927-b169-4cd8c23c9da2",
+      "name": "Split"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2240,
+        -128
+      ],
+      "id": "01247b9b-a8f8-4c18-a5c7-32bbf5db2ee5",
+      "name": "Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  channel: 'C035KDLD6MP' // mission-user-research\n},{\n  channel: 'C089XFWGYLR' // updates-product-bakery\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2016,
+        -128
+      ],
+      "id": "b4283712-b046-4fee-b1a5-b05301d46891",
+      "name": " Channels"
+    },
+    {
+      "parameters": {
+        "resource": "channel",
+        "operation": "history",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.channel }}"
+        },
+        "returnAll": true,
+        "filters": {
+          "latest": "={{ $now.minus(3, 'months') }}"
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        -1792,
+        -128
+      ],
+      "id": "c36a069c-3279-44f7-93ac-824547846893",
+      "name": "GetChannel",
+      "webhookId": "e4f9fa1d-6f45-434d-8618-5e128bc25496",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "9MB0qfWs7veeeuoj"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "thread_ts",
+              "keyValue": "={{ $json.ts }}"
+            }
+          ]
+        }
+      },
+      "id": "7be133f3-39e4-456e-a2ee-6851d15743b5",
+      "name": "FilterNew",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -1568,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "9MB0qfWs7veeeuoj"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "thread_ts": "={{ $('State').item.json.ts }}",
+            "channel": "={{ $('GetChannel').item.json.channel || $('Channels').first().json.channel }}"
+          },
+          "schema": [
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "db8a0b2e-d24b-458c-9e29-502d1846d24a",
+      "name": "MarkIngested",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        608,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ Number($json.ts) }}",
+              "rightValue": "={{ $now.minus(3, 'months').toSeconds() }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6e911c50-f0ac-449b-aa8c-f4c8f8b6c9be",
+      "name": "WindowIF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1344,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "slack",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "metadata->>ts",
+              "condition": "eq",
+              "keyValue": "={{ $json.ts }}"
+            }
+          ]
+        }
+      },
+      "id": "d713fab2-c447-48fc-9877-6dd8cf0b11d8",
+      "name": "DeleteFromVectorStore",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        48
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "PrepChunk": {
+      "main": [
+        [
+          {
+            "node": "Load",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetUser": {
+      "main": [
+        [
+          {
+            "node": "PrepChunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop": {
+      "main": [
+        [],
+        [
+          {
+            "node": "State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "State": {
+      "main": [
+        [
+          {
+            "node": "GetThread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetThread": {
+      "main": [
+        [
+          {
+            "node": "GetUser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doc": {
+      "ai_document": [
+        [
+          {
+            "node": "Load",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Load",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Doc",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": " Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    " Channels": {
+      "main": [
+        [
+          {
+            "node": "GetChannel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetChannel": {
+      "main": [
+        [
+          {
+            "node": "FilterNew",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load": {
+      "main": [
+        [
+          {
+            "node": "MarkIngested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MarkIngested": {
+      "main": [
+        [
+          {
+            "node": "Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FilterNew": {
+      "main": [
+        [
+          {
+            "node": "WindowIF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WindowIF": {
+      "main": [
+        [
+          {
+            "node": "Loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DeleteFromVectorStore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
+  },
+  "triggerCount": 0,
+  "versionId": "58adc078-f3f1-45df-bc2a-f6edcf25fe6c",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "sN4NLjKdQAvpQSY4",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "11a9602f-f355-4cc2-87b8-cdafc2e82571",
+      "name": "LoadThreads",
+      "nodeIds": [
+        "baa846e3-2d27-4de4-9a1d-7a1b92e483e0",
+        "08978cf5-2bc7-41b5-92b3-62bf28c68403",
+        "2638988f-5a7e-4d11-ab4d-cd3d09c42af3",
+        "0ac5ab87-2ca3-43bf-835a-37146939b625",
+        "ea14d291-739c-497a-8496-fb2c902355de",
+        "db8a0b2e-d24b-458c-9e29-502d1846d24a",
+        "0842ba5e-c186-4adc-8814-02a4f84d79f0",
+        "d2204c98-1ebe-4927-b169-4cd8c23c9da2",
+        "4383d0b8-11da-48b5-853c-091b9813a63c"
+      ]
+    }
+  ]
+}

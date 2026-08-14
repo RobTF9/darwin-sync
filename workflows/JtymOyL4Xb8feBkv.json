@@ -6,14 +6,14 @@
       "parameters": {
         "path": "1f15cc88-7690-458e-8704-1dc6e0c23941",
         "authentication": "headerAuth",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
         -288,
-        -160
+        -224
       ],
       "id": "0b8a57f5-7ad5-48eb-8161-1bef5ad7f162",
       "name": "Webhook",
@@ -37,8 +37,8 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "chatInput": "={{ $json.body.chatInput }}",
-            "sessionId": "={{ $json.body.sessionId }}"
+            "chatInput": "={{ $('Webhook').item.json.body.chatInput }}",
+            "sessionId": "={{ $('Webhook').item.json.body.sessionId }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -121,15 +121,14 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        -64,
-        -160
+        160,
+        -128
       ],
       "id": "c35eac09-b193-4ffe-ba32-66847e78bb02",
       "name": "Call 'Darwin'"
     },
     {
       "parameters": {
-        "operation": "upsert",
         "dataTableId": {
           "__rl": true,
           "value": "qs1D3FTeLIGIaZh5",
@@ -137,19 +136,10 @@
           "cachedResultName": "Async Darwin Results",
           "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/qs1D3FTeLIGIaZh5"
         },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "sessionId",
-              "keyValue": "={{ $('Webhook').item.json.body.sessionId }}"
-            }
-          ]
-        },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "output": "={{ $json.output }}",
-            "sessionId": "={{ $('Webhook').item.json.body.sessionId }}"
+            "sessionId": "={{ $json.body.sessionId }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -182,10 +172,110 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        160,
-        -160
+        -64,
+        -224
       ],
-      "id": "b014216a-c113-4b69-962a-933755998b70",
+      "id": "be33d6d5-3109-4e9e-8c11-e182b20a781a",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        384,
+        -320
+      ],
+      "id": "8df319f3-ad9c-4577-a3a2-00c234b587a5",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ebe76eaa-5135-4122-8e71-592ecf290bc1",
+              "name": "id",
+              "value": "queryId",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        160,
+        -320
+      ],
+      "id": "0a29112e-6c52-4b1c-a35e-41a18e71f000",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "qs1D3FTeLIGIaZh5",
+          "mode": "list",
+          "cachedResultName": "Async Darwin Results",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/qs1D3FTeLIGIaZh5"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $('Insert row').item.json.id }}"
+            },
+            {
+              "keyName": "sessionId",
+              "keyValue": "={{ $('Insert row').item.json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "output": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        -128
+      ],
+      "id": "36360fb8-930b-463c-8d83-379856cdfc00",
       "name": "Upsert row(s)"
     }
   ],
@@ -194,7 +284,7 @@
       "main": [
         [
           {
-            "node": "Call 'Darwin'",
+            "node": "Insert row",
             "type": "main",
             "index": 0
           }
@@ -211,6 +301,33 @@
           }
         ]
       ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Call 'Darwin'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -219,7 +336,7 @@
     "availableInMCP": false
   },
   "triggerCount": 1,
-  "versionId": "16b6300d-73aa-4d04-8cbb-2237b56fc789",
+  "versionId": "7ad879a9-ba5a-4cd2-bf70-4fffd883200b",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
