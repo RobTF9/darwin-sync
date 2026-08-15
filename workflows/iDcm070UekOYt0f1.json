@@ -165,40 +165,6 @@
         "channelId": {
           "__rl": true,
           "mode": "id",
-          "value": "C09DRCJLQCE"
-        },
-        "messageType": "block",
-        "blocksUi": "={{ $('format').item.json.blocksJson }}",
-        "otherOptions": {
-          "thread_ts": {
-            "replyValues": {
-              "thread_ts": "={{ $('Post Error to Slack').item.json.message.ts }}"
-            }
-          }
-        }
-      },
-      "id": "97c2a801-1722-4302-a36e-68257b457c06",
-      "name": "Post Diagnosis Reply",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.3,
-      "position": [
-        1344,
-        0
-      ],
-      "webhookId": "c4f2f88e-e3b8-493b-b864-8659638638e1",
-      "credentials": {
-        "slackApi": {
-          "id": "BBkWcmrv3sWmNe1t",
-          "name": "Slack Bot"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "select": "channel",
-        "channelId": {
-          "__rl": true,
-          "mode": "id",
           "value": "={{ $json.customData.channel || $json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.channel }}"
         },
         "text": "=🚨 Execution failed: {{ $vars.instance_url}}workflow/{{ $json.workflowId }}/executions/{{ $json.id }}",
@@ -225,20 +191,6 @@
           "name": "Slack Bot"
         }
       }
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "// Same format step as the `format` Code node in the Slack workflow: wrap the\n// Builder agent's raw markdown diagnosis in a Block Kit markdown block — Slack\n// renders standard markdown natively (headers, tables, code fences, mentions).\n// Cumulative markdown-block limit is 12,000 chars per message.\nconst LIMIT = 12000;\nconst header = '*Builder diagnosis & suggested fix:*\\n';\nconst footer = '\\n\\n_Reply in this thread to continue the conversation with the Builder._';\nlet body = $json.output ?? '';\nconst budget = LIMIT - header.length - footer.length;\nif (body.length > budget) {\n  body = body.slice(0, budget - 120) + '\\n\\n_…truncated — reply exceeded Slack’s 12,000-character markdown block limit_';\n}\nconst text = header + body + footer;\n// blocksUi must be an object shaped { blocks: [...] } — a bare array spreads\n// into the request body without a `blocks` key, and Slack rejects\n// chat.postMessage with \"no_text\".\nconst content = { blocks: [{ type: 'markdown', text }] };\nreturn { json: { blocksJson: JSON.stringify(content), output: text } };"
-      },
-      "id": "602d071c-b6a6-4221-b46f-146a514779cb",
-      "name": "format",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1104,
-        0
-      ]
     }
   ],
   "connections": {
@@ -295,24 +247,7 @@
     },
     "Post Error to Slack": {
       "main": [
-        [
-          {
-            "node": "format",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "format": {
-      "main": [
-        [
-          {
-            "node": "Post Diagnosis Reply",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     }
   },
@@ -322,7 +257,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "638055c8-a9ab-4852-bb21-1b9b7e6083fa",
+  "versionId": "f26cc1cc-52ba-4abc-8e6f-3c4abfdc3f75",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

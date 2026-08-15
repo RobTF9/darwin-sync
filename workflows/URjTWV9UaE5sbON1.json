@@ -1,0 +1,251 @@
+{
+  "id": "URjTWV9UaE5sbON1",
+  "name": "RetrievalDispatch",
+  "nodes": [
+    {
+      "id": "c6a48647-32fa-4231-a3be-3ef59b5215e8",
+      "name": "Case Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -288,
+        304
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "case_id"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8f6a5889-550b-4570-8a1f-e7962786cd83",
+      "name": "Load Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        304
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "retrieval_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Case Input').item.json.case_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "449d64ef-4a60-4a16-b663-4211065301ea",
+      "name": "Build Turns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        304
+      ],
+      "parameters": {
+        "jsCode": "const c = $input.first().json;\nconst runId = $('Case Input').item.json.run_id;\nconst caseId = $('Case Input').item.json.case_id;\nlet ctx = c.context_messages;\nif (typeof ctx === 'string') { try { ctx = JSON.parse(ctx); } catch (e) { ctx = []; } }\nif (!Array.isArray(ctx)) ctx = [];\nconst sessionId = 'retrieval-' + runId + '-' + caseId;\n// Multi-turn cases: fold prior turns into ONE prompt. Replaying turns as separate\n// agent calls accumulates tool outputs in session memory and overflows the context\n// window (observed: 3M tokens by turn 3 on a transcript-heavy case).\nlet chatInput = c.prompt;\nif (ctx.length) {\n  const numbered = ctx.map((m, i) => (i + 1) + '. ' + String(m)).join('\\n');\n  chatInput = 'Earlier in this conversation, the user said:\\n' + numbered + '\\n\\nCurrent question: ' + c.prompt;\n}\nreturn [{ json: { chatInput: chatInput, is_final: true, sessionId: sessionId, slug: c.slug } }];"
+      }
+    },
+    {
+      "id": "664b9d92-d7db-4d29-a3e9-a2043ff69a39",
+      "name": "Call Agent",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        384,
+        304
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HDMvthliXrAcZrXp"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chatInput": "={{ $json.chatInput }}",
+            "task": "={{ $json.chatInput }}",
+            "sessionId": "={{ $json.sessionId }}",
+            "session_id": "={{ $json.sessionId }}",
+            "channel": "retrieval-eval",
+            "env": "test",
+            "slack_channel": ""
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "65eb90a5-f3ea-4d94-baa9-6b7c4ef4342c",
+      "name": "Capture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        304
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst c = $('Load Case').item.json;\nconst runId = $('Case Input').item.json.run_id;\nconst caseId = $('Case Input').item.json.case_id;\nconst final = items[items.length - 1].json;\nlet status = 'pending';\nlet answer = '';\nlet called = [];\nlet steps = [];\nif (final && final.error) {\n  status = 'error';\n  answer = typeof final.error === 'string' ? final.error : JSON.stringify(final.error);\n} else {\n  if (typeof final.output === 'string') answer = final.output;\n  else if (final.output !== undefined) answer = JSON.stringify(final.output);\n  else answer = JSON.stringify(final);\n  if (Array.isArray(final.tools_used)) called = final.tools_used;\n  if (Array.isArray(final.intermediateSteps)) steps = final.intermediateSteps;\n  if (!answer) status = 'error';\n}\nconst norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');\nconst calledN = [];\nfor (const t of called) { const n = norm(t); if (!calledN.includes(n)) calledN.push(n); }\nfor (const s of steps) { const t = s && s.action && s.action.tool; if (t) { const n = norm(t); if (!calledN.includes(n)) calledN.push(n); } }\n\nconst metaOf = (row, contentKey) => {\n  if (row.metadata && typeof row.metadata === 'object') return row.metadata;\n  const m = {};\n  for (const k of Object.keys(row)) {\n    if (k === contentKey || k === 'metadata' || k === 'score') continue;\n    const v = row[k];\n    if (v == null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') m[k] = v;\n  }\n  return m;\n};\n\nconst unwrapRow = (row) => {\n  if (!row || typeof row !== 'object') return null;\n  if (row.document && typeof row.document.pageContent === 'string') {\n    return { content: row.document.pageContent, metadata: row.document.metadata || {}, score: row.score ?? null };\n  }\n  if (typeof row.pageContent === 'string') return { content: row.pageContent, metadata: metaOf(row, 'pageContent'), score: row.score ?? null };\n  if (typeof row.content === 'string') return { content: row.content, metadata: metaOf(row, 'content'), score: row.score ?? null };\n  return null;\n};\n\nconst compressObs = (obs) => {\n  if (obs == null) return [];\n  let parsed;\n  try { parsed = JSON.parse(String(obs)); } catch (e) { return [{ content: String(obs).slice(0, 1200), metadata: {}, score: null }]; }\n  const outer = Array.isArray(parsed) ? parsed : [parsed];\n  const rows = [];\n  for (const item of outer) {\n    const blocks = item && Array.isArray(item.response) ? item.response : [item];\n    for (const b of blocks) {\n      let candidate = b;\n      if (b && b.type === 'text' && typeof b.text === 'string') {\n        try { candidate = JSON.parse(b.text); } catch (e) { candidate = { content: b.text }; }\n      }\n      const row = unwrapRow(candidate);\n      if (row) rows.push(row);\n      if (rows.length >= 10) break;\n    }\n    if (rows.length >= 10) break;\n  }\n  return rows.map(r => ({ content: r.content.slice(0, 1200), metadata: r.metadata, score: r.score }));\n};\n\nconst trimmed = steps.slice(0, 25).map(s => ({\n  tool: s && s.action && s.action.tool ? norm(s.action.tool) : null,\n  input: s && s.action ? JSON.stringify(s.action.toolInput ?? null).slice(0, 2000) : null,\n  rows: compressObs(s ? s.observation : null)\n}));\nreturn [{ json: {\n  run_id: runId,\n  case_id: caseId,\n  case_slug: c.slug,\n  status: status,\n  agent_output: answer.slice(0, 8000),\n  called_tools: calledN,\n  raw_steps: trimmed\n} }];"
+      }
+    },
+    {
+      "id": "0a31ec5b-5bce-438d-8559-26eeb0ed3d15",
+      "name": "Save Result",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        832,
+        304
+      ],
+      "parameters": {
+        "tableId": "retrieval_results",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "case_slug",
+              "fieldValue": "={{ $json.case_slug }}"
+            },
+            {
+              "fieldId": "mechanism",
+              "fieldValue": "darwin-agent"
+            },
+            {
+              "fieldId": "target",
+              "fieldValue": "={{ $vars.env }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "agent_output",
+              "fieldValue": "={{ $json.agent_output }}"
+            },
+            {
+              "fieldId": "called_tools",
+              "fieldValue": "={{ $json.called_tools }}"
+            },
+            {
+              "fieldId": "raw_steps",
+              "fieldValue": "={{ $json.raw_steps }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Case Input": {
+      "main": [
+        [
+          {
+            "node": "Load Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Case": {
+      "main": [
+        [
+          {
+            "node": "Build Turns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Turns": {
+      "main": [
+        [
+          {
+            "node": "Call Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Agent": {
+      "main": [
+        [
+          {
+            "node": "Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "75041927-a6ee-4d84-96dd-e3c65ed6014b",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}

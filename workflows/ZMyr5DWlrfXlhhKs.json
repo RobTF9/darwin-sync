@@ -363,7 +363,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst steps = Array.isArray(item.intermediateSteps) ? item.intermediateSteps : [];\nconst tools = [];\nfor (const s of steps) {\n  const t = s && s.action && s.action.tool;\n  if (t && !tools.includes(t)) tools.push(t);\n}\nreturn [{ json: { output: item.output || '', tools_used: tools } }];"
+        "jsCode": "const item = $input.first().json;\nconst steps = Array.isArray(item.intermediateSteps) ? item.intermediateSteps : [];\n\nconst isErrorObs = (obs) => {\n  if (obs == null) return true;\n  const s = String(obs).trim();\n  if (s === '') return true;\n  let parsed;\n  try { parsed = JSON.parse(s); } catch { return false; }\n  const arr = Array.isArray(parsed) ? parsed : [parsed];\n  return arr.length > 0 && arr.every(x => x && typeof x === 'object' && 'error' in x);\n};\n\n// Record array-valued fields up to 2 levels deep as \"path -> {kind,count}\".\n// Lets the evaluator assert on wrapper payloads (data.web, response, links)\n// without forwarding raw observations.\nconst nestedCounts = (obj, prefix, depth, acc) => {\n  if (depth > 2 || !obj || typeof obj !== 'object' || Array.isArray(obj)) return acc;\n  for (const k of Object.keys(obj)) {\n    const v = obj[k];\n    const path = prefix ? prefix + '.' + k : k;\n    if (Array.isArray(v)) {\n      if (Object.keys(acc).length < 20) acc[path] = { kind: 'array', count: v.length };\n    } else if (v && typeof v === 'object') {\n      nestedCounts(v, path, depth + 1, acc);\n    }\n  }\n  return acc;\n};\n\nconst shapeOf = (obs) => {\n  if (obs == null) return { kind: 'null' };\n  const s = String(obs).trim();\n  if (s === '') return { kind: 'empty' };\n  let parsed;\n  try { parsed = JSON.parse(s); } catch { return { kind: 'string' }; }\n  if (Array.isArray(parsed)) {\n    const first = parsed[0];\n    const shape = {\n      kind: 'array',\n      count: parsed.length,\n      itemKeys: first && typeof first === 'object' && !Array.isArray(first) ? Object.keys(first) : null,\n    };\n    if (first && typeof first === 'object' && !Array.isArray(first)) {\n      shape.nested = nestedCounts(first, '', 0, {});\n    }\n    return shape;\n  }\n  if (parsed && typeof parsed === 'object') {\n    return { kind: 'object', keys: Object.keys(parsed), nested: nestedCounts(parsed, '', 0, {}) };\n  }\n  return { kind: typeof parsed };\n};\n\nconst tools = [];\nconst outcomes = [];\nfor (const s of steps) {\n  const tool = s && s.action && s.action.tool;\n  if (!tool) continue;\n  if (!tools.includes(tool)) tools.push(tool);\n  const ok = !isErrorObs(s.observation);\n  outcomes.push({ tool, ok, shape: ok ? shapeOf(s.observation) : { kind: 'error' } });\n}\n\nreturn [{ json: {\n  output: item.output || '',\n  tools_used: tools,\n  // Compact per-tool verdict + shape summary. Consumed by\n  // IntegrationDispatch.Evaluate; ignored by manage_system (Darwin).\n  tool_outcomes: outcomes,\n} }];\n"
       },
       "id": "3ef61a07-1fa0-4246-b530-120b50ddd8bb",
       "name": "Format Output",
@@ -530,7 +530,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "fbe64911-78ac-4749-bd30-e62bc6aa0e54",
+  "versionId": "097ac256-20c2-4c38-a4be-1e9ade0d3c52",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

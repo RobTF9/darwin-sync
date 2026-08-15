@@ -1,0 +1,420 @@
+{
+  "id": "9aoqb4qULHyuLs1K",
+  "name": "RetrievalRun",
+  "nodes": [
+    {
+      "id": "302d7118-42c1-476c-a361-c02567abecaa",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -640,
+        768
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "requested_by"
+            },
+            {
+              "name": "category"
+            },
+            {
+              "name": "slug"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f71375e9-d2a4-4386-acd8-5085b4ed7130",
+      "name": "Run Id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -416,
+        768
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "run-id",
+              "name": "run_id",
+              "value": "={{ 'retrieval-' + $now.toFormat('yyyyLLdd-HHmmss') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0a06a019-8ea0-4f2e-be94-b68d136a643b",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        768
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "retrieval_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "enabled",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "dd794f22-75b5-430e-9822-0be04f2e02df",
+      "name": "Filter Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        768
+      ],
+      "parameters": {
+        "jsCode": "const input = $('Input').item.json;\nconst category = String(input.category || '').trim();\nconst slug = String(input.slug || '').trim();\nreturn $input.all()\n  .map(i => i.json)\n  .filter(c => (!category || c.category === category) && (!slug || c.slug === slug))\n  .map(c => ({ json: c }));"
+      }
+    },
+    {
+      "id": "d1856a72-c6b8-404b-9a6f-648f0409dbdb",
+      "name": "Load Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        304,
+        448
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "retrieval_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Run Id').first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "383146ed-7fb2-4513-8194-bf64ab4b8fcb",
+      "name": "Poll Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        368
+      ],
+      "parameters": {
+        "jsCode": "const runId = $('Run Id').first().json.run_id;\nconst expected = $('Filter Cases').all().length;\nconst rows = $input.all().map(i => i.json).filter(r => r.run_id === runId);\nconst slugs = {};\nfor (const c of $('Filter Cases').all()) slugs[c.json.id] = c.json.slug;\nconst seen = new Set();\nconst unique = [];\nfor (const r of rows) {\n  if (!r.case_id || seen.has(r.case_id)) continue;\n  seen.add(r.case_id);\n  unique.push(r);\n}\nconst counts = { pending: 0, pass: 0, fail: 0, error: 0 };\nconst cases = unique.map(r => {\n  counts[r.status] = (counts[r.status] || 0) + 1;\n  return { slug: slugs[r.case_id] || r.case_id, status: r.status, called_tools: r.called_tools };\n});\ncases.sort((a, b) => (a.slug < b.slug ? -1 : 1));\nconst poll = ($runIndex || 0) + 1;\nreturn [{ json: {\n  run_id: runId,\n  expected: expected,\n  landed: unique.length,\n  polls: poll,\n  complete: unique.length >= expected,\n  timeout: poll >= 20,\n  pending: counts.pending,\n  pass: counts.pass,\n  fail: counts.fail,\n  error: counts.error,\n  cases: cases\n} }];"
+      }
+    },
+    {
+      "id": "af284154-e434-4f96-8d44-9e5fb40b5300",
+      "name": "Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        752,
+        368
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.complete }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "id": "cond-complete"
+            },
+            {
+              "leftValue": "={{ $json.timeout }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "id": "cond-timeout"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "29f39b71-3824-48f8-bbec-d85cd7b41fea",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst lines = [];\nlines.push('## `' + r.run_id + '`', '');\nlines.push('**' + (r.complete ? 'Complete' : 'Incomplete (timeout)') + '** · ' + r.landed + '/' + r.expected + ' cases landed · ' + r.polls + ' polls', '');\nlines.push('| Case | Status | Tools called |', '| --- | --- | --- |');\nfor (const c of r.cases) {\n  const tools = Array.isArray(c.called_tools) ? c.called_tools.join(', ') : '';\n  lines.push('| `' + c.slug + '` | ' + c.status + ' | ' + (tools || '—') + ' |');\n}\nlines.push('', 'Statuses are `pending` until scored locally with `pnpm evals:score-agent -- --run ' + r.run_id + '`.');\nreturn [{ json: {\n  markdown: lines.join('\\n'),\n  run_id: r.run_id,\n  expected: r.expected,\n  landed: r.landed,\n  complete: r.complete,\n  cases: r.cases\n} }];"
+      }
+    },
+    {
+      "id": "2475822e-ef00-4a60-9a4f-7b530a215c3b",
+      "name": "Pace Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        976,
+        544
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "11078043-ffc8-48e5-a9f6-cb8e35683d8d"
+    },
+    {
+      "id": "cc9a495f-8215-42d1-94df-b14fff21689e",
+      "name": "Dispatch Case",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        688
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "URjTWV9UaE5sbON1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Run Id').item.json.run_id }}",
+            "case_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "15f39a50-24ad-45f2-8e30-dfb0469a7fb3",
+      "name": "Pace",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        704,
+        848
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "a8fc8331-292d-4799-b787-a7a8344f1536"
+    },
+    {
+      "id": "5d9f2ba5-4306-40d5-97a5-20ca94a3fc09",
+      "name": "Batch",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        256,
+        768
+      ],
+      "parameters": {
+        "batchSize": 6
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Run Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Id": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Filter Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Cases": {
+      "main": [
+        [
+          {
+            "node": "Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Results": {
+      "main": [
+        [
+          {
+            "node": "Poll Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Check": {
+      "main": [
+        [
+          {
+            "node": "Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete?": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pace Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace Poll": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Case": {
+      "main": [
+        [
+          {
+            "node": "Pace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace": {
+      "main": [
+        [
+          {
+            "node": "Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dispatch Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "38caf227-72f5-4cdc-abda-b3306f0eaefb",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}
