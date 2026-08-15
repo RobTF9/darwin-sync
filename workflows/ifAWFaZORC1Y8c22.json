@@ -9,7 +9,7 @@
     "availableInMCP": false
   },
   "triggerCount": 0,
-  "versionId": "2df5c039-eb55-4924-b177-240154019633",
+  "versionId": "92c1b75f-3c51-4484-b6ea-a6bfd5db41a5",
   "owner": {
     "type": "personal",
     "projectId": "gaAiXT3wHyNP6mrE",
@@ -17,6 +17,6 @@
     "personalEmail": "robert+darwin@n8n.io"
   },
   "parentFolderId": null,
-  "isArchived": false,
+  "isArchived": true,
   "nodeGroups": []
 }

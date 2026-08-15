@@ -1,13 +1,9 @@
 {
-  "id": "10SbbqNOabufmvyV",
-  "name": "Darwin linear",
-  "type": "linearOAuth2Api",
+  "id": "xyfYErKBBCTrIiMl",
+  "name": "Robs Slack",
+  "type": "slackApi",
   "data": {
-    "clientId": "",
-    "clientSecret": "",
-    "actor": "",
-    "includeAdminScope": true,
-    "signingSecret": ""
+    "accessToken": ""
   },
   "ownedBy": {
     "type": "team",

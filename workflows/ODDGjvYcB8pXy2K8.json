@@ -4,26 +4,6 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 30
-            }
-          ]
-        }
-      },
-      "id": "4bd19005-f901-4cf9-a4d2-1669b183b8da",
-      "name": "Every 30 Minutes",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [
-        -1168,
-        368
-      ]
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "https://core-api.uk.plain.com/graphql/v1",
         "authentication": "genericCredentialType",
@@ -183,20 +163,22 @@
         -688,
         368
       ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1168,
+        368
+      ],
+      "id": "5e9a3ed4-a189-461b-91f0-68f5e3523799",
+      "name": "When Executed by Another Workflow"
     }
   ],
   "connections": {
-    "Every 30 Minutes": {
-      "main": [
-        [
-          {
-            "node": "Fetch Plain Threads",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Fetch Plain Threads": {
       "main": [
         [
@@ -256,6 +238,17 @@
           }
         ]
       ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Fetch Plain Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -264,7 +257,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "689eb3b5-ecce-4811-8246-f1ee433e222c",
+  "versionId": "dcf38d32-e955-4a61-89bc-e945dca65635",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
