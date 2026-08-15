@@ -542,107 +542,6 @@
       ],
       "id": "06afb659-9bd5-4249-b81c-9c64976a573d",
       "name": "10 min"
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {}
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [
-        -688,
-        1600
-      ],
-      "id": "351cba5f-fb0b-400f-b700-4b6d06ffe413",
-      "name": "Daily"
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "OupKSoKX2mR2B8qY",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/OupKSoKX2mR2B8qY",
-          "cachedResultName": "Darwin — SlackThreadIngestion"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        -464,
-        1504
-      ],
-      "id": "986fad0d-8a07-4a25-ac19-5cc048686766",
-      "name": "Slack"
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "3QspDyQqUkXFn3ow",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/3QspDyQqUkXFn3ow",
-          "cachedResultName": "Darwin — GongIngestion"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        -464,
-        1696
-      ],
-      "id": "e9c3dd31-55c0-4f33-910f-f757e089dcbe",
-      "name": "Gong"
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "ODDGjvYcB8pXy2K8",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/ODDGjvYcB8pXy2K8",
-          "cachedResultName": "Darwin — PlainIngestion"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
-      },
-      "id": "fb89bec4-4d34-429a-90d6-4bf1a0bc2cd0",
-      "name": "Plain",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        -464,
-        1312
-      ]
     }
   ],
   "connections": {
@@ -854,32 +753,6 @@
           }
         ]
       ]
-    },
-    "Daily": {
-      "main": [
-        [
-          {
-            "node": "Gong",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Slack",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Plain",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Gong": {
-      "main": [
-        []
-      ]
     }
   },
   "settings": {
@@ -892,7 +765,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
-  "versionId": "9a656ed0-03f7-42c1-947f-03e374556562",
+  "versionId": "6ff60661-0e6b-4dd1-92dd-c7ba6ceb49a7",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
