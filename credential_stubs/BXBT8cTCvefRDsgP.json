@@ -1,13 +1,9 @@
 {
-  "id": "Av2ehn3RdLrlzohO",
-  "name": "Supabase Postgres",
-  "type": "postgres",
+  "id": "BXBT8cTCvefRDsgP",
+  "name": "OpenRouter account",
+  "type": "openRouterApi",
   "data": {
-    "host": "",
-    "user": "",
-    "password": "",
-    "allowUnauthorizedCerts": true,
-    "port": 6543
+    "apiKey": ""
   },
   "ownedBy": {
     "type": "team",

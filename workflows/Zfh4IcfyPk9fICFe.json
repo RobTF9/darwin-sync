@@ -1,0 +1,129 @@
+{
+  "id": "Zfh4IcfyPk9fICFe",
+  "name": "GetResourceContext",
+  "nodes": [
+    {
+      "id": "cfa967f6-36ff-4409-98cf-b7a8f9c2c4de",
+      "name": "Sub",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "path"
+            },
+            {
+              "name": "window_secs"
+            },
+            {
+              "name": "max_items"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d35c25f9-a238-4b22-9aa7-237c69a78d98",
+      "name": "Build SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const t = $('Sub').first().json;\nconst esc = (s) => String(s).replace(/'/g, \"''\");\nif (!t.path) throw new Error('path is required — pass the `path` field from a search hit');\nconst w = Math.min(Number(t.window_secs) || 240, 900);\nconst m = Math.min(Number(t.max_items) || 20, 50);\nreturn { sql: \"select public.get_resource_context('\" + esc(t.path) + \"'::ltree, \" + w + \", \" + m + \") as context\" };"
+      }
+    },
+    {
+      "id": "e08bdf2b-d695-4cec-9d2d-f81b3be2a380",
+      "name": "get_resource_context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "e40185ac-017f-48ba-bd50-c2753f6b86d1",
+      "name": "Unwrap",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return $input.item.json.context;"
+      }
+    }
+  ],
+  "connections": {
+    "Sub": {
+      "main": [
+        [
+          {
+            "node": "Build SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SQL": {
+      "main": [
+        [
+          {
+            "node": "get_resource_context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_resource_context": {
+      "main": [
+        [
+          {
+            "node": "Unwrap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "2aacd61b-b4fc-4168-8134-7b71eca5b7d7",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "DTre4lbkGJubF43l",
+  "isArchived": false,
+  "nodeGroups": []
+}

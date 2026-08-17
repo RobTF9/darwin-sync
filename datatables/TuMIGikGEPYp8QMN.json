@@ -13,6 +13,12 @@
       "name": "synced_at",
       "type": "string",
       "index": 1
+    },
+    {
+      "id": "Ye87M4qVatkdX5jT",
+      "name": "reply_count",
+      "type": "number",
+      "index": 2
     }
   ],
   "ownedBy": {
@@ -21,5 +27,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-08-12T20:11:34.289Z",
-  "updatedAt": "2026-08-13T08:21:23.307Z"
+  "updatedAt": "2026-08-15T20:20:27.821Z"
 }

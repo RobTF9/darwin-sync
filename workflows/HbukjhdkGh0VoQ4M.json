@@ -1,0 +1,114 @@
+{
+  "id": "HbukjhdkGh0VoQ4M",
+  "name": "SearchTest",
+  "nodes": [
+    {
+      "id": "61b01b32-3bd4-454c-821c-5a4e4367d0ab",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "fd30f942-f76d-4d97-aa42-bf881ba2f2a3",
+      "name": "Call Search",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "SeM49wLBqaM1KknA"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "query": "what frustrates users about error handling and retries?"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "1c4ff75d-5f07-473d-8fca-778764e3e946",
+      "name": "Call Browse",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "dLWwo63SMOZqfYfJ"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "path": "projects",
+            "depth": 1
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Call Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Search": {
+      "main": [
+        [
+          {
+            "node": "Call Browse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "3762631f-56cf-41ad-bda9-bfbe8c927c4f",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

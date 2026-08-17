@@ -81,30 +81,6 @@
       "updatedAt": "2026-08-07T09:52:33.015Z"
     },
     {
-      "id": "sN4NLjKdQAvpQSY4",
-      "name": "Slack",
-      "parentFolderId": "Y04SDqFk92B7CIGH",
-      "homeProjectId": "2uAQ2XYnaFVSte2z",
-      "createdAt": "2026-08-12T17:51:48.701Z",
-      "updatedAt": "2026-08-12T17:51:48.701Z"
-    },
-    {
-      "id": "Ht5UYVPQwt80dZHr",
-      "name": "Gong",
-      "parentFolderId": "Y04SDqFk92B7CIGH",
-      "homeProjectId": "2uAQ2XYnaFVSte2z",
-      "createdAt": "2026-08-12T18:27:46.102Z",
-      "updatedAt": "2026-08-12T18:27:46.102Z"
-    },
-    {
-      "id": "wwliuVCMD3BrEsbz",
-      "name": "Plain",
-      "parentFolderId": "Y04SDqFk92B7CIGH",
-      "homeProjectId": "2uAQ2XYnaFVSte2z",
-      "createdAt": "2026-08-13T06:12:02.744Z",
-      "updatedAt": "2026-08-13T06:12:02.744Z"
-    },
-    {
       "id": "VOBjsASxrcPKChe6",
       "name": "Retrieval",
       "parentFolderId": "fxhuxPGdNIHdYUsf",

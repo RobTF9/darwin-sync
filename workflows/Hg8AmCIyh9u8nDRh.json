@@ -1,0 +1,32 @@
+{
+  "id": "Hg8AmCIyh9u8nDRh",
+  "name": "tmp-folder-test",
+  "nodes": [
+    {
+      "id": "41f1c9f1-a8bc-435f-9643-edb570f6b162",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "e1a2e149-519a-42dd-8cc9-170016afd3e9",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "Y04SDqFk92B7CIGH",
+  "isArchived": true,
+  "nodeGroups": []
+}

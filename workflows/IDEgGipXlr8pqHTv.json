@@ -64,8 +64,8 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -288,
-        912
+        -256,
+        1040
       ],
       "id": "c48632dd-8faf-48da-b13d-58f9ecb67975",
       "name": "create_session",
@@ -91,8 +91,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        176,
-        912
+        208,
+        1040
       ],
       "id": "94b62403-613d-479c-8df2-1783172a07e0",
       "name": "create_mux_upload",
@@ -116,8 +116,8 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        416,
-        912
+        448,
+        1040
       ],
       "id": "c6f14c3f-19b0-4e2f-8423-7c178e96e642",
       "name": "from_drive",
@@ -149,8 +149,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        768,
-        864
+        464,
+        896
       ],
       "id": "04ccbb0a-282a-4758-93f7-4dea308ec6ca",
       "name": "upload_to_mux"
@@ -162,8 +162,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1024,
-        864
+        720,
+        896
       ],
       "id": "b5c7046c-e79e-4cde-9904-1e577e9b11ab",
       "name": "wait",
@@ -179,8 +179,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1232,
-        864
+        928,
+        896
       ],
       "id": "b8dbc71a-114d-48cb-8b64-0e58731a561b",
       "name": "get_uploade",
@@ -201,8 +201,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1488,
-        864
+        1184,
+        896
       ],
       "id": "8b0d86a1-88e7-42a0-af7f-5cd7d501c3c7",
       "name": "get_asset",
@@ -238,8 +238,8 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        1744,
-        864
+        1440,
+        896
       ],
       "id": "b9089687-15ec-4c00-9ac7-2d25834f35be",
       "name": "update_playback_id",
@@ -268,8 +268,8 @@
       "type": "n8n-nodes-base.executionData",
       "typeVersion": 1.1,
       "position": [
-        -64,
-        912
+        -32,
+        1040
       ],
       "id": "518c1388-927a-4ab2-8c5b-c92d5613195e",
       "name": "Execution Data"
@@ -525,8 +525,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1680,
-        1712
+        1376,
+        1568
       ],
       "id": "cd15e01d-462b-4a2f-b5ab-9bf8f2ebeb9a",
       "name": "session_analysis"
@@ -560,8 +560,8 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        1344,
-        1536
+        1040,
+        1392
       ],
       "id": "a811c04b-c108-4469-935c-6680b35987ce",
       "name": "update",
@@ -616,8 +616,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        768,
-        1280
+        464,
+        1136
       ],
       "id": "f9ca9285-eaed-407b-9581-a0ed47b66458",
       "name": "deepgram",
@@ -676,8 +676,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1264,
-        1808
+        960,
+        1664
       ],
       "id": "fdece905-b51d-47d3-865a-02b8355d4d8c",
       "name": "sesh_vectors"
@@ -729,8 +729,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1680,
-        1520
+        1376,
+        1376
       ],
       "id": "41410801-02d2-4f50-9643-59f722b856dc",
       "name": "job_analysis"
@@ -782,13 +782,17 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1680,
-        1328
+        1376,
+        1184
       ],
       "id": "e59090f8-ee7c-4203-ad2f-b3af8b6d6430",
       "name": "opportunity_analysis"
     },
     {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Same format step as the `format` Code node in the Slack workflow: wrap the\n// Builder agent's raw markdown diagnosis in a Block Kit markdown block — Slack\n// renders standard markdown natively (headers, tables, code fences, mentions).\n// Cumulative markdown-block limit is 12,000 chars per message.\nconst LIMIT = 12000;\nconst header = '*Builder diagnosis & suggested fix:*\\n';\nconst footer = '\\n\\n_Reply in this thread to continue the conversation with the Builder._';\nlet body = $json.output ?? '';\nconst budget = LIMIT - header.length - footer.length;\nif (body.length > budget) {\n  body = body.slice(0, budget - 120) + '\\n\\n_…truncated — reply exceeded Slack’s 12,000-character markdown block limit_';\n}\nconst text = header + body + footer;\n// blocksUi must be an object shaped { blocks: [...] } — a bare array spreads\n// into the request body without a `blocks` key, and Slack rejects\n// chat.postMessage with \"no_text\".\nconst content = { blocks: [{ type: 'markdown', text }] };\nreturn { json: { blocksJson: JSON.stringify(content), output: text } };"
+      },
       "id": "4ef0cb52-dd43-469c-96f9-ba11fd3a24dd",
       "name": "format",
       "type": "n8n-nodes-base.code",
@@ -796,11 +800,7 @@
       "position": [
         1392,
         272
-      ],
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "// Same format step as the `format` Code node in the Slack workflow: wrap the\n// Builder agent's raw markdown diagnosis in a Block Kit markdown block — Slack\n// renders standard markdown natively (headers, tables, code fences, mentions).\n// Cumulative markdown-block limit is 12,000 chars per message.\nconst LIMIT = 12000;\nconst header = '*Builder diagnosis & suggested fix:*\\n';\nconst footer = '\\n\\n_Reply in this thread to continue the conversation with the Builder._';\nlet body = $json.output ?? '';\nconst budget = LIMIT - header.length - footer.length;\nif (body.length > budget) {\n  body = body.slice(0, budget - 120) + '\\n\\n_…truncated — reply exceeded Slack’s 12,000-character markdown block limit_';\n}\nconst text = header + body + footer;\n// blocksUi must be an object shaped { blocks: [...] } — a bare array spreads\n// into the request body without a `blocks` key, and Slack rejects\n// chat.postMessage with \"no_text\".\nconst content = { blocks: [{ type: 'markdown', text }] };\nreturn { json: { blocksJson: JSON.stringify(content), output: text } };"
-      }
+      ]
     }
   ],
   "connections": {
@@ -1020,7 +1020,7 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "triggerCount": 0,
-  "versionId": "4baece9a-5de0-4214-a519-d8a3b0dd9055",
+  "versionId": "5fd746bc-df72-4dfa-8f30-9187d76468a5",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -1050,6 +1050,16 @@
         "fdece905-b51d-47d3-865a-02b8355d4d8c",
         "41410801-02d2-4f50-9643-59f722b856dc",
         "e59090f8-ee7c-4203-ad2f-b3af8b6d6430"
+      ]
+    },
+    {
+      "id": "70bf1244-118d-41ba-92a9-0ad7da6ef452",
+      "name": "Create session and download video",
+      "nodeIds": [
+        "c48632dd-8faf-48da-b13d-58f9ecb67975",
+        "94b62403-613d-479c-8df2-1783172a07e0",
+        "c6f14c3f-19b0-4e2f-8423-7c178e96e642",
+        "518c1388-927a-4ab2-8c5b-c92d5613195e"
       ]
     }
   ]

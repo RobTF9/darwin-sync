@@ -1,0 +1,997 @@
+{
+  "id": "wUWBqDOTZ82KLR4L",
+  "name": "ForumIngestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ad1a1b8d-f323-478e-bd26-ae526de62016",
+      "name": "Backfill (manual)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2240,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pages",
+              "name": "pages",
+              "value": 60,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4fec658e-abd5-46e2-acb6-6fee53158c1e",
+      "name": "BackfillConfig",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2016,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "created-within-window",
+              "leftValue": "={{ $json.created_at }}",
+              "rightValue": "={{ $now.minus(3, 'months') }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d60b1f72-ee40-4b6c-b2f2-b7e16dab592d",
+      "name": "WithinWindow",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -1344,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT $2::jsonb AS post\nWHERE NOT EXISTS (\n  SELECT 1 FROM public.ingest_ledger WHERE source = 'forum' AND source_id = $1\n)",
+        "options": {
+          "queryReplacement": "={{ [$json.id.toString(), JSON.stringify($json)] }}"
+        }
+      },
+      "id": "b263c727-d874-48de-9a1a-3a16ddb139e3",
+      "name": "LedgerCheck",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1120,
+        48
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "text",
+              "name": "text",
+              "type": "string",
+              "value": "={{ ($json.post.raw && $json.post.raw.trim()) ? \"Topic: \" + $json.post.topic_title + \"\\n\\n\" + $json.post.raw : \"Topic: \" + $json.post.topic_title + \"\\n\\n\" + $json.post.cooked.replace(/<[^>]+>/g, \" \").replace(/s+/g, \" \").trim() }}"
+            },
+            {
+              "id": "topic_id",
+              "name": "metadata.topic_id",
+              "type": "string",
+              "value": "={{ $json.post.topic_id.toString() }}"
+            },
+            {
+              "id": "post_id",
+              "name": "metadata.post_id",
+              "type": "string",
+              "value": "={{ $json.post.id.toString() }}"
+            },
+            {
+              "id": "post_number",
+              "name": "metadata.post_number",
+              "type": "number",
+              "value": "={{ $json.post.post_number }}"
+            },
+            {
+              "id": "post_url",
+              "name": "metadata.post_url",
+              "type": "string",
+              "value": "={{ \"https://community.n8n.io/t/\" + $json.post.topic_slug + \"/\" + $json.post.topic_id + \"/\" + $json.post.post_number }}"
+            },
+            {
+              "id": "post_username",
+              "name": "metadata.post_username",
+              "type": "string",
+              "value": "={{ $json.post.username }}"
+            },
+            {
+              "id": "post_staff",
+              "name": "metadata.post_staff",
+              "type": "boolean",
+              "value": "={{ Boolean($json.post.staff) }}"
+            },
+            {
+              "id": "post_trust_level",
+              "name": "metadata.post_trust_level",
+              "type": "number",
+              "value": "={{ $json.post.trust_level }}"
+            },
+            {
+              "id": "post_score",
+              "name": "metadata.post_score",
+              "type": "number",
+              "value": "={{ $json.post.score }}"
+            },
+            {
+              "id": "post_created_at",
+              "name": "metadata.post_created_at",
+              "type": "string",
+              "value": "={{ $json.post.created_at }}"
+            },
+            {
+              "id": "post_type",
+              "name": "metadata.post_type",
+              "type": "string",
+              "value": "={{ $json.post.post_number === 1 ? 'original_post' : ($json.post.accepted_answer ? 'accepted_answer' : 'reply') }}"
+            },
+            {
+              "id": "topic_title",
+              "name": "metadata.topic_title",
+              "type": "string",
+              "value": "={{ $json.post.topic_title }}"
+            },
+            {
+              "id": "topic_slug",
+              "name": "metadata.topic_slug",
+              "type": "string",
+              "value": "={{ $json.post.topic_slug }}"
+            },
+            {
+              "id": "topic_category",
+              "name": "metadata.topic_category",
+              "type": "string",
+              "value": "={{ $json.post.category_id.toString() }}"
+            },
+            {
+              "id": "topic_solved",
+              "name": "metadata.topic_solved",
+              "type": "boolean",
+              "value": "={{ Boolean($json.post.topic_accepted_answer) }}"
+            },
+            {
+              "id": "topic_url",
+              "name": "metadata.topic_url",
+              "type": "string",
+              "value": "={{ \"https://community.n8n.io/t/\" + $json.post.topic_slug + \"/\" + $json.post.topic_id }}"
+            },
+            {
+              "id": "source",
+              "name": "metadata.source",
+              "type": "string",
+              "value": "forum"
+            },
+            {
+              "id": "type",
+              "name": "metadata.type",
+              "type": "string",
+              "value": "post"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6506feea-661b-46ff-a58c-b59dc156097a",
+      "name": "PreparePost",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2016,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "forum",
+          "mode": "list",
+          "cachedResultName": "forum"
+        },
+        "options": {
+          "queryName": "match_forum"
+        }
+      },
+      "id": "ca40444e-2aac-4b10-9519-4119b919ac00",
+      "name": "Embed & Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -1760,
+        688
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {}
+      },
+      "id": "af8c2f95-122f-400c-a838-30ed9658e823",
+      "name": "OpenAI Embedding",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -1792,
+        928
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('PreparePost').item.json.text }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "topic_id",
+                "value": "={{ $('PreparePost').item.json.metadata.topic_id }}"
+              },
+              {
+                "name": "post_id",
+                "value": "={{ $('PreparePost').item.json.metadata.post_id }}"
+              },
+              {
+                "name": "post_number",
+                "value": "={{ $('PreparePost').item.json.metadata.post_number }}"
+              },
+              {
+                "name": "post_url",
+                "value": "={{ $('PreparePost').item.json.metadata.post_url }}"
+              },
+              {
+                "name": "post_username",
+                "value": "={{ $('PreparePost').item.json.metadata.post_username }}"
+              },
+              {
+                "name": "post_staff",
+                "value": "={{ $('PreparePost').item.json.metadata.post_staff }}"
+              },
+              {
+                "name": "post_trust_level",
+                "value": "={{ $('PreparePost').item.json.metadata.post_trust_level }}"
+              },
+              {
+                "name": "post_score",
+                "value": "={{ $('PreparePost').item.json.metadata.post_score }}"
+              },
+              {
+                "name": "post_created_at",
+                "value": "={{ $('PreparePost').item.json.metadata.post_created_at }}"
+              },
+              {
+                "name": "post_type",
+                "value": "={{ $('PreparePost').item.json.metadata.post_type }}"
+              },
+              {
+                "name": "topic_title",
+                "value": "={{ $('PreparePost').item.json.metadata.topic_title }}"
+              },
+              {
+                "name": "topic_slug",
+                "value": "={{ $('PreparePost').item.json.metadata.topic_slug }}"
+              },
+              {
+                "name": "topic_category",
+                "value": "={{ $('PreparePost').item.json.metadata.topic_category }}"
+              },
+              {
+                "name": "topic_solved",
+                "value": "={{ $('PreparePost').item.json.metadata.topic_solved }}"
+              },
+              {
+                "name": "topic_url",
+                "value": "={{ $('PreparePost').item.json.metadata.topic_url }}"
+              },
+              {
+                "name": "source",
+                "value": "forum"
+              },
+              {
+                "name": "type",
+                "value": "post"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b7591bd7-4cc0-4055-889d-30204666fe3d",
+      "name": "Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -1664,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "chunkSize": 3000,
+        "chunkOverlap": 300,
+        "options": {}
+      },
+      "id": "c60f0b58-aa4b-41e7-a4a3-9217fbc7f2ba",
+      "name": "Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -1584,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH dir AS (\n  INSERT INTO public.resource (parent_id, path, kind, source_id, title, created_at)\n  SELECT r.id, ('forum.t' || $1)::ltree, 'directory', $1, NULLIF($2, ''), now()\n  FROM public.resource r WHERE r.path = 'forum'::ltree\n  ON CONFLICT (path) DO UPDATE SET title = COALESCE(EXCLUDED.title, resource.title)\n  RETURNING id\n),\nparent AS (\n  SELECT id FROM dir\n  UNION ALL SELECT id FROM public.resource WHERE kind = 'directory' AND path = ('forum.t' || $1)::ltree\n  LIMIT 1\n),\nleaf AS (\n  INSERT INTO public.resource (parent_id, path, kind, source_id, title, created_at)\n  SELECT (SELECT id FROM parent),\n         ('forum.t' || $1 || '.p' || $3)::ltree,\n         'forum_topic',\n         (SELECT f.id::text FROM public.forum f WHERE f.metadata->>'post_id' = $4 ORDER BY f.id LIMIT 1),\n         NULLIF($2, ''), now()\n  ON CONFLICT (path) DO UPDATE SET title = COALESCE(EXCLUDED.title, resource.title)\n  RETURNING id\n),\nft AS (\n  INSERT INTO public.forum_threads (topic_id, title, slug, category_id, solved, url, original_username,\n                                    started_at, last_posted_at, post_count)\n  VALUES ($1, NULLIF($2, ''), NULLIF($6, ''), NULLIF($7, ''), $8::boolean, NULLIF($9, ''),\n          NULLIF($10, ''), NULLIF($11, '')::timestamptz, NULLIF($11, '')::timestamptz,\n          (SELECT count(*) FROM public.forum f WHERE f.metadata->>'topic_id' = $1))\n  ON CONFLICT (topic_id) DO UPDATE SET\n    title          = COALESCE(EXCLUDED.title, forum_threads.title),\n    slug           = COALESCE(EXCLUDED.slug, forum_threads.slug),\n    category_id    = COALESCE(EXCLUDED.category_id, forum_threads.category_id),\n    solved         = EXCLUDED.solved,\n    post_count     = (SELECT count(*) FROM public.forum f WHERE f.metadata->>'topic_id' = $1),\n    started_at     = LEAST(forum_threads.started_at, EXCLUDED.started_at),\n    last_posted_at = GREATEST(forum_threads.last_posted_at, EXCLUDED.last_posted_at),\n    updated_at     = now()\n  RETURNING topic_id\n),\nled AS (\n  INSERT INTO public.ingest_ledger (source, source_id, content_hash, chunk_version, embed_model, status, ingested_at)\n  VALUES ('forum', $4, md5($5), 1, 'text-embedding-3-large', 'done', now())\n  ON CONFLICT (source, source_id) DO NOTHING\n  RETURNING source_id\n)\nSELECT (SELECT id FROM leaf) AS leaf_node, (SELECT source_id FROM led) AS ledger_row, (SELECT topic_id FROM ft) AS thread_row",
+        "options": {
+          "queryReplacement": "={{ [$('PreparePost').item.json.metadata.topic_id, $('PreparePost').item.json.metadata.topic_title, $('PreparePost').item.json.metadata.post_number, $('PreparePost').item.json.metadata.post_id, $('PreparePost').item.json.text, $('PreparePost').item.json.metadata.topic_slug, $('PreparePost').item.json.metadata.topic_category, $('PreparePost').item.json.metadata.topic_solved, $('PreparePost').item.json.metadata.topic_url, $('PreparePost').item.json.metadata.post_number === 1 ? $('PreparePost').item.json.metadata.post_username : '', $('PreparePost').item.json.metadata.post_created_at] }}"
+        }
+      },
+      "id": "c21aecb5-e7ce-4dcd-8395-3dfd959d5a45",
+      "name": "UpsertNodes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1296,
+        688
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT source_id AS topic_id, title\nFROM public.resource\nWHERE kind = 'directory'\n  AND path::text ~ '^forum\\.t[0-9]+$'\n  AND summary IS NULL\nORDER BY created_at DESC\nLIMIT 500",
+        "options": {}
+      },
+      "id": "599b51a6-988f-4f32-8c9e-803fb26f22a6",
+      "name": "GetUnsummarizedTopics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -480,
+        -208
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT $1 AS topic_id,\n       left(string_agg(f.content, E'\\n\\n' ORDER BY (f.metadata->>'post_number')::int), 12000) AS topic_text,\n       count(*) AS post_count\nFROM public.forum f\nWHERE f.metadata->>'topic_id' = $1",
+        "options": {
+          "queryReplacement": "={{ [$json.topic_id] }}"
+        }
+      },
+      "id": "7e1ff72e-f66d-4353-9279-b59ec67f62c6",
+      "name": "GetTopicText",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -224,
+        -128
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Summarize this n8n community forum topic for a research search index.\\n\\nRequirements:\\n- 2-3 sentences: what the user is trying to do, the problem or question, and any resolution or answer reached\\n- name n8n features/nodes exactly as written\\n- no preamble\\n\\nTopic posts:\\n\" + $json.topic_text }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You write search-index summaries for topics on n8n's community forum. You never invent facts and you name n8n features exactly as written. You always respond in the requested JSON format."
+            }
+          ]
+        },
+        "batching": {
+          "batchSize": 2,
+          "delayBetweenBatches": 500
+        }
+      },
+      "id": "80864afb-a33f-4911-9db1-a5fe0313ffba",
+      "name": "SummarizeTopic",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        32,
+        -128
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-v4-flash",
+        "options": {
+          "maxTokens": 2000,
+          "responseFormat": "json_object",
+          "temperature": 0.2
+        }
+      },
+      "id": "d0444b26-e157-4e83-8fc4-f487f09037b2",
+      "name": "OpenRouterModel",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        16,
+        112
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "BXBT8cTCvefRDsgP",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"summary\": \"2-3 sentences: what the user is trying to do, the problem or question, and any resolution or answer reached\"}",
+        "autoFix": true
+      },
+      "id": "0eb15c2a-29ff-44f4-9d5f-9a1a001de2ae",
+      "name": "TopicParser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        144,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-v4-flash",
+        "options": {
+          "maxTokens": 2000,
+          "responseFormat": "json_object",
+          "temperature": 0.2
+        }
+      },
+      "id": "9ab70b8c-fd77-45cb-88cd-70976bea864a",
+      "name": "OpenRouterFix",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        224,
+        320
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "BXBT8cTCvefRDsgP",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH r AS (\n  UPDATE public.resource SET summary = COALESCE(NULLIF($2, ''), summary)\n  WHERE kind = 'directory' AND path = ('forum.t' || $1)::ltree\n  RETURNING id\n),\nft AS (\n  UPDATE public.forum_threads SET summary = COALESCE(NULLIF($2, ''), summary), updated_at = now()\n  WHERE topic_id = $1\n  RETURNING topic_id\n),\nf AS (\n  UPDATE public.forum SET metadata = metadata || jsonb_build_object('summary', $2)\n  WHERE metadata->>'topic_id' = $1 AND NULLIF($2, '') IS NOT NULL\n  RETURNING id\n)\nSELECT (SELECT count(*) FROM r) AS nodes_updated,\n       (SELECT count(*) FROM ft) AS threads_updated,\n       (SELECT count(*) FROM f) AS posts_updated",
+        "options": {
+          "queryReplacement": "={{ [$('GetTopicText').item.json.topic_id, ($json.output && $json.output.summary) ? $json.output.summary : ''] }}"
+        }
+      },
+      "id": "7493e95b-8696-4703-a53e-f3192945305b",
+      "name": "SaveSummary",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        496,
+        -128
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Setup required\n\n**GetPosts** uses the core Discourse node against community.n8n.io — fill in the **Discourse community** credential (URL + read-only API key + username) before running.\n\n**Backfill**: run *Backfill (manual)* — up to 3000 latest posts, rolling 12-month window.\n**Daily**: 150 latest posts.\n\n**Dedupe**: `ingest_ledger` (source=forum, source_id=post_id) — re-running is safe.\n**Summaries**: after posts land, topics with NULL summary on their resource node are summarized (deepseek-v4-flash via OpenRouter) into `resource.summary` + `forum.metadata.summary`.\n\n**Drop-and-re-run**: `DELETE FROM forum; DELETE FROM resource WHERE path <@ 'forum' AND path != 'forum'; DELETE FROM ingest_ledger WHERE source='forum';` then run the backfill.",
+        "height": 340,
+        "width": 620,
+        "color": 4
+      },
+      "id": "833c47dd-1cef-4b36-bc66-ddd00a2f7e91",
+      "name": "SetupNote",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2240,
+        -528
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://community.n8n.io/posts.json",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "pagination": {}
+        }
+      },
+      "id": "feb3a7ea-5225-4ca5-a672-bd82eda6d415",
+      "name": "FetchPosts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1792,
+        48
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "latest_posts",
+        "options": {}
+      },
+      "id": "f9560426-d30c-42a6-b922-301115ac8a4a",
+      "name": "SplitOutPosts",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1568,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH old_posts AS (\n  SELECT id, metadata->>'post_id' AS post_id, metadata->>'topic_id' AS topic_id\n  FROM public.forum\n  WHERE (metadata->>'post_created_at')::timestamptz < now() - interval '3 months'\n),\ndp AS (\n  DELETE FROM public.forum WHERE id IN (SELECT id FROM old_posts) RETURNING id\n),\ndl AS (\n  DELETE FROM public.ingest_ledger\n  WHERE source = 'forum' AND source_id IN (SELECT post_id FROM old_posts)\n  RETURNING 1\n),\ndn AS (\n  DELETE FROM public.resource\n  WHERE kind = 'forum_topic' AND path <@ 'forum'\n    AND (source_id::bigint IN (SELECT id FROM old_posts)\n         OR source_id::bigint NOT IN (SELECT id FROM public.forum))\n  RETURNING 1\n),\ndd AS (\n  DELETE FROM public.resource d\n  WHERE d.kind = 'directory' AND d.path::text ~ '^forum\\.t[0-9]+$'\n    AND NOT EXISTS (\n      SELECT 1 FROM public.forum f\n      WHERE f.metadata->>'topic_id' = d.source_id\n        AND (f.metadata->>'post_created_at')::timestamptz >= now() - interval '3 months'\n    )\n  RETURNING 1\n),\ndf AS (\n  DELETE FROM public.forum_threads ft\n  WHERE NOT EXISTS (\n    SELECT 1 FROM public.forum f\n    WHERE f.metadata->>'topic_id' = ft.topic_id\n      AND (f.metadata->>'post_created_at')::timestamptz >= now() - interval '3 months'\n  )\n  RETURNING 1\n)\nSELECT (SELECT count(*) FROM dp) AS posts_deleted,\n       (SELECT count(*) FROM dl) AS ledger_rows_deleted,\n       (SELECT count(*) FROM dn) AS leaf_nodes_deleted,\n       (SELECT count(*) FROM dd) AS topic_dirs_deleted,\n       (SELECT count(*) FROM df) AS forum_threads_deleted",
+        "options": {}
+      },
+      "id": "655f4578-9688-4e5a-b857-aa2afbe6558d",
+      "name": "CleanupOldPosts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1792,
+        240
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Rolling 3-month window: deletes old forum vector rows, their ledger rows, orphaned forum_topic leaf nodes, and topic directory nodes with no remaining posts."
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "562ecae1-e90d-42b0-8a02-b8aa506611ed",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2240,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "wUWBqDOTZ82KLR4L",
+          "mode": "list",
+          "cachedResultName": "ForumIngestion"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "f37d7558-2ded-49c2-9ef2-4604f9350a51",
+      "name": "Call 'ForumIngestion'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -688,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "51c6e3b2-bac8-43b7-87c8-ee92613aea05",
+      "name": "BatchLoop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -896,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "id": "90a8bb8b-1678-436e-a975-477ebb40b998",
+      "name": "PaceWait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        112
+      ],
+      "webhookId": "d42a936c-1bf0-4d11-9be9-487c34970189"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2256,
+        -16
+      ],
+      "id": "31649619-5e73-4e4c-babc-31396c444837",
+      "name": "Midnight"
+    }
+  ],
+  "connections": {
+    "Backfill (manual)": {
+      "main": [
+        [
+          {
+            "node": "BackfillConfig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WithinWindow": {
+      "main": [
+        [
+          {
+            "node": "LedgerCheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PreparePost": {
+      "main": [
+        [
+          {
+            "node": "Embed & Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed & Store": {
+      "main": [
+        [
+          {
+            "node": "UpsertNodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embedding": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Embed & Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Embed & Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetUnsummarizedTopics": {
+      "main": [
+        [
+          {
+            "node": "GetTopicText",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetTopicText": {
+      "main": [
+        [
+          {
+            "node": "SummarizeTopic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SummarizeTopic": {
+      "main": [
+        [
+          {
+            "node": "SaveSummary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouterModel": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "SummarizeTopic",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TopicParser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "SummarizeTopic",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouterFix": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "TopicParser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BackfillConfig": {
+      "main": [
+        [
+          {
+            "node": "FetchPosts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CleanupOldPosts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FetchPosts": {
+      "main": [
+        [
+          {
+            "node": "SplitOutPosts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitOutPosts": {
+      "main": [
+        [
+          {
+            "node": "WithinWindow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "PreparePost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'ForumIngestion'": {
+      "main": [
+        [
+          {
+            "node": "GetUnsummarizedTopics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PaceWait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LedgerCheck": {
+      "main": [
+        [
+          {
+            "node": "BatchLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BatchLoop": {
+      "main": [
+        [
+          {
+            "node": "GetUnsummarizedTopics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'ForumIngestion'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PaceWait": {
+      "main": [
+        [
+          {
+            "node": "BatchLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Midnight": {
+      "main": [
+        [
+          {
+            "node": "BackfillConfig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "3c55a35a-0725-425a-8b28-8bc6f5e8b45b",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "Y04SDqFk92B7CIGH",
+  "isArchived": false,
+  "nodeGroups": []
+}

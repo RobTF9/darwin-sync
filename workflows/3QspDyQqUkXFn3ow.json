@@ -11,8 +11,8 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.2,
       "position": [
-        -1200,
-        912
+        -1216,
+        960
       ]
     },
     {
@@ -32,8 +32,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        -1200,
-        480
+        -992,
+        432
       ],
       "webhookId": "af895969-81b3-453e-a77a-3a2a5f8e245b",
       "credentials": {
@@ -52,8 +52,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -976,
-        480
+        -768,
+        432
       ]
     },
     {
@@ -86,35 +86,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -752,
-        480
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "rowNotExists",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "sZjl3a1tHTiiRv0I"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "call_id",
-              "keyValue": "={{ $json.call_id }}"
-            }
-          ]
-        }
-      },
-      "id": "bae79b19-06d1-405d-86f1-c5d5d4356878",
-      "name": "Check New",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        -528,
-        480
+        -544,
+        432
       ]
     },
     {
@@ -122,8 +95,8 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -1456,
-        480
+        -1216,
+        544
       ],
       "id": "2150717a-5fe3-4a68-963b-5f1b933fdf2f",
       "name": "When clicking ‘Execute workflow’"
@@ -135,8 +108,8 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -976,
-        912
+        -992,
+        960
       ]
     },
     {
@@ -156,8 +129,8 @@
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        -752,
-        912
+        -768,
+        960
       ],
       "credentials": {
         "googleBigQueryOAuth2Api": {
@@ -168,28 +141,28 @@
     },
     {
       "parameters": {
-        "jsCode": "return $input.all().map((item) => {\n  const r = item.json;\n  const meta = Array.isArray(r.metaData) ? (r.metaData[0] || {}) : (r.metaData || {});\n  const content = Array.isArray(r.content) ? (r.content[0] || {}) : (r.content || {});\n  const parties = r.parties || [];\n  const transcript = r.transcript || [];\n\n  // Build anonymized speaker map: speakerId -> \"Speaker N (Affiliation)\"\n  // N is 1-indexed by array position; Affiliation from parties[i].affiliation.\n  const speakerLabels = {};   // keyed by speakerId\n  const nameToLabel = {};      // real name -> label, for scrubbing summary text\n  parties.forEach((p, i) => {\n    const affiliation = p.affiliation || 'Unknown';\n    const label = 'Speaker ' + (i + 1) + ' (' + affiliation + ')';\n    if (p.speakerId !== undefined && p.speakerId !== null) {\n      speakerLabels[p.speakerId] = label;\n    }\n    if (p.name) {\n      nameToLabel[p.name] = label;\n    }\n  });\n\n  // Helper: replace any real participant name occurrences with the anon label.\n  const scrub = (text) => {\n    if (!text) return text;\n    let out = String(text);\n    for (const [name, label] of Object.entries(nameToLabel)) {\n      if (!name) continue;\n      const escaped = name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n      out = out.replace(new RegExp(escaped, 'g'), label);\n    }\n    return out;\n  };\n\n  // Participants line uses anonymized labels only (no names/emails).\n  const participantLabels = parties.map((p, i) => 'Speaker ' + (i + 1) + ' (' + (p.affiliation || 'Unknown') + ')');\n\n  const keyPointsText = (content.keyPoints || []).map(k => \"- \" + (k.text || \"\")).join(\"\\n\");\n\n  const outlineText = (content.outline || []).map(s => {\n    const items = (s.items || []).map(i => \"  - \" + (i.text || \"\")).join(\"\\n\");\n    return \"### \" + (s.section || \"\") + \"\\n\" + items;\n  }).join(\"\\n\\n\");\n\n  const highlightsText = (content.highlights || []).map(h => {\n    const items = (h.items || []).map(i => \"  - \" + (i.text || \"\")).join(\"\\n\");\n    return \"### \" + (h.title || \"\") + \"\\n\" + items;\n  }).join(\"\\n\\n\");\n\n  const trackersText = (content.trackers || [])\n    .filter(t => Number(t.count) > 0)\n    .map(t => t.name + \" (\" + t.count + \")\")\n    .join(\", \");\n\n  const summaryParts = [\n    \"# \" + (meta.title || \"Untitled call\"),\n    \"Date: \" + r.scheduled_at,\n    \"Participants: \" + participantLabels.join(\", \"),\n  ];\n  if (meta.url) summaryParts.push(\"URL: \" + meta.url);\n  summaryParts.push(\"\", \"## Brief\", content.brief || \"\");\n  if (keyPointsText) summaryParts.push(\"\", \"## Key Points\", keyPointsText);\n  if (outlineText) summaryParts.push(\"\", \"## Outline\", outlineText);\n  if (highlightsText) summaryParts.push(\"\", \"## Highlights\", highlightsText);\n  if (trackersText) summaryParts.push(\"\", \"## Trackers triggered\", trackersText);\n  const summaryText = scrub(summaryParts.join(\"\\n\"));\n\n  const transcriptText = transcript.map(turn => {\n    const speaker = speakerLabels[turn.speakerId] || (\"Speaker \" + turn.speakerId);\n    const sentences = (turn.sentences || []).map(s => s.text).join(\" \");\n    const topic = turn.topic ? \" [\" + turn.topic + \"]\" : \"\";\n    return speaker + topic + \": \" + sentences;\n  }).join(\"\\n\\n\");\n\n  return {\n    json: {\n      call_id: r.call_id,\n      scheduled_at: r.scheduled_at,\n      primary_user_id: r.primary_user_id || null,\n      meeting_system: r.meeting_system || null,\n      title: meta.title || \"\",\n      duration: meta.duration ? Number(meta.duration) : null,\n      url: meta.url || \"\",\n      embed_url_base: `https://us-29262.app.gong.io/embedded-call?call-id=${r.call_id}`,\n      summary_text: summaryText,\n      transcript_text: transcriptText,\n    }\n  };\n});"
+        "jsCode": "return $input.all().map((item) => {\n  const r = item.json;\n  const meta = Array.isArray(r.metaData) ? (r.metaData[0] || {}) : (r.metaData || {});\n  const content = Array.isArray(r.content) ? (r.content[0] || {}) : (r.content || {});\n  const parties = r.parties || [];\n  const transcript = r.transcript || [];\n\n  // Speaker labels use REAL names + affiliation (PII relaxation, 2026-08):\n  // \"Jane Doe (External)\". Falls back to \"Speaker N (Affiliation)\" when nameless.\n  const speakerLabels = {};\n  parties.forEach((p, i) => {\n    const affiliation = p.affiliation || 'Unknown';\n    const label = (p.name || 'Speaker ' + (i + 1)) + ' (' + affiliation + ')';\n    if (p.speakerId !== undefined && p.speakerId !== null) {\n      speakerLabels[p.speakerId] = label;\n    }\n  });\n\n  const participantLabels = parties.map((p, i) => (p.name || 'Speaker ' + (i + 1)) + ' (' + (p.affiliation || 'Unknown') + ')');\n\n  const keyPointsText = (content.keyPoints || []).map(k => \"- \" + (k.text || \"\")).join(\"\\n\");\n\n  const outlineText = (content.outline || []).map(s => {\n    const items = (s.items || []).map(i => \"  - \" + (i.text || \"\")).join(\"\\n\");\n    return \"### \" + (s.section || \"\") + \"\\n\" + items;\n  }).join(\"\\n\\n\");\n\n  const highlightsText = (content.highlights || []).map(h => {\n    const items = (h.items || []).map(i => \"  - \" + (i.text || \"\")).join(\"\\n\");\n    return \"### \" + (h.title || \"\") + \"\\n\" + items;\n  }).join(\"\\n\\n\");\n\n  const trackers = (content.trackers || [])\n    .filter(t => Number(t.count) > 0)\n    .map(t => ({ name: t.name, count: Number(t.count) }));\n  const trackersText = trackers.map(t => t.name + \" (\" + t.count + \")\").join(\", \");\n\n  const summaryParts = [\n    \"# \" + (meta.title || \"Untitled call\"),\n    \"Date: \" + r.scheduled_at,\n    \"Participants: \" + participantLabels.join(\", \"),\n  ];\n  if (meta.url) summaryParts.push(\"URL: \" + meta.url);\n  summaryParts.push(\"\", \"## Brief\", content.brief || \"\");\n  if (keyPointsText) summaryParts.push(\"\", \"## Key Points\", keyPointsText);\n  if (outlineText) summaryParts.push(\"\", \"## Outline\", outlineText);\n  if (highlightsText) summaryParts.push(\"\", \"## Highlights\", highlightsText);\n  if (trackersText) summaryParts.push(\"\", \"## Trackers triggered\", trackersText);\n  const summaryText = summaryParts.join(\"\\n\");\n\n  const transcriptText = transcript.map(turn => {\n    const speaker = speakerLabels[turn.speakerId] || (\"Speaker \" + turn.speakerId);\n    const sentences = (turn.sentences || []).map(s => s.text).join(\" \");\n    const topic = turn.topic ? \" [\" + turn.topic + \"]\" : \"\";\n    return speaker + topic + \": \" + sentences;\n  }).join(\"\\n\\n\");\n\n  return {\n    json: {\n      call_id: r.call_id,\n      scheduled_at: r.scheduled_at,\n      primary_user_id: r.primary_user_id || null,\n      meeting_system: r.meeting_system || null,\n      title: meta.title || \"\",\n      duration: meta.duration ? Number(meta.duration) : null,\n      url: meta.url || \"\",\n      embed_url_base: `https://us-29262.app.gong.io/embedded-call?call-id=${r.call_id}`,\n      summary_text: summaryText,\n      transcript_text: transcriptText,\n      parties: parties.map(p => ({ name: p.name || null, affiliation: p.affiliation || 'Unknown' })),\n      trackers: trackers,\n    }\n  };\n});"
       },
       "id": "20fc4f6b-7c71-4ad9-95ff-0fceaaf72b02",
       "name": "Prepare Calls",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -528,
-        912
+        -544,
+        960
       ]
     },
     {
       "parameters": {
-        "jsCode": "const j = $('Prepare Calls').item.json;\nconst out = [];\n\n// Extract clean date from scheduled_at\nconst date = j.scheduled_at ? j.scheduled_at.substring(0, 10) : null;\n\nout.push({\n  json: {\n    call_id: j.call_id,\n    scheduled_at: j.scheduled_at,\n    date: date,\n    primary_user_id: j.primary_user_id,\n    meeting_system: j.meeting_system,\n    title: j.title,\n    url: j.url,\n    embed_url_base: j.embed_url_base,\n    doc_type: \"summary\",\n    content: j.summary_text,\n  }\n});\n\nif (j.transcript_text && j.transcript_text.trim().length > 0) {\n  out.push({\n    json: {\n      call_id: j.call_id,\n      scheduled_at: j.scheduled_at,\n      date: date,\n      primary_user_id: j.primary_user_id,\n      meeting_system: j.meeting_system,\n      title: j.title,\n      url: j.url,\n      embed_url_base: j.embed_url_base,\n      doc_type: \"transcript\",\n      content: j.transcript_text,\n    }\n  });\n}\n\nreturn out;"
+        "jsCode": "const j = $('Prepare Calls').item.json;\nconst out = [];\n\nconst date = j.scheduled_at ? j.scheduled_at.substring(0, 10) : null;\nconst shared = {\n  call_id: j.call_id,\n  scheduled_at: j.scheduled_at,\n  date: date,\n  primary_user_id: j.primary_user_id,\n  meeting_system: j.meeting_system,\n  title: j.title,\n  url: j.url,\n  embed_url_base: j.embed_url_base,\n  parties: j.parties,\n  trackers: j.trackers,\n};\n\nout.push({\n  json: { ...shared, doc_type: \"summary\", content: j.summary_text }\n});\n\nif (j.transcript_text && j.transcript_text.trim().length > 0) {\n  out.push({\n    json: { ...shared, doc_type: \"transcript\", content: j.transcript_text }\n  });\n}\n\nreturn out;"
       },
       "id": "53265f8d-c108-439f-8539-e110c62b002d",
       "name": "Explode Documents",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -80,
-        912
+        128,
+        960
       ]
     },
     {
@@ -210,8 +183,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
       "typeVersion": 1.3,
       "position": [
-        176,
-        912
+        384,
+        960
       ],
       "credentials": {
         "supabaseApi": {
@@ -233,8 +206,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
       "typeVersion": 1.2,
       "position": [
-        160,
-        1152
+        368,
+        1200
       ],
       "credentials": {
         "openAiApi": {
@@ -286,6 +259,14 @@
               {
                 "name": "embed_url_base",
                 "value": "={{ $json.embed_url_base }}"
+              },
+              {
+                "name": "parties",
+                "value": "={{ $json.parties }}"
+              },
+              {
+                "name": "trackers",
+                "value": "={{ $json.trackers }}"
               }
             ]
           }
@@ -296,8 +277,8 @@
       "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
       "typeVersion": 1.1,
       "position": [
-        288,
-        1152
+        496,
+        1200
       ]
     },
     {
@@ -311,59 +292,14 @@
       "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
       "typeVersion": 1,
       "position": [
-        368,
-        1360
-      ]
-    },
-    {
-      "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "sZjl3a1tHTiiRv0I"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "call_id": "={{ $('Prepare Calls').item.json.call_id }}",
-            "synced_at": "={{ $now.toISO() }}"
-          },
-          "schema": [
-            {
-              "id": "call_id",
-              "displayName": "call_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "synced_at",
-              "displayName": "synced_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "3200fc7b-4681-42a8-9205-87399e6112b4",
-      "name": "Mark Ingested",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        640,
-        912
+        576,
+        1408
       ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "DELETE FROM public.gong WHERE call_id = $1;",
+        "query": "DELETE FROM public.gong WHERE metadata->>'call_id' = $1;",
         "options": {
           "queryBatching": "independently",
           "queryReplacement": "={{ $('Prepare Calls').item.json.call_id }}"
@@ -374,8 +310,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -304,
-        912
+        -96,
+        960
       ],
       "credentials": {
         "postgres": {
@@ -409,11 +345,129 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        -304,
-        480
+        128,
+        368
       ],
       "id": "313ad3af-b7f4-4816-868f-b87c55c64cdf",
       "name": "Call 'GongIngestion'"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH up AS (\n  INSERT INTO public.gong_calls (call_id, scheduled_at, primary_user_id, meeting_system, data, summary, ingested_at)\n  VALUES ($1, NULLIF($2, '')::timestamptz, NULLIF($3, ''), NULLIF($4, ''), $5::jsonb,\n          nullif(trim(both E' \\n\\t' from split_part(split_part($6, '## Brief', 2), E'\\n## ', 1)), ''), now())\n  ON CONFLICT (call_id) DO UPDATE SET\n    scheduled_at    = EXCLUDED.scheduled_at,\n    primary_user_id = EXCLUDED.primary_user_id,\n    meeting_system  = EXCLUDED.meeting_system,\n    data            = EXCLUDED.data,\n    summary         = COALESCE(EXCLUDED.summary, gong_calls.summary),\n    ingested_at     = now()\n  RETURNING *\n)\nINSERT INTO public.resource (parent_id, path, kind, source_id, title, summary, created_at)\nSELECT (SELECT id FROM public.resource WHERE path = 'gong'::ltree),\n       ('gong.c' || up.call_id)::ltree,\n       'directory', up.call_id,\n       NULLIF(up.data->>'title', ''), up.summary,\n       COALESCE(up.scheduled_at, now())\nFROM up\nON CONFLICT (path) DO UPDATE SET\n  title   = COALESCE(EXCLUDED.title, resource.title),\n  summary = COALESCE(EXCLUDED.summary, resource.summary)\nRETURNING id",
+        "options": {
+          "queryReplacement": "={{ [$('Prepare Calls').item.json.call_id, $('Prepare Calls').item.json.scheduled_at, $('Prepare Calls').item.json.primary_user_id, $('Prepare Calls').item.json.meeting_system, JSON.stringify({ title: $('Prepare Calls').item.json.title, url: $('Prepare Calls').item.json.url, duration: $('Prepare Calls').item.json.duration, embed_url_base: $('Prepare Calls').item.json.embed_url_base, parties: $('Prepare Calls').item.json.parties, trackers: $('Prepare Calls').item.json.trackers }), $('Prepare Calls').item.json.summary_text] }}"
+        }
+      },
+      "id": "3b18b8e6-0a1a-4df4-b80d-49a91e95e1a4",
+      "name": "UpsertGongCall",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -320,
+        960
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Upserts gong_calls (incl. summary = Gong brief) and the gong.c<call_id> resource directory node. Makes new calls browseable via ls immediately."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ins AS (\n  INSERT INTO public.resource (parent_id, path, kind, source_id, title, summary, created_at)\n  SELECT d.id,\n         (d.path::text || '.r' || g.id)::ltree,\n         'gong_call', g.id::text,\n         left(coalesce(g.metadata->>'title', 'gong call'), 80),\n         d.summary,\n         coalesce(nullif(g.metadata->>'scheduled_at', '')::timestamptz, now())\n  FROM public.gong g\n  JOIN public.resource d ON d.kind = 'directory' AND d.path = ('gong.c' || $1)::ltree\n  WHERE g.metadata->>'call_id' = $1\n  ON CONFLICT (path) DO NOTHING\n  RETURNING id\n),\ndel AS (\n  DELETE FROM public.resource r\n  WHERE r.kind = 'gong_call'\n    AND r.path <@ ('gong.c' || $1)::ltree\n    AND r.source_id::bigint NOT IN (SELECT id FROM public.gong WHERE metadata->>'call_id' = $1)\n  RETURNING 1\n),\nled AS (\n  INSERT INTO public.ingest_ledger (source, source_id, content_hash, chunk_version, embed_model, status, ingested_at)\n  VALUES ('gong', $1, md5(coalesce($2, '')), 1, 'text-embedding-3-large', 'done', now())\n  ON CONFLICT (source, source_id) DO UPDATE SET content_hash = EXCLUDED.content_hash, status = 'done', ingested_at = now()\n  RETURNING source_id\n)\nSELECT (SELECT count(*) FROM ins) AS leaves_added,\n       (SELECT count(*) FROM del) AS leaves_removed,\n       (SELECT count(*) FROM led) AS ledger_written",
+        "options": {
+          "queryReplacement": "={{ [$('Prepare Calls').item.json.call_id, $('Prepare Calls').item.json.transcript_text] }}"
+        }
+      },
+      "id": "610a55b8-66f5-4d69-b439-66b159614c6a",
+      "name": "SyncGongNodes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        848,
+        960
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Creates gong_call leaf resource nodes for this call’s vector rows (after embedding) and prunes leaves whose vector rows were deleted."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT j->>'call_id' AS call_id, j->>'title' AS title, j->>'parties' AS parties,\n       j->>'sync_status' AS sync_status, j->>'sync_time' AS sync_time\nFROM (SELECT $2::jsonb) AS t(j)\nWHERE NOT EXISTS (\n  SELECT 1 FROM public.ingest_ledger WHERE source = 'gong' AND source_id = $1\n)",
+        "options": {
+          "queryReplacement": "={{ [$json.call_id, JSON.stringify($json)] }}"
+        }
+      },
+      "id": "4e596610-7ed8-497d-9d8f-067a8fdae945",
+      "name": "LedgerCheck",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -320,
+        432
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "d8ac5088-cca4-4779-b1d3-9f617426c490",
+      "name": "BatchLoop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -96,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "cf892edc-11a4-470c-bf56-bedf410a53f7",
+      "name": "PaceWait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        352,
+        432
+      ],
+      "webhookId": "48c9cbd4-88f1-450a-ac35-986d3e8389bb"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1216,
+        288
+      ],
+      "id": "c80a2334-360a-4694-976f-5ba9f5e063f9",
+      "name": "Schedule Trigger"
     }
   ],
   "connections": {
@@ -444,28 +498,6 @@
         [
           {
             "node": "Has Calls",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Calls": {
-      "main": [
-        [
-          {
-            "node": "Check New",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check New": {
-      "main": [
-        [
-          {
-            "node": "Call 'GongIngestion'",
             "type": "main",
             "index": 0
           }
@@ -505,33 +537,11 @@
         ]
       ]
     },
-    "Prepare Calls": {
-      "main": [
-        [
-          {
-            "node": "Delete Vectors",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Explode Documents": {
       "main": [
         [
           {
             "node": "Embed & Store",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Embed & Store": {
-      "main": [
-        [
-          {
-            "node": "Mark Ingested",
             "type": "main",
             "index": 0
           }
@@ -582,25 +592,121 @@
         ]
       ]
     },
+    "Prepare Calls": {
+      "main": [
+        [
+          {
+            "node": "UpsertGongCall",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpsertGongCall": {
+      "main": [
+        [
+          {
+            "node": "Delete Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed & Store": {
+      "main": [
+        [
+          {
+            "node": "SyncGongNodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Calls": {
+      "main": [
+        [
+          {
+            "node": "LedgerCheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LedgerCheck": {
+      "main": [
+        [
+          {
+            "node": "BatchLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BatchLoop": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Call 'GongIngestion'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Call 'GongIngestion'": {
       "main": [
-        []
+        [
+          {
+            "node": "PaceWait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PaceWait": {
+      "main": [
+        [
+          {
+            "node": "BatchLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sync Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "31d650c5-b6db-4fd6-bbb7-4eafacd1a117",
+  "versionId": "27ea4870-d153-4665-aa94-7d7c252d1f12",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
-  "parentFolderId": "Ht5UYVPQwt80dZHr",
+  "parentFolderId": "Y04SDqFk92B7CIGH",
   "isArchived": false,
   "nodeGroups": []
 }

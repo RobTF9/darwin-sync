@@ -1,16 +1,16 @@
 {
   "id": "OupKSoKX2mR2B8qY",
-  "name": "SlackThreadIngestion",
+  "name": "SlackIngestion",
   "nodes": [
     {
       "parameters": {
-        "jsCode": "\n\n// Resolve the channel ID for this thread dynamically from upstream data\nconst channelId = $('GetChannel').item.json.channel || $('Channels').first().json.channel;\n\n// Get all thread messages and corresponding user profiles\nconst threadMessages = $('GetThread').all();\nconst userProfiles = $('GetUser').all();\n\n// Build a map of user id -> profile for reliable lookup (order-independent)\nconst profileMap = {};\nfor (const p of userProfiles) {\n  const prof = p.json || {};\n  const uid = prof.id || prof.user;\n  if (uid) profileMap[uid] = prof;\n}\n\n// Format each message with username, looked up by the message's author id\nconst formattedThread = threadMessages.map((msg) => {\n  const profile = profileMap[msg.json.user];\n  const userName = profile?.real_name || msg.json.user;\n  const userTitle = profile?.title || '';\n\n  return `<message>\n  <author>${userName}${userTitle ? ` (${userTitle})` : ''}</author>\n  <content>${msg.json.text}</content>\n  <timestamp>${msg.json.ts}</timestamp>\n</message>`;\n}).join('\\n');\n\n// Get thread metadata from first message\nconst firstMsg = threadMessages[0]?.json;\nconst threadTs = firstMsg?.thread_ts || firstMsg?.ts;\n\nreturn {\n  json: {\n    chunk: `<slack-thread id=\"${threadTs}\">\\n${formattedThread}\\n</slack-thread>`,\n    metadata: {\n      url: threadTs\n        ? `https://n8nio.slack.com/archives/${channelId}/p${threadTs.replaceAll('.', '')}`\n        : undefined,\n      message_count: threadMessages.length,\n      timestamp: $('GetThread').first().json.ts\n    }\n  }\n};"
+        "jsCode": "// Channel id/name arrive via the sub-workflow trigger input (orchestrator passthrough)\nconst channelId = $('Trigger').item.json.channel;\nconst channelName = $('Trigger').item.json.channel_name || channelId;\n\n// Get all thread messages and corresponding user profiles\nconst threadMessages = $('GetThread').all();\nconst userProfiles = $('GetUser').all();\n\n// Build a map of user id -> profile for reliable lookup (order-independent)\nconst profileMap = {};\nfor (const p of userProfiles) {\n  const prof = p.json || {};\n  const uid = prof.id || prof.user;\n  if (uid) profileMap[uid] = prof;\n}\n\n// Format each message with username, looked up by the message's author id\nconst authorNames = [];\nconst formattedThread = threadMessages.map((msg) => {\n  const profile = profileMap[msg.json.user];\n  const userName = profile?.real_name || msg.json.user;\n  const userTitle = profile?.title || '';\n  if (!authorNames.includes(userName)) authorNames.push(userName);\n\n  return `<message>\n  <author>${userName}${userTitle ? ` (${userTitle})` : ''}</author>\n  <content>${msg.json.text}</content>\n  <timestamp>${msg.json.ts}</timestamp>\n</message>`;\n}).join('\\n');\n\n// Get thread metadata from first message\nconst firstMsg = threadMessages[0]?.json;\nconst threadTs = firstMsg?.thread_ts || firstMsg?.ts;\n\n// Fallback title: first non-empty line of the first message (LLM title preferred)\nconst firstLine = (firstMsg?.text || '').split('\\n').map(l => l.trim()).find(l => l.length > 0) || 'Slack thread';\n\nreturn {\n  json: {\n    chunk: `<slack-thread id=\"${threadTs}\" channel=\"${channelName}\">\n${formattedThread}\n</slack-thread>`,\n    metadata: {\n      url: threadTs\n        ? `https://n8nio.slack.com/archives/${channelId}/p${threadTs.replaceAll('.', '')}`\n        : undefined,\n      ts: threadTs,\n      channel: channelId,\n      channel_name: channelName,\n      authors: authorNames.join(', '),\n      message_count: threadMessages.length,\n      title_fallback: firstLine.slice(0, 120),\n      timestamp: $('GetThread').first().json.ts\n    }\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -112,
-        -80
+        -1520,
+        592
       ],
       "id": "baa846e3-2d27-4de4-9a1d-7a1b92e483e0",
       "name": "PrepChunk"
@@ -28,8 +28,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        -336,
-        -80
+        -1744,
+        592
       ],
       "id": "08978cf5-2bc7-41b5-92b3-62bf28c68403",
       "name": "GetUser",
@@ -43,46 +43,22 @@
     },
     {
       "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        -1088,
-        -224
-      ],
-      "id": "c0992fbf-cd9e-4de5-ade9-74bee21f8451",
-      "name": "Loop"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.noOp",
-      "name": "State",
-      "typeVersion": 1,
-      "position": [
-        -784,
-        -80
-      ],
-      "id": "2638988f-5a7e-4d11-ab4d-cd3d09c42af3"
-    },
-    {
-      "parameters": {
         "resource": "channel",
         "operation": "replies",
         "channelId": {
           "__rl": true,
-          "mode": "id",
-          "value": "={{ $('GetChannel').item.json.channel || $('Channels').first().json.channel }}"
+          "value": "={{ $json.channel }}",
+          "mode": "id"
         },
-        "ts": "={{ $json.ts }}",
+        "ts": "={{ $json.msg.ts }}",
         "returnAll": true,
         "filters": {}
       },
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        -560,
-        -80
+        -1968,
+        592
       ],
       "id": "0ac5ab87-2ca3-43bf-835a-37146939b625",
       "name": "GetThread",
@@ -110,8 +86,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
       "typeVersion": 1.3,
       "position": [
-        144,
-        -80
+        -592,
+        592
       ],
       "id": "ea14d291-739c-497a-8496-fb2c902355de",
       "name": "Load",
@@ -137,6 +113,18 @@
               {
                 "name": "ts",
                 "value": "={{ $('PrepChunk').item.json.metadata.timestamp }}"
+              },
+              {
+                "name": "channel_name",
+                "value": "={{ $('PrepChunk').item.json.metadata.channel_name }}"
+              },
+              {
+                "name": "authors",
+                "value": "={{ $('PrepChunk').item.json.metadata.authors }}"
+              },
+              {
+                "name": "message_count",
+                "value": "={{ $('PrepChunk').item.json.metadata.message_count }}"
               }
             ]
           }
@@ -145,8 +133,8 @@
       "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
       "typeVersion": 1.1,
       "position": [
-        248,
-        152
+        -480,
+        848
       ],
       "id": "4383d0b8-11da-48b5-853c-091b9813a63c",
       "name": "Doc"
@@ -159,8 +147,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
       "typeVersion": 1.2,
       "position": [
-        120,
-        152
+        -608,
+        848
       ],
       "id": "0842ba5e-c186-4adc-8814-02a4f84d79f0",
       "name": "Embed",
@@ -180,8 +168,8 @@
       "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
       "typeVersion": 1,
       "position": [
-        328,
-        360
+        -400,
+        1056
       ],
       "id": "d2204c98-1ebe-4927-b169-4cd8c23c9da2",
       "name": "Split"
@@ -194,23 +182,23 @@
       "typeVersion": 1.2,
       "position": [
         -2240,
-        -128
+        464
       ],
       "id": "01247b9b-a8f8-4c18-a5c7-32bbf5db2ee5",
       "name": "Trigger"
     },
     {
       "parameters": {
-        "jsCode": "return [{\n  channel: 'C035KDLD6MP' // mission-user-research\n},{\n  channel: 'C089XFWGYLR' // updates-product-bakery\n}]"
+        "jsCode": "return [{\n  channel: 'C035KDLD6MP',\n  name: 'mission-user-research'\n},{\n  channel: 'C089XFWGYLR',\n  name: 'updates-product-bakery'\n}]"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         -2016,
-        -128
+        144
       ],
       "id": "b4283712-b046-4fee-b1a5-b05301d46891",
-      "name": " Channels"
+      "name": "Channels"
     },
     {
       "parameters": {
@@ -223,14 +211,14 @@
         },
         "returnAll": true,
         "filters": {
-          "latest": "={{ $now.minus(3, 'months') }}"
+          "oldest": "={{ $now.minus(3, 'months') }}"
         }
       },
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
         -1792,
-        -128
+        48
       ],
       "id": "c36a069c-3279-44f7-93ac-824547846893",
       "name": "GetChannel",
@@ -244,78 +232,6 @@
     },
     {
       "parameters": {
-        "operation": "rowNotExists",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "9MB0qfWs7veeeuoj"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "thread_ts",
-              "keyValue": "={{ $json.ts }}"
-            }
-          ]
-        }
-      },
-      "id": "7be133f3-39e4-456e-a2ee-6851d15743b5",
-      "name": "FilterNew",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        -1568,
-        -128
-      ]
-    },
-    {
-      "parameters": {
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "9MB0qfWs7veeeuoj"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "thread_ts": "={{ $('State').item.json.ts }}",
-            "channel": "={{ $('GetChannel').item.json.channel || $('Channels').first().json.channel }}"
-          },
-          "schema": [
-            {
-              "id": "thread_ts",
-              "displayName": "thread_ts",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "channel",
-              "displayName": "channel",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "db8a0b2e-d24b-458c-9e29-502d1846d24a",
-      "name": "MarkIngested",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        608,
-        -80
-      ]
-    },
-    {
-      "parameters": {
         "conditions": {
           "combinator": "and",
           "options": {
@@ -326,7 +242,7 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ Number($json.ts) }}",
+              "leftValue": "={{ Number($json.msg.ts) }}",
               "rightValue": "={{ $now.minus(3, 'months').toSeconds() }}",
               "operator": {
                 "type": "number",
@@ -343,7 +259,7 @@
       "typeVersion": 2.3,
       "position": [
         -1344,
-        -128
+        48
       ]
     },
     {
@@ -356,7 +272,7 @@
             {
               "keyName": "metadata->>ts",
               "condition": "eq",
-              "keyValue": "={{ $json.ts }}"
+              "keyValue": "={{ $json.msg.ts }}"
             }
           ]
         }
@@ -366,8 +282,8 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -1104,
-        48
+        -1136,
+        160
       ],
       "credentials": {
         "supabaseApi": {
@@ -375,48 +291,283 @@
           "name": "Supabase API"
         }
       }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Summarize this Slack thread from n8n's internal user-research Slack for a research search index.\\n\\nRequirements:\\n- title: max 80 characters, plain text, no quotes or markup; name the n8n feature or area if one is discussed\\n- summary: 1-2 sentences capturing the user need, pain point, insight, or decision\\n\\nThread:\\n\" + $json.chunk }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You write search-index metadata for Slack threads from n8n's internal user-research Slack. You never invent facts and you name n8n features exactly as written. You always respond in the requested JSON format."
+            }
+          ]
+        },
+        "batching": {
+          "batchSize": 2,
+          "delayBetweenBatches": 500
+        }
+      },
+      "id": "e60a06db-8966-4f67-b18d-5e0ba53b4762",
+      "name": "SummarizeThread",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1296,
+        592
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-v4-flash",
+        "options": {
+          "maxTokens": 2000,
+          "responseFormat": "json_object",
+          "temperature": 0.2
+        }
+      },
+      "id": "6fa3bd1f-0831-4c75-aa14-2161ce16afeb",
+      "name": "OpenRouterModel",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        1056
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "BXBT8cTCvefRDsgP",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"title\": \"Concise thread title naming the n8n feature discussed\", \"summary\": \"1-2 sentences: the user need, pain point, insight, or decision in this thread\"}",
+        "autoFix": true
+      },
+      "id": "d3a6e541-91e9-43d0-8a02-3f853f38c808",
+      "name": "ThreadParser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -1200,
+        848
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH dir AS (\n  INSERT INTO public.resource (parent_id, path, kind, title)\n  SELECT r.id, ('slack.' || lower($1))::ltree, 'directory', NULLIF($3, '')\n  FROM public.resource r\n  WHERE r.path = 'slack'::ltree\n  ON CONFLICT (path) DO NOTHING\n  RETURNING id\n),\nup AS (\n  INSERT INTO public.slack_threads (channel_id, thread_ts, channel_name, title, summary, authors, message_count, permalink, started_at)\n  VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), NULLIF($5, ''), string_to_array(NULLIF($6, ''), ', '), NULLIF($7::text, '')::int, NULLIF($8, ''), to_timestamp($9::double precision))\n  ON CONFLICT (channel_id, thread_ts) DO UPDATE SET\n    channel_name  = COALESCE(EXCLUDED.channel_name, slack_threads.channel_name),\n    title         = COALESCE(EXCLUDED.title, slack_threads.title),\n    summary       = COALESCE(EXCLUDED.summary, slack_threads.summary),\n    authors       = COALESCE(EXCLUDED.authors, slack_threads.authors),\n    message_count = COALESCE(EXCLUDED.message_count, slack_threads.message_count),\n    permalink     = COALESCE(EXCLUDED.permalink, slack_threads.permalink),\n    updated_at    = now()\n  RETURNING *\n),\nnode_parent AS (\n  SELECT id FROM dir\n  UNION ALL\n  SELECT id FROM public.resource WHERE kind = 'directory' AND path = ('slack.' || lower($1))::ltree\n  LIMIT 1\n)\nINSERT INTO public.resource (parent_id, path, kind, source_id, title, summary, created_at)\nSELECT (SELECT id FROM node_parent),\n       ('slack.' || lower(up.channel_id) || '.t' || replace(up.thread_ts, '.', '_'))::ltree,\n       'slack_thread',\n       up.channel_id || ':' || up.thread_ts,\n       up.title,\n       up.summary,\n       COALESCE(up.started_at, now())\nFROM up\nON CONFLICT (path) DO UPDATE SET\n  parent_id = COALESCE(resource.parent_id, EXCLUDED.parent_id),\n  title     = EXCLUDED.title,\n  summary   = EXCLUDED.summary,\n  source_id = EXCLUDED.source_id\nRETURNING id, title",
+        "options": {
+          "queryReplacement": "={{ [$('PrepChunk').item.json.metadata.channel, $('PrepChunk').item.json.metadata.ts, $('PrepChunk').item.json.metadata.channel_name, ($json.output && $json.output.title) ? $json.output.title : $('PrepChunk').item.json.metadata.title_fallback, ($json.output && $json.output.summary) ? $json.output.summary : '', $('PrepChunk').item.json.metadata.authors, $('PrepChunk').item.json.metadata.message_count, $('PrepChunk').item.json.metadata.url, $('PrepChunk').item.json.metadata.ts] }}"
+        }
+      },
+      "id": "e2775657-e42d-496c-9e0a-f55104508284",
+      "name": "UpsertThread",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -848,
+        592
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH dt AS (\n  DELETE FROM public.slack_threads WHERE channel_id = $1 AND thread_ts = $2 RETURNING channel_id\n),\ndl AS (\n  DELETE FROM public.ingest_ledger WHERE source = 'slack' AND source_id = $2 RETURNING 1\n)\nDELETE FROM public.resource\nWHERE kind = 'slack_thread'\n  AND path = ('slack.' || lower($1) || '.t' || replace($2, '.', '_'))::ltree\nRETURNING id",
+        "options": {
+          "queryReplacement": "={{ [$('GetChannel').item.json.channel || $('Channels').item.json.channel, $('WindowIF').item.json.msg.ts] }}"
+        }
+      },
+      "id": "32031441-3771-420b-9ac4-510d01c5cfd1",
+      "name": "DeleteThreadRow",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -912,
+        160
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ds AS (\n  DELETE FROM public.slack\n  WHERE (metadata->>'ts')::double precision < extract(epoch from now() - interval '3 months')\n  RETURNING metadata->>'ts' AS ts\n),\ndt AS (\n  DELETE FROM public.slack_threads\n  WHERE started_at < now() - interval '3 months'\n  RETURNING channel_id, thread_ts\n),\ndl AS (\n  DELETE FROM public.ingest_ledger\n  WHERE source = 'slack' AND (source_id IN (SELECT ts FROM ds) OR source_id IN (SELECT thread_ts FROM dt))\n  RETURNING 1\n),\ndn AS (\n  DELETE FROM public.resource\n  WHERE kind = 'slack_thread' AND path <@ 'slack'\n    AND (source_id IN (SELECT channel_id || ':' || thread_ts FROM dt)\n         OR source_id NOT IN (SELECT channel_id || ':' || thread_ts FROM public.slack_threads))\n  RETURNING 1\n)\nSELECT (SELECT count(*) FROM ds) AS vectors_deleted,\n       (SELECT count(*) FROM dt) AS threads_deleted,\n       (SELECT count(*) FROM dl) AS ledger_rows_deleted,\n       (SELECT count(*) FROM dn) AS nodes_deleted",
+        "options": {}
+      },
+      "id": "b357a701-8075-4e74-8f7b-12553dc50624",
+      "name": "CleanupOldThreads",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1792,
+        240
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Rolling 3-month window: deletes old slack vector rows, slack_threads rows, ingest_ledger rows, and orphaned slack_thread resource nodes. Runs every execution (fans off Channels, executeOnce)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT $2::jsonb AS msg, $3::text AS channel, NULLIF($4, '') AS channel_name\nWHERE NOT EXISTS (\n  SELECT 1 FROM public.ingest_ledger WHERE source = 'slack' AND source_id = $1\n)",
+        "options": {
+          "queryReplacement": "={{ [$json.ts, JSON.stringify($json), $json.channel || $('Channels').item.json.channel, $('Channels').item.json.name || ''] }}"
+        }
+      },
+      "id": "d246660c-3aeb-4330-909e-09bf08de1c45",
+      "name": "LedgerCheck",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1568,
+        48
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.ingest_ledger (source, source_id, content_hash, chunk_version, embed_model, status, ingested_at)\nVALUES ('slack', $1, md5(coalesce($2, '')), 1, 'text-embedding-3-large', 'done', now())\nON CONFLICT (source, source_id) DO UPDATE SET content_hash = EXCLUDED.content_hash, status = 'done', ingested_at = now()\nRETURNING source_id",
+        "options": {
+          "queryReplacement": "={{ [$('PrepChunk').item.json.metadata.ts, $('PrepChunk').item.json.chunk] }}"
+        }
+      },
+      "id": "5e56290e-e2d6-42f1-be11-deb47c7a2821",
+      "name": "MarkIngested",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1488,
+        464
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "ece77a76-0dc4-41c4-bb42-c7a09ce4d6bd",
+      "name": "Backfill (manual)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2240,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "OupKSoKX2mR2B8qY",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/OupKSoKX2mR2B8qY",
+          "cachedResultName": "Darwin — SlackIngestion"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "c9904875-2cbd-44dd-beaf-b189de153063",
+      "name": "Call 'SlackIngestion'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -752,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1088,
+        -192
+      ],
+      "id": "54efcadf-e8fd-41f8-96c0-bb3a6f270fe2",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -528,
+        -96
+      ],
+      "id": "8c702ba6-2ec6-410f-8633-8a5dfff087da",
+      "name": "Wait",
+      "webhookId": "3dd1712a-72e2-477c-8812-c6cce490dbf9"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 5
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2240,
+        0
+      ],
+      "id": "e08d8d0d-ce34-42b3-a545-32cd0aa17bae",
+      "name": "5am"
     }
   ],
   "connections": {
-    "PrepChunk": {
-      "main": [
-        [
-          {
-            "node": "Load",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "GetUser": {
       "main": [
         [
           {
             "node": "PrepChunk",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Loop": {
-      "main": [
-        [],
-        [
-          {
-            "node": "State",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "State": {
-      "main": [
-        [
-          {
-            "node": "GetThread",
             "type": "main",
             "index": 0
           }
@@ -467,22 +618,105 @@
         ]
       ]
     },
-    "Trigger": {
+    "WindowIF": {
       "main": [
         [
           {
-            "node": " Channels",
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DeleteFromVectorStore",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    " Channels": {
+    "Channels": {
       "main": [
         [
           {
             "node": "GetChannel",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CleanupOldThreads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PrepChunk": {
+      "main": [
+        [
+          {
+            "node": "SummarizeThread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SummarizeThread": {
+      "main": [
+        [
+          {
+            "node": "UpsertThread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpsertThread": {
+      "main": [
+        [
+          {
+            "node": "Load",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouterModel": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "SummarizeThread",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "ThreadParser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ThreadParser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "SummarizeThread",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeleteFromVectorStore": {
+      "main": [
+        [
+          {
+            "node": "DeleteThreadRow",
             "type": "main",
             "index": 0
           }
@@ -493,7 +727,18 @@
       "main": [
         [
           {
-            "node": "FilterNew",
+            "node": "LedgerCheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LedgerCheck": {
+      "main": [
+        [
+          {
+            "node": "WindowIF",
             "type": "main",
             "index": 0
           }
@@ -511,40 +756,67 @@
         ]
       ]
     },
-    "MarkIngested": {
+    "Backfill (manual)": {
       "main": [
         [
           {
-            "node": "Loop",
+            "node": "Channels",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "FilterNew": {
+    "Trigger": {
       "main": [
         [
           {
-            "node": "WindowIF",
+            "node": "GetThread",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "WindowIF": {
+    "Call 'SlackIngestion'": {
       "main": [
         [
           {
-            "node": "Loop",
+            "node": "Wait",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
         [
           {
-            "node": "DeleteFromVectorStore",
+            "node": "Call 'SlackIngestion'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5am": {
+      "main": [
+        [
+          {
+            "node": "Channels",
             "type": "main",
             "index": 0
           }
@@ -559,13 +831,13 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "58adc078-f3f1-45df-bc2a-f6edcf25fe6c",
+  "versionId": "af26404d-b510-4660-9f85-e77eb3cc0574",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
-  "parentFolderId": "sN4NLjKdQAvpQSY4",
+  "parentFolderId": "Y04SDqFk92B7CIGH",
   "isArchived": false,
   "nodeGroups": [
     {
@@ -574,10 +846,12 @@
       "nodeIds": [
         "baa846e3-2d27-4de4-9a1d-7a1b92e483e0",
         "08978cf5-2bc7-41b5-92b3-62bf28c68403",
-        "2638988f-5a7e-4d11-ab4d-cd3d09c42af3",
         "0ac5ab87-2ca3-43bf-835a-37146939b625",
+        "e60a06db-8966-4f67-b18d-5e0ba53b4762",
+        "6fa3bd1f-0831-4c75-aa14-2161ce16afeb",
+        "d3a6e541-91e9-43d0-8a02-3f853f38c808",
+        "e2775657-e42d-496c-9e0a-f55104508284",
         "ea14d291-739c-497a-8496-fb2c902355de",
-        "db8a0b2e-d24b-458c-9e29-502d1846d24a",
         "0842ba5e-c186-4adc-8814-02a4f84d79f0",
         "d2204c98-1ebe-4927-b169-4cd8c23c9da2",
         "4383d0b8-11da-48b5-853c-091b9813a63c"

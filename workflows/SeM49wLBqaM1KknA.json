@@ -1,0 +1,185 @@
+{
+  "id": "SeM49wLBqaM1KknA",
+  "name": "Search",
+  "nodes": [
+    {
+      "id": "394d8ccb-23c3-4de1-a7ec-2d2cc3094ee6",
+      "name": "Sub",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "query"
+            },
+            {
+              "name": "sources"
+            },
+            {
+              "name": "k"
+            },
+            {
+              "name": "max_results"
+            },
+            {
+              "name": "within"
+            },
+            {
+              "name": "approved"
+            },
+            {
+              "name": "project_id"
+            },
+            {
+              "name": "date_from"
+            },
+            {
+              "name": "date_to"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "565e4854-fd5a-408a-a2f4-89ecf2dc2e6c",
+      "name": "Embed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"text-embedding-3-large\", input: $json.query }) }}"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "id": "18536ac8-b30f-4a46-b9a0-4e1d004ae92f",
+      "name": "Build SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const t = $('Sub').first().json;\nconst emb = $input.item.json.data[0].embedding;\nconst esc = (s) => String(s).replace(/'/g, \"''\");\nlet sourcesArr = \"'{sessions,jobs,opportunities,forum,plain,gong,slack}'::text[]\";\nif (t.sources) {\n  const parts = String(t.sources).split(',').map(s => s.trim()).filter(Boolean);\n  if (parts.length) sourcesArr = \"'{\" + parts.join(',') + \"}'::text[]\";\n}\nconst within = t.within ? \"'\" + esc(t.within) + \"'::ltree\" : 'null';\nconst approved = (t.approved === undefined || t.approved === null || t.approved === '') ? 'null' : (String(t.approved) === 'true' ? 'true' : 'false');\nconst projectId = t.project_id ? \"'\" + esc(t.project_id) + \"'::uuid\" : 'null';\nconst dateFrom = t.date_from ? \"'\" + esc(t.date_from) + \"'::date\" : 'null';\nconst dateTo = t.date_to ? \"'\" + esc(t.date_to) + \"'::date\" : 'null';\nconst k = Number(t.k) || 10;\nconst maxResults = Number(t.max_results) || 15;\nconst sql = \"select * from public.search_all('[\" + emb.join(',') + \"]'::vector, '\" + esc(t.query) + \"', \" + k + \", \" + maxResults + \", \" + sourcesArr + \", \" + within + \", \" + approved + \", \" + projectId + \", \" + dateFrom + \", \" + dateTo + \")\";\nreturn { sql };"
+      }
+    },
+    {
+      "id": "82fd23f0-8183-445c-9d62-8216146ad7c7",
+      "name": "search_all",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ccc1a848-f4fc-4437-ba87-d13c923381c3",
+      "name": "Shape Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.source);\nconst sources = [...new Set(rows.map(r => r.source))];\n\nlet emptyHint;\nif (rows.length === 0) {\n  const t = $('Sub').first().json;\n  const widen = [];\n  // approved is tri-state: omitted/null = ALL sessions, true = only approved,\n  // false = only UNapproved. Never suggest approved:false — it narrows.\n  if (t.approved === true || t.approved === 'true') {\n    widen.push('drop the approved filter (omit it entirely — approved:false means ONLY unapproved sessions, a narrower set, not a wider one)');\n  }\n  if (t.within) widen.push(\"drop the within scope (you searched '\" + t.within + \"')\");\n  if (t.date_from || t.date_to) widen.push('drop or widen the date range');\n  if (t.sources) widen.push('broaden sources (omit the sources parameter to search all seven)');\n  widen.push('rephrase the query with different terms');\n  emptyHint = 'No results. To widen, try in order: ' + widen.join('; ') + '. If none help, the corpus likely has nothing on this — say so rather than retrying with the same terms.';\n}\n\nreturn [{ json: {\n  results: rows,\n  meta: {\n    count: rows.length,\n    sources_searched: sources,\n    citation_rule: 'Cite deep_link verbatim — never construct or paraphrase URLs.',\n    empty_hint: emptyHint\n  }\n} }];"
+      }
+    }
+  ],
+  "connections": {
+    "Sub": {
+      "main": [
+        [
+          {
+            "node": "Embed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed": {
+      "main": [
+        [
+          {
+            "node": "Build SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SQL": {
+      "main": [
+        [
+          {
+            "node": "search_all",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "search_all": {
+      "main": [
+        [
+          {
+            "node": "Shape Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "ecfc2006-b489-4107-bd98-87288972be02",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "DTre4lbkGJubF43l",
+  "isArchived": false,
+  "nodeGroups": []
+}

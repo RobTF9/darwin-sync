@@ -9,35 +9,23 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ query: `query FetchThreads($cursor: String) { threads(first: 50, after: $cursor, filters: { updatedAt: { after: \"${$json.lastSync || \"2020-01-01T00:00:00Z\"}\" } }, sortBy: { field: CREATED_AT, direction: ASC }) { pageInfo { hasNextPage endCursor } totalCount edges { node { id title status priority createdAt { iso8601 } updatedAt { iso8601 } customer { id fullName email { email } } labels { labelType { id name } } timelineEntries(first: 100) { edges { node { id timestamp { iso8601 } llmText actor { ... on UserActor { user { fullName } } ... on CustomerActor { customer { fullName } } ... on MachineUserActor { machineUser { fullName } } } } } } } } } }`, variables: { cursor: null } }) }}",
-        "options": {
-          "pagination": {
-            "pagination": {
-              "parameters": {
-                "parameters": [
-                  {
-                    "type": "body",
-                    "name": "variables",
-                    "value": "={{ JSON.stringify({ cursor: $response.body.data.threads.pageInfo.endCursor }) }}"
-                  }
-                ]
-              },
-              "paginationCompleteWhen": "other",
-              "completeExpression": "={{ !$response.body.data.threads.pageInfo.hasNextPage }}",
-              "limitPagesFetched": true,
-              "requestInterval": 1000
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ `query FetchThreads { threads(first: 50, filters: { createdAt: { after: \"${$json.watermark}\" }, labelTypeIds: [\"lt_01KWF5X59RBXEEN4YGFC927T8W\",\"lt_01KM3FF872J38X0RV65N9G26BF\",\"lt_01KM3FFD39R71K397NKKMF87ET\",\"lt_01KM3FFC0FH05FX4GEHPGV53DD\",\"lt_01K1B3C172DYM5HKH1Y9REYFFZ\",\"lt_01KM3FFDDWDVSPECFNWZXHJEEW\",\"lt_01K1B3FB3FF6FE9QH5PP8MJV23\"] }, sortBy: { field: CREATED_AT, direction: ASC }) { pageInfo { hasNextPage } totalCount edges { node { id title status priority createdAt { iso8601 } updatedAt { iso8601 } customer { id fullName email { email } } labels { labelType { id name } } timelineEntries(first: 20) { edges { node { id timestamp { iso8601 } llmText actor { ... on UserActor { user { fullName } } ... on CustomerActor { customer { fullName } } ... on MachineUserActor { machineUser { fullName } } } } } } } } } }` }}"
             }
-          }
-        }
+          ]
+        },
+        "options": {}
       },
       "id": "e832a8b0-1e47-4d07-97f5-5830a76b116d",
       "name": "Fetch Plain Threads",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -928,
-        368
+        -752,
+        -32
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -63,8 +51,8 @@
       "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
       "typeVersion": 1.3,
       "position": [
-        -352,
-        368
+        176,
+        592
       ],
       "credentials": {
         "supabaseApi": {
@@ -85,8 +73,8 @@
       "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -448,
-        624
+        136,
+        808
       ],
       "credentials": {
         "openAiApi": {
@@ -98,26 +86,46 @@
     {
       "parameters": {
         "jsonMode": "expressionData",
-        "jsonData": "={{ $json.text }}",
+        "jsonData": "={{ $('Format Threads for Embedding').item.json.text }}",
         "textSplittingMode": "custom",
         "options": {
           "metadata": {
             "metadataValues": [
               {
                 "name": "thread_id",
-                "value": "={{ $json.metadata.thread_id }}"
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.thread_id }}"
               },
               {
                 "name": "thread_title",
-                "value": "={{ $json.metadata.thread_title }}"
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.thread_title }}"
               },
               {
                 "name": "status",
-                "value": "={{ $json.metadata.status }}"
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.status }}"
               },
               {
                 "name": "priority",
-                "value": "={{ $json.metadata.priority }}"
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.priority }}"
+              },
+              {
+                "name": "customer_name",
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.customer_name }}"
+              },
+              {
+                "name": "company",
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.company }}"
+              },
+              {
+                "name": "labels",
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.labels }}"
+              },
+              {
+                "name": "created_at",
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.created_at }}"
+              },
+              {
+                "name": "message_count",
+                "value": "={{ $('Format Threads for Embedding').item.json.metadata.message_count }}"
               },
               {
                 "name": "source",
@@ -132,8 +140,8 @@
       "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
       "typeVersion": 1.1,
       "position": [
-        -304,
-        608
+        264,
+        808
       ]
     },
     {
@@ -147,21 +155,21 @@
       "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
       "typeVersion": 1,
       "position": [
-        -320,
-        784
+        344,
+        1016
       ]
     },
     {
       "parameters": {
-        "jsCode": "\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const threads = item.json.data?.threads?.edges || [];\n  \n  for (const { node: thread } of threads) {\n    const messages = (thread.timelineEntries?.edges || [])\n      .filter(({ node: entry }) => entry.llmText)\n      .map(({ node: entry }) => {\n        const ts = entry.timestamp?.iso8601?.slice(0, 16) || '';\n        return ts + ' ' + entry.llmText;\n      });\n\n    if (messages.length === 0) continue;\n\n    const labels = (thread.labels || []).map(l => l.labelType?.name).filter(Boolean);\n\n    const header = [\n      'Thread: ' + (thread.title || 'Untitled'),\n      'Status: ' + thread.status,\n      'Priority: ' + (thread.priority ?? 'UNSET'),\n      labels.length ? 'Labels: ' + labels.join(', ') : null\n    ].filter(Boolean).join(' | ');\n\n    const text = header + '\\n---\\n' + messages.join('\\n');\n\n    results.push({\n      json: {\n        text,\n        thread_id: thread.id,\n        metadata: {\n          thread_id: thread.id,\n          thread_title: thread.title || 'Untitled',\n          status: thread.status,\n          priority: thread.priority ?? 'UNSET',\n          labels,\n          created_at: thread.createdAt?.iso8601,\n          updated_at: thread.updatedAt?.iso8601,\n          message_count: messages.length,\n          source: 'plain'\n        }\n      }\n    });\n  }\n}\n\nreturn results;\n"
+        "jsCode": "const items = $input.all();\nconst results = [];\nconst esc = (s) => String(s ?? '').replace(/'/g, \"''\");\n\n// Accept both shapes: split-out edge items ({ node: thread }) from the\n// orchestrator, or full GraphQL page wrappers ({ data: { threads: { edges } } })\n// when run directly.\nconst allThreads = [];\nfor (const item of items) {\n  if (item.json && item.json.node) {\n    allThreads.push(item.json.node);\n  } else {\n    const edges = item.json.data?.threads?.edges || [];\n    for (const e of edges) allThreads.push(e.node);\n  }\n}\n\nfor (const thread of allThreads) {\n  const messages = (thread.timelineEntries?.edges || [])\n    .filter(({ node: entry }) => entry.llmText)\n    .map(({ node: entry }) => {\n      const actor = entry.actor?.user?.fullName || entry.actor?.customer?.fullName || entry.actor?.machineUser?.fullName || '';\n      const ts = entry.timestamp?.iso8601?.slice(0, 16) || '';\n      return (ts + (actor ? ' [' + actor + ']' : '') + ' ' + entry.llmText).trim();\n    });\n\n  if (messages.length === 0) continue;\n\n  const labels = (thread.labels || []).map(l => l.labelType?.name).filter(Boolean);\n  const customerName = thread.customer?.fullName || null;\n  const email = thread.customer?.email?.email || null;\n  const company = email ? email.split('@')[1]?.replace(/\\.(com|co|io|net|org)$/, '') : null;\n\n  const header = [\n    'Thread: ' + (thread.title || 'Untitled'),\n    'Status: ' + thread.status,\n    'Priority: ' + (thread.priority ?? 'UNSET'),\n    customerName ? 'Customer: ' + customerName + (company ? ' (' + company + ')' : '') : null,\n    labels.length ? 'Labels: ' + labels.join(', ') : null\n  ].filter(Boolean).join(' | ');\n\n  const text = header + '\\n---\\n' + messages.join('\\n');\n\n  // One statement, both side effects: upsert the raw thread store AND dedupe\n  // the vector rows for this thread. Passthrough row keeps the item flow 1:1.\n  const sync_sql =\n    \"WITH u AS (INSERT INTO public.plain_threads (thread_id, customer_id, status, priority, data, ingested_at) VALUES ('\" +\n    esc(thread.id) + \"', \" +\n    (thread.customer?.id ? \"'\" + esc(thread.customer.id) + \"'\" : \"null\") + \", '\" +\n    esc(thread.status) + \"', '\" +\n    esc(String(thread.priority ?? 'UNSET')) + \"', '\" +\n    esc(JSON.stringify(thread)) + \"'::jsonb, now()) \" +\n    \"ON CONFLICT (thread_id) DO UPDATE SET customer_id = EXCLUDED.customer_id, status = EXCLUDED.status, priority = EXCLUDED.priority, data = EXCLUDED.data, ingested_at = now() RETURNING 1), \" +\n    \"d AS (DELETE FROM public.plain WHERE metadata->>'thread_id' = '\" + esc(thread.id) + \"' RETURNING 1) \" +\n    \"SELECT 1 AS passthrough;\";\n\n  results.push({\n    json: {\n      text,\n      thread_id: thread.id,\n      sync_sql,\n      metadata: {\n        thread_id: thread.id,\n        thread_title: thread.title || 'Untitled',\n        status: thread.status,\n        priority: thread.priority ?? 'UNSET',\n        customer_name: customerName,\n        company,\n        labels: labels.join(', '),\n        created_at: thread.createdAt?.iso8601,\n        updated_at: thread.updatedAt?.iso8601,\n        message_count: messages.length,\n        source: 'plain'\n      }\n    }\n  });\n}\n\nreturn results;"
       },
       "id": "7a968cb3-87af-4a8c-a067-fdb75863b391",
       "name": "Format Threads for Embedding",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -688,
-        368
+        -976,
+        592
       ]
     },
     {
@@ -171,11 +179,400 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.2,
       "position": [
-        -1168,
-        368
+        -1200,
+        592
       ],
       "id": "5e9a3ed4-a189-461b-91f0-68f5e3523799",
       "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        -32
+      ],
+      "id": "2dbf5ce9-4a12-42a0-8ace-c8f21c37da71",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data.threads.edges",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        80
+      ],
+      "id": "d520b01d-0641-438d-9cd8-963bf89d4cbc",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ODDGjvYcB8pXy2K8",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ODDGjvYcB8pXy2K8",
+          "cachedResultName": "Darwin — PlainIngestion"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        80
+      ],
+      "id": "53aa2ac7-dd45-431f-aab0-9efd8c01a210",
+      "name": "Call 'PlainIngestion'"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "process",
+              "leftValue": "={{ !$json.ledger || Number(($json.node.timelineEntries.edges || []).filter(e => e.node && e.node.llmText).length) > Number($json.ledger.content_hash || 0) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b885709c-2409-4eca-93f6-0bbb5a8b9a02",
+      "name": "New or Grown?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -80,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH old_plain AS (\n  SELECT id, metadata->>'thread_id' AS thread_id FROM public.plain\n  WHERE (metadata->>'created_at')::timestamptz < now() - interval '3 months'\n),\ndp AS (\n  DELETE FROM public.plain WHERE id IN (SELECT id FROM old_plain) RETURNING id\n),\ndt AS (\n  DELETE FROM public.plain_threads\n  WHERE (data->'updatedAt'->>'iso8601')::timestamptz < now() - interval '3 months'\n  RETURNING thread_id\n),\ndl AS (\n  DELETE FROM public.ingest_ledger\n  WHERE source = 'plain' AND (source_id IN (SELECT thread_id FROM old_plain) OR source_id IN (SELECT thread_id FROM dt))\n  RETURNING 1\n),\ndr AS (\n  DELETE FROM public.resource\n  WHERE path <@ 'plain'\n    AND (\n      (kind = 'directory' AND source_id IS NOT NULL\n        AND (source_id IN (SELECT thread_id FROM dt) OR source_id NOT IN (SELECT thread_id FROM public.plain_threads)))\n      OR (kind = 'plain_thread'\n        AND (source_id::bigint IN (SELECT id FROM old_plain) OR source_id::bigint NOT IN (SELECT id FROM public.plain)))\n    )\n  RETURNING 1\n)\nSELECT (SELECT count(*) FROM dp) AS vectors_deleted,\n       (SELECT count(*) FROM dt) AS threads_deleted,\n       (SELECT count(*) FROM dl) AS ledger_rows_deleted,\n       (SELECT count(*) FROM dr) AS nodes_deleted",
+        "options": {}
+      },
+      "id": "5954a419-23d5-47d0-a808-466cf15d5f0e",
+      "name": "Delete Old Threads",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        368,
+        -112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.sync_sql }}",
+        "options": {}
+      },
+      "id": "a34a1111-f2e7-471b-b8a2-4c43e03e4375",
+      "name": "Sync Thread",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -752,
+        592
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Summarize this Plain customer-support thread for a research search index.\\n\\nRequirements:\\n- title: max 80 characters, plain text, no quotes or markup; name the n8n feature or area if one is discussed\\n- summary: 1-2 sentences capturing the CUSTOMER's problem, request, or feedback — not the support agent's handling\\n\\nThread:\\n\" + $('Format Threads for Embedding').item.json.text }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You write search-index metadata for customer support threads from Plain (n8n's support platform). You summarize the customer's problem or request, never the agent's handling. You never invent facts and you name n8n features exactly as written. You always respond in the requested JSON format."
+            }
+          ]
+        },
+        "batching": {
+          "batchSize": 2,
+          "delayBetweenBatches": 500
+        }
+      },
+      "id": "0ca23261-06a9-475c-b295-e774f6227ce4",
+      "name": "SummarizeThread",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -528,
+        592
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-v4-flash",
+        "options": {
+          "maxTokens": 2000,
+          "responseFormat": "json_object",
+          "temperature": 0.2
+        }
+      },
+      "id": "1b799482-ad10-4f22-bd5b-a571d9c04d55",
+      "name": "OpenRouterModel",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -456,
+        1016
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "BXBT8cTCvefRDsgP",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"title\": \"Concise thread title naming the n8n feature discussed\", \"summary\": \"1-2 sentences: the customer problem, request, or feedback in this thread\"}",
+        "autoFix": true
+      },
+      "id": "ce9696a8-b5d2-463c-af85-014ef66d2df3",
+      "name": "ThreadParser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -456,
+        808
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.plain_threads\nSET title = COALESCE(NULLIF($1, ''), title),\n    summary = COALESCE(NULLIF($2, ''), summary)\nWHERE thread_id = $3\nRETURNING thread_id",
+        "options": {
+          "queryReplacement": "={{ [($json.output && $json.output.title) ? $json.output.title : '', ($json.output && $json.output.summary) ? $json.output.summary : '', $('Format Threads for Embedding').item.json.metadata.thread_id] }}"
+        }
+      },
+      "id": "b115cc65-91bc-45c4-89b4-9d2ddd38c4f7",
+      "name": "UpdateThreadSummary",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -80,
+        592
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT public.refresh_plain_tree()::text AS result",
+        "options": {}
+      },
+      "id": "aabd44dc-91dc-4945-9c0b-c66653dcdc0e",
+      "name": "RefreshPlainTree",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        592,
+        -112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT $2::jsonb AS node,\n       (SELECT row_to_json(l) FROM public.ingest_ledger l\n        WHERE l.source = 'plain' AND l.source_id = $1) AS ledger",
+        "options": {
+          "queryReplacement": "={{ [$json.node.id, JSON.stringify($json.node)] }}"
+        }
+      },
+      "id": "4f606b26-b09c-4178-8063-412b22f9a71e",
+      "name": "GetLedger",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -304,
+        80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.ingest_ledger (source, source_id, content_hash, chunk_version, embed_model, status, ingested_at)\nVALUES ('plain', $1, $2, 1, 'text-embedding-3-large', 'done', now())\nON CONFLICT (source, source_id) DO UPDATE SET content_hash = EXCLUDED.content_hash, status = 'done', ingested_at = now()\nRETURNING source_id",
+        "options": {
+          "queryReplacement": "={{ [$('Format Threads for Embedding').item.json.metadata.thread_id, $('Format Threads for Embedding').item.json.metadata.message_count] }}"
+        }
+      },
+      "id": "c2267312-5ac0-4214-bbd4-8fa977e40c3c",
+      "name": "Mark Ingested",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        640,
+        592
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 15,
+        "options": {}
+      },
+      "id": "024b146c-b79c-4965-a047-a8a5fb5061fc",
+      "name": "BatchLoop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        144,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "74ca351d-4b5e-4cbc-9b33-08b02bded608",
+      "name": "PaceWait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        160
+      ],
+      "webhookId": "d120e14d-490c-45fe-b153-f1b824969827"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT to_char(\n  GREATEST(\n    coalesce((SELECT max((data->'createdAt'->>'iso8601')::timestamptz) FROM public.plain_threads), '-infinity'::timestamptz),\n    now() - interval '3 months'\n  ) + interval '1 second',\n  'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'\n) AS watermark",
+        "options": {}
+      },
+      "id": "bef877f9-f53a-40a8-9f6e-d87dc95b9dea",
+      "name": "GetWatermark",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -976,
+        -32
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Backfill/incremental cursor: newest ingested thread's createdAt (+1s), or 3 months ago when the table is empty. One page fetched per loop iteration — bounded memory, no n8n body-pagination."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://core-api.uk.plain.com/graphql/v1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ `query FetchRecent { threads(first: 50, filters: { updatedAt: { after: \"${$now.minus({ hours: 26 }).toUTC().toISO()}\" }, labelTypeIds: [\"lt_01KWF5X59RBXEEN4YGFC927T8W\",\"lt_01KM3FF872J38X0RV65N9G26BF\",\"lt_01KM3FFD39R71K397NKKMF87ET\",\"lt_01KM3FFC0FH05FX4GEHPGV53DD\",\"lt_01K1B3C172DYM5HKH1Y9REYFFZ\",\"lt_01KM3FFDDWDVSPECFNWZXHJEEW\",\"lt_01K1B3FB3FF6FE9QH5PP8MJV23\"] }, sortBy: { field: UPDATED_AT, direction: DESC }) { pageInfo { hasNextPage } totalCount edges { node { id title status priority createdAt { iso8601 } updatedAt { iso8601 } customer { id fullName email { email } } labels { labelType { id name } } timelineEntries(first: 20) { edges { node { id timestamp { iso8601 } llmText actor { ... on UserActor { user { fullName } } ... on CustomerActor { customer { fullName } } ... on MachineUserActor { machineUser { fullName } } } } } } } } } }` }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "297533b1-f62c-48dc-8238-78d586b03a08",
+      "name": "Fetch Recent Updates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -752,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "J7C09wvLzVTNh2Q2",
+          "name": "Plain"
+        }
+      },
+      "notes": "Daily incremental: threads UPDATED in the last 26h carrying an allowlist label. Catches late-labeled threads the createdAt watermark would miss. Single page (50) — daily labeled volume is small."
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 4
+            }
+          ]
+        }
+      },
+      "id": "54596c1c-fc03-49fe-87dd-3f5c6b0fdf83",
+      "name": "Daily 04:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -976,
+        160
+      ]
     }
   ],
   "connections": {
@@ -183,16 +580,11 @@
       "main": [
         [
           {
-            "node": "Format Threads for Embedding",
+            "node": "Split Out",
             "type": "main",
             "index": 0
           }
         ]
-      ]
-    },
-    "Insert into Plain Vectors": {
-      "main": [
-        []
       ]
     },
     "OpenAI Embeddings": {
@@ -228,7 +620,51 @@
         ]
       ]
     },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Format Threads for Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Format Threads for Embedding": {
+      "main": [
+        [
+          {
+            "node": "Sync Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync Thread": {
+      "main": [
+        [
+          {
+            "node": "SummarizeThread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SummarizeThread": {
+      "main": [
+        [
+          {
+            "node": "UpdateThreadSummary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpdateThreadSummary": {
       "main": [
         [
           {
@@ -239,11 +675,166 @@
         ]
       ]
     },
-    "When Executed by Another Workflow": {
+    "OpenRouterModel": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "SummarizeThread",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "ThreadParser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ThreadParser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "SummarizeThread",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "GetLedger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetLedger": {
+      "main": [
+        [
+          {
+            "node": "New or Grown?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert into Plain Vectors": {
+      "main": [
+        [
+          {
+            "node": "Mark Ingested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New or Grown?": {
+      "main": [
+        [
+          {
+            "node": "BatchLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BatchLoop": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Threads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'PlainIngestion'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'PlainIngestion'": {
+      "main": [
+        [
+          {
+            "node": "PaceWait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PaceWait": {
+      "main": [
+        [
+          {
+            "node": "BatchLoop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "GetWatermark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetWatermark": {
       "main": [
         [
           {
             "node": "Fetch Plain Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Updates": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 04:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recent Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Threads": {
+      "main": [
+        [
+          {
+            "node": "RefreshPlainTree",
             "type": "main",
             "index": 0
           }
@@ -254,16 +845,20 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1",
+    "timeSavedMode": "fixed",
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner"
   },
-  "triggerCount": 0,
-  "versionId": "dcf38d32-e955-4a61-89bc-e945dca65635",
+  "triggerCount": 1,
+  "versionId": "5e9831df-b9be-4dff-9348-23373e219da1",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
-  "parentFolderId": "wwliuVCMD3BrEsbz",
+  "parentFolderId": "Y04SDqFk92B7CIGH",
   "isArchived": false,
   "nodeGroups": []
 }

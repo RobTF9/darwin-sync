@@ -1,0 +1,339 @@
+{
+  "id": "DiGFpmB1KEp1bX76",
+  "name": "SessionTreeBuilder",
+  "nodes": [
+    {
+      "id": "7786b803-383e-4115-aa53-e01b93e5f7c3",
+      "name": "Rebuild (manual)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2240,
+        -128
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "94e1d167-fe6c-49fa-be22-bd611babff12",
+      "name": "ResetSessionTree",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2016,
+        -16
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH a AS (DELETE FROM public.resource WHERE path <@ 'projects' AND path != 'projects' RETURNING 1),\nb AS (DELETE FROM public.resource WHERE path <@ 'sessions' AND path != 'sessions' RETURNING 1),\nc AS (DELETE FROM public.resource WHERE path <@ 'jobs' AND path != 'jobs' RETURNING 1),\nd AS (DELETE FROM public.resource WHERE path <@ 'opportunities' AND path != 'opportunities' RETURNING 1)\nSELECT (SELECT count(*) FROM a) AS projects_cleared,\n       (SELECT count(*) FROM b) AS sessions_cleared,\n       (SELECT count(*) FROM c) AS jobs_cleared,\n       (SELECT count(*) FROM d) AS opportunities_cleared",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "744d908e-8ae3-4e45-b376-800e994f00d1",
+      "name": "Daily 05:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2240,
+        96
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 5,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "145e0f81-6b66-46a4-b822-38139c098b08",
+      "name": "Roots",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1792,
+        -16
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.resource (parent_id, path, kind, source_id, title)\nSELECT NULL, r.name::ltree, 'directory', NULL, initcap(r.name)\nFROM (VALUES ('projects'), ('sessions'), ('jobs'), ('opportunities'), ('forum'), ('gong'), ('plain'), ('slack')) AS r(name)\nON CONFLICT (path) DO NOTHING",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "a55ce9f0-aa6c-44f1-b6e9-22f7f44b67d6",
+      "name": "Projects",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1568,
+        -16
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH base AS (\n  SELECT id, name, created_at, coalesce(public.slugify(name), 'project') AS slug FROM public.project\n), dedup AS (\n  SELECT *, CASE WHEN count(*) OVER (PARTITION BY slug) > 1\n                 THEN slug || '_x' || left(md5(id::text), 5) ELSE slug END AS label\n  FROM base\n)\nINSERT INTO public.resource (parent_id, path, kind, source_id, title, created_at)\nSELECT (SELECT id FROM public.resource WHERE path = 'projects'),\n       ('projects.' || d.label)::ltree, 'project', d.id::text, d.name, d.created_at\nFROM dedup d\nON CONFLICT (path) DO NOTHING",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "4f532e7c-1e2e-445b-81ce-7e2d4d9ed3a7",
+      "name": "Sessions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1344,
+        -16
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH base AS (\n  SELECT s.id, s.participant_name, s.session_summary, s.created_at, s.project_id,\n         coalesce(public.slugify(s.participant_name), 'session')\n           || to_char(s.created_at, '_YYYY_MM_DD') AS slug\n  FROM public.session s\n), dedup AS (\n  SELECT *, CASE WHEN count(*) OVER (PARTITION BY project_id, slug) > 1\n                 THEN slug || '_x' || left(md5(id::text), 5) ELSE slug END AS label\n  FROM base\n)\nINSERT INTO public.resource (parent_id, path, kind, source_id, title, summary, created_at)\nSELECT coalesce(pr.id, (SELECT id FROM public.resource WHERE path = 'sessions')),\n       (coalesce(pr.path::text, 'sessions') || '.' || d.label)::ltree,\n       'session', d.id::text,\n       d.participant_name || coalesce(' — ' || p.name, ''),\n       d.session_summary, d.created_at\nFROM dedup d\nLEFT JOIN public.project p ON p.id = d.project_id\nLEFT JOIN public.resource pr ON pr.kind = 'project' AND pr.source_id = d.project_id::text\nON CONFLICT (path) DO NOTHING",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "4b66ee2c-a2a4-4917-8c85-5c996e90b695",
+      "name": "Chunks",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1120,
+        -16
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH numbered AS (\n  SELECT sv.id, (sv.metadata->>'session_id')::uuid AS session_id,\n         (sv.metadata->>'start')::double precision AS start_ts,\n         row_number() OVER (PARTITION BY sv.metadata->>'session_id'\n                            ORDER BY (sv.metadata->>'start')::double precision) AS idx\n  FROM public.session_vectors sv\n  WHERE sv.metadata->>'session_id' IS NOT NULL\n)\nINSERT INTO public.resource (parent_id, path, kind, source_id, title, created_at)\nSELECT sn.id,\n       (sn.path::text || '.chunk_' || lpad(n.idx::text, 4, '0'))::ltree,\n       'chunk', n.id::text,\n       'chunk @ ' || coalesce(floor(n.start_ts)::text, '?'),\n       now()\nFROM numbered n\nJOIN public.resource sn ON sn.kind = 'session' AND sn.source_id = n.session_id::text\nON CONFLICT (path) DO NOTHING",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "b1145539-d44c-4348-9eed-c07704a53c9b",
+      "name": "JobThemes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -896,
+        -16
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.resource (parent_id, path, kind, source_id, title)\nSELECT (SELECT id FROM public.resource WHERE path = 'jobs'),\n       ('jobs.' || coalesce(public.slugify(theme), 'untitled'))::ltree, 'directory', NULL, theme\nFROM (SELECT DISTINCT theme FROM public.job WHERE deleted = false) t\nON CONFLICT (path) DO NOTHING",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "e2346a36-57aa-4883-bcf3-261c161abaff",
+      "name": "Jobs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -672,
+        -16
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH base AS (\n  SELECT j.id, j.content, j.created_at, coalesce(public.slugify(j.theme), 'untitled') AS tslug,\n         coalesce(public.slugify(left(j.content, 60)), 'job') AS cslug\n  FROM public.job j WHERE j.deleted = false\n), dedup AS (\n  SELECT *, CASE WHEN count(*) OVER (PARTITION BY tslug, cslug) > 1\n                 THEN cslug || '_x' || left(md5(id::text), 5) ELSE cslug END AS label\n  FROM base\n)\nINSERT INTO public.resource (parent_id, path, kind, source_id, title, created_at)\nSELECT td.id, ('jobs.' || d.tslug || '.' || d.label)::ltree, 'job', d.id::text,\n       left(d.content, 120), d.created_at\nFROM dedup d\nJOIN public.resource td ON td.kind = 'directory' AND td.path = ('jobs.' || d.tslug)::ltree\nON CONFLICT (path) DO NOTHING",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "fe2e16ec-0968-4f57-a360-9e45fd857a78",
+      "name": "Opportunities",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -448,
+        -16
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH base AS (\n  SELECT o.id, o.content, o.created_at,\n         coalesce(public.slugify(left(o.content, 60)), 'opportunity') AS slug\n  FROM public.opportunity o WHERE o.deleted = false\n), dedup AS (\n  SELECT *, CASE WHEN count(*) OVER (PARTITION BY slug) > 1\n                 THEN slug || '_x' || left(md5(id::text), 5) ELSE slug END AS label\n  FROM base\n)\nINSERT INTO public.resource (parent_id, path, kind, source_id, title, created_at)\nSELECT (SELECT id FROM public.resource WHERE path = 'opportunities'),\n       ('opportunities.' || d.label)::ltree, 'opportunity', d.id::text,\n       left(d.content, 120), d.created_at\nFROM dedup d\nON CONFLICT (path) DO NOTHING",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "0e9f2858-6d0c-4bad-8b9a-a3edb6528bea",
+      "name": "SetupNote",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2240,
+        -460
+      ],
+      "parameters": {
+        "content": "## SessionTreeBuilder\n\nRebuilds the **session side** of the resource tree from native tables — pure SQL, no LLM, no embeddings (~seconds, $0).\n\n**Tree shape** (matches the 20260815170000 backfill conventions):\n- `projects.<project-slug>` → `session` nodes (summary from `session.session_summary`) → `chunk_NNNN` (stable ordinals by start time)\n- `jobs.<theme>` directories → `job` nodes\n- `opportunities.<slug>`\n\n**Full-rebuild semantics**: clears the four subtrees (`projects`, `sessions`, `jobs`, `opportunities`) then re-inserts — renames, orphans and `deleted=true` rows are handled automatically. Other sources' subtrees (forum/gong/plain/slack) are untouched; their ingestion workflows write their own nodes.\n\nAlso ensures all 8 root directories exist — the ingestion workflows' upsert CTEs look them up for `parent_id`.\n\n**Runs**: manual for on-demand rebuilds; daily 05:00 UTC heal run keeps the tree fresh until SessionVectors/JobAnalysis/OpportunityAnalysis write nodes at ingest (retrieval plan §8.1).",
+        "width": 620,
+        "height": 380,
+        "color": 4
+      }
+    }
+  ],
+  "connections": {
+    "Rebuild (manual)": {
+      "main": [
+        [
+          {
+            "node": "ResetSessionTree",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ResetSessionTree": {
+      "main": [
+        [
+          {
+            "node": "Roots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 05:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "ResetSessionTree",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Roots": {
+      "main": [
+        [
+          {
+            "node": "Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Projects": {
+      "main": [
+        [
+          {
+            "node": "Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sessions": {
+      "main": [
+        [
+          {
+            "node": "Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunks": {
+      "main": [
+        [
+          {
+            "node": "JobThemes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JobThemes": {
+      "main": [
+        [
+          {
+            "node": "Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jobs": {
+      "main": [
+        [
+          {
+            "node": "Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
+  },
+  "triggerCount": 1,
+  "versionId": "71e03369-8cd8-4084-920d-cd29cd950b10",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fKSSeYxcgwpceK78",
+  "isArchived": false,
+  "nodeGroups": []
+}

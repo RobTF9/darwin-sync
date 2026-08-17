@@ -246,35 +246,7 @@
       "typeVersion": 1.3,
       "position": [
         480,
-        704
-      ]
-    },
-    {
-      "parameters": {
-        "amount": 20
-      },
-      "id": "15f39a50-24ad-45f2-8e30-dfb0469a7fb3",
-      "name": "Pace",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        704,
-        784
-      ],
-      "webhookId": "a8fc8331-292d-4799-b787-a7a8344f1536"
-    },
-    {
-      "parameters": {
-        "batchSize": 6,
-        "options": {}
-      },
-      "id": "5d9f2ba5-4306-40d5-97a5-20ca94a3fc09",
-      "name": "Batch",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        256,
-        704
+        688
       ]
     },
     {
@@ -332,6 +304,7 @@
       }
     },
     {
+      "parameters": {},
       "id": "29eebbcd-9cae-440f-b4f3-e4765230de2f",
       "name": "Manual Trigger",
       "type": "n8n-nodes-base.manualTrigger",
@@ -339,10 +312,12 @@
       "position": [
         -864,
         928
-      ],
-      "parameters": {}
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "let input = null;\ntry { input = $('Input').item.json; } catch (e) { input = null; }\nconst manual = !input;\nreturn [{ json: {\n  requested_by: (input && input.requested_by) || 'manual',\n  category: (input && input.category) || '',\n  slug: (input && input.slug) || '',\n  transport: (input && input.transport) || (manual ? 'slack' : 'direct'),\n  channel_id: (input && input.channel_id) || 'C0BQH5S6P1P',\n  bot_id: (input && input.bot_id) || ''\n} }];"
+      },
       "id": "14d8e93f-5ecb-42b8-98b2-0967160ca677",
       "name": "Config",
       "type": "n8n-nodes-base.code",
@@ -350,10 +325,35 @@
       "position": [
         -416,
         928
-      ],
+      ]
+    },
+    {
       "parameters": {
-        "jsCode": "let input = null;\ntry { input = $('Input').item.json; } catch (e) { input = null; }\nconst manual = !input;\nreturn [{ json: {\n  requested_by: (input && input.requested_by) || 'manual',\n  category: (input && input.category) || '',\n  slug: (input && input.slug) || '',\n  transport: (input && input.transport) || (manual ? 'slack' : 'direct'),\n  channel_id: (input && input.channel_id) || 'C0BQH5S6P1P',\n  bot_id: (input && input.bot_id) || ''\n} }];"
-      }
+        "amount": 20
+      },
+      "id": "15f39a50-24ad-45f2-8e30-dfb0469a7fb3",
+      "name": "Pace",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        704,
+        784
+      ],
+      "webhookId": "a8fc8331-292d-4799-b787-a7a8344f1536"
+    },
+    {
+      "parameters": {
+        "batchSize": 6,
+        "options": {}
+      },
+      "id": "5d9f2ba5-4306-40d5-97a5-20ca94a3fc09",
+      "name": "Batch",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        256,
+        704
+      ]
     }
   ],
   "connections": {
@@ -452,35 +452,6 @@
         ]
       ]
     },
-    "Pace": {
-      "main": [
-        [
-          {
-            "node": "Batch",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Batch": {
-      "main": [
-        [
-          {
-            "node": "Load Results",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Dispatch Case",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Summary": {
       "main": [
         [
@@ -546,6 +517,35 @@
           }
         ]
       ]
+    },
+    "Pace": {
+      "main": [
+        [
+          {
+            "node": "Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dispatch Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -554,7 +554,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "75d02c32-0203-4568-8551-8dd5ccb2f608",
+  "versionId": "76f6a57c-3dda-438a-bb93-0f0080d45219",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
