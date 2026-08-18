@@ -1,0 +1,291 @@
+{
+  "id": "grPqzVKXq92Z7gD6",
+  "name": "TEMP - Slack Channel Research Call Share Distribution",
+  "nodes": [
+    {
+      "id": "0090eb8e-1332-42d9-a7dc-8d5401e7c7b2",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "8ac02af7-efa8-479b-9c81-dbca2684257d",
+      "name": "GetHistory",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "resource": "channel",
+        "operation": "history",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C035KDLD6MP"
+        },
+        "returnAll": true,
+        "filters": {
+          "oldest": "1755475200"
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "277bfed1-de03-49a1-8e77-f58aa50f576d"
+    },
+    {
+      "id": "0a2e1c41-5f3d-4990-b784-b212766bbda9",
+      "name": "Filter & Group By User",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Filter messages that share research calls, then group by posting user.\n// Upper time bound enforced here (Slack 'latest' filter is unreliable with returnAll).\nconst KEYWORDS = ['gong.io/call', 'us-29262.app.gong.io', 'pidgeonhead', 'research call', 'session'];\nconst OLDEST = 1755475200; // 2025-08-18 00:00 UTC\nconst LATEST = 1787011200; // 2026-08-18 00:00 UTC\n\nconst items = $input.all();\nconst counts = {}; // userId -> count\n\nfor (const it of items) {\n  const m = it.json || {};\n  if (m.bot_id) continue;\n  const user = m.user;\n  if (!user) continue;\n  const ts = parseFloat(m.ts);\n  if (!isNaN(ts) && (ts < OLDEST || ts >= LATEST)) continue;\n  const text = (m.text || '').toLowerCase();\n  if (!text) continue;\n  const matched = KEYWORDS.some(k => text.includes(k));\n  if (!matched) continue;\n  counts[user] = (counts[user] || 0) + 1;\n}\n\nconst total = Object.values(counts).reduce((a, b) => a + b, 0);\nconst userIds = Object.keys(counts);\nif (userIds.length === 0) {\n  return [{ json: { userId: null, count: 0, total: 0, noData: true } }];\n}\nreturn userIds.map(uid => ({ json: { userId: uid, count: counts[uid], total } }));"
+      }
+    },
+    {
+      "id": "62af5404-c4c4-42c9-b6fa-6c48d49a02fa",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.userId);\nconst total = rows.reduce((a, r) => a + (Number(r.count) || 0), 0);\n\nif (rows.length === 0 || total === 0) {\n  return [{ json: { report: 'No research-call-sharing messages found in channel C035KDLD6MP for the period 2025-08-18 to 2026-08-18.' } }];\n}\n\nrows.sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));\n\nlet table = '*Research Call Share Distribution — <#C035KDLD6MP>*\\n';\ntable += '_Period: 2025-08-18 → 2026-08-18 · Total research-call shares: ' + total + '_\\n\\n';\ntable += '```\\n';\nconst pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);\ntable += pad('Person Name', 28) + pad('Message Count', 15) + 'Percentage (%)\\n';\ntable += '-'.repeat(58) + '\\n';\nfor (const r of rows) {\n  const cnt = Number(r.count) || 0;\n  const pct = (cnt / total * 100).toFixed(1);\n  table += pad(r.name, 28) + pad(cnt, 15) + pct + '%\\n';\n}\ntable += '-'.repeat(58) + '\\n';\ntable += pad('TOTAL', 28) + pad(total, 15) + '100.0%\\n';\ntable += '```';\n\nreturn [{ json: { report: table, total } }];"
+      }
+    },
+    {
+      "id": "35bad80b-3bd8-4b50-98aa-ae09c6470d40",
+      "name": "PostReport",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "resource": "message",
+        "operation": "post",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C035KDLD6MP"
+        },
+        "messageType": "text",
+        "text": "={{ $json.report }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "042994a0-7a7f-400f-826b-5e8a00974546"
+    },
+    {
+      "id": "9e3aa311-7d46-4abe-855d-c12aab763099",
+      "name": "UserInfo",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "resource": "user",
+        "operation": "info",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.userId }}"
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "6eb74f87-aaa6-4cec-abce-e240f19f909f"
+    },
+    {
+      "id": "c937f46a-5319-43a5-81ae-f7acdff05907",
+      "name": "Carry Name",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        272
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "userId",
+              "value": "={{ $('Loop Users').item.json.userId }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "count",
+              "value": "={{ $('Loop Users').item.json.count }}",
+              "type": "number"
+            },
+            {
+              "id": "a3",
+              "name": "total",
+              "value": "={{ $('Loop Users').item.json.total }}",
+              "type": "number"
+            },
+            {
+              "id": "a4",
+              "name": "name",
+              "value": "={{ $json.profile?.real_name || $json.real_name || $json.profile?.display_name || $json.name || $('Loop Users').item.json.userId }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1c65efe0-a215-4ed6-aedd-5a3b72f22f01",
+      "name": "Loop Users",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "batchSize": 1
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "GetHistory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetHistory": {
+      "main": [
+        [
+          {
+            "node": "Filter & Group By User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Group By User": {
+      "main": [
+        [
+          {
+            "node": "Loop Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "PostReport",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UserInfo": {
+      "main": [
+        [
+          {
+            "node": "Carry Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Carry Name": {
+      "main": [
+        [
+          {
+            "node": "Loop Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Users": {
+      "main": [
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "UserInfo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "0db1753a-0a24-4d28-bbd9-7095dba57281",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

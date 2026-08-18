@@ -1,0 +1,201 @@
+{
+  "id": "65ec7cDouoYwobRG",
+  "name": "TEMP - Slack Research Call Distribution",
+  "nodes": [
+    {
+      "id": "0a16ee80-a89d-4c4a-9e11-54b092e97085",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "8a14fd7e-9b50-4240-8d75-5e7a3decd009",
+      "name": "Fetch Slack History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/conversations.history",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "C035KDLD6MP"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            },
+            {
+              "name": "oldest",
+              "value": "={{ Math.floor(Date.now()/1000) - 31536000 }}"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata?.next_cursor }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "limitPagesFetched": true,
+              "maxRequests": 50,
+              "requestInterval": 1200
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "a878a702-b657-4d9b-bd21-9a77d8dc8ed8",
+      "name": "Filter & Count Per User",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Collect all matching messages across paginated responses and count per user\nconst keywords = ['gong.io', 'pidgeonhead', 'research call', 'session'];\nconst counts = {};\n\nfor (const item of $input.all()) {\n  const body = item.json;\n  const messages = Array.isArray(body.messages) ? body.messages : [];\n  for (const msg of messages) {\n    // skip system/join-leave style subtypes, keep normal + broadcasts + bot messages\n    if (msg.subtype && msg.subtype !== 'thread_broadcast' && msg.subtype !== 'bot_message') continue;\n    const text = (msg.text || '').toLowerCase();\n    if (!keywords.some(k => text.includes(k))) continue;\n    const user = msg.user || msg.bot_id || 'unknown';\n    counts[user] = (counts[user] || 0) + 1;\n  }\n}\n\nconst total = Object.values(counts).reduce((a, b) => a + b, 0);\n\n// One item per distinct user; totalMatched carried on each for percentage calc\nreturn Object.entries(counts).map(([userId, count]) => ({\n  json: { userId, count, totalMatched: total }\n}));"
+      }
+    },
+    {
+      "id": "cc8ff1d1-0f52-45d0-987f-90fbc99802d1",
+      "name": "Resolve User Name",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.info",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user",
+              "value": "={{ $json.userId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "23e67190-5bd9-4335-b192-ad4578824f23",
+      "name": "Build Results Table",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Combine users.info responses with the counts from the Filter node.\n// The Resolve User Name node preserves item pairing, so we read counts from\n// the paired 'Filter & Count Per User' item by index.\nconst results = [];\n\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const info = items[i].json; // users.info response\n  const source = $('Filter & Count Per User').all()[i].json;\n  const userObj = info && info.user ? info.user : null;\n  const profile = userObj && userObj.profile ? userObj.profile : {};\n  const name = (profile.real_name || profile.display_name || (userObj && userObj.name) || source.userId);\n  const total = source.totalMatched || 0;\n  const pct = total > 0 ? (source.count / total) * 100 : 0;\n  results.push({\n    userId: source.userId,\n    name,\n    count: source.count,\n    percentage: Math.round(pct * 10) / 10\n  });\n}\n\n// Sort descending by count\nresults.sort((a, b) => b.count - a.count);\n\n// Render a markdown table summary\nconst header = '| User | Messages | % of total |\\n|---|---|---|';\nconst bodyRows = results.map(r => `| ${r.name} | ${r.count} | ${r.percentage}% |`).join('\\n');\nconst table = header + '\\n' + bodyRows;\n\nconst totalMatched = results.reduce((a, r) => a + r.count, 0);\n\nreturn [\n  { json: { summaryTable: table, totalMatched, distinctUsers: results.length, rows: results } }\n];"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Fetch Slack History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Slack History": {
+      "main": [
+        [
+          {
+            "node": "Filter & Count Per User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Count Per User": {
+      "main": [
+        [
+          {
+            "node": "Resolve User Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve User Name": {
+      "main": [
+        [
+          {
+            "node": "Build Results Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "f74d8696-e02e-49b9-afdb-381766f28cb7",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

@@ -1,0 +1,143 @@
+{
+  "id": "rumdVx3DhGQfUtgy",
+  "name": "TEMP - Slack Research Call Links Per User",
+  "nodes": [
+    {
+      "id": "eb12285c-31d6-4fa9-9380-c7ea53bdeb4e",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "de23f59c-9992-44dd-8870-3c4ae64556d0",
+      "name": "Fetch History",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "channel",
+        "operation": "history",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C035KDLD6MP"
+        },
+        "returnAll": true,
+        "filters": {
+          "oldest": "={{ $now.minus({ years: 1 }).toSeconds() }}"
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "209867b2-7ab5-43cb-86cc-62f615b55f32"
+    },
+    {
+      "id": "1969e2b0-2ba5-4388-9a5e-2fa2316d953a",
+      "name": "Filter Research Links",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "(zoom\\.us|meet\\.google\\.com|gong\\.io|grain\\.com|teams\\.microsoft\\.com|fathom\\.video|otter\\.ai|research call)",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "3a791f7f-dcb7-4fad-9065-8b2f31bf9323",
+      "name": "Count Per User & Percentage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const counts = {};\nfor (const item of items) {\n  const user = item.json.user || item.json.username || item.json.bot_id || 'unknown';\n  counts[user] = (counts[user] || 0) + 1;\n}\nconst total = Object.values(counts).reduce((a, b) => a + b, 0);\nreturn Object.entries(counts)\n  .sort((a, b) => b[1] - a[1])\n  .map(([user, count]) => ({ json: { user, count, percentage: total ? Math.round((count / total) * 10000) / 100 : 0, total } }));"
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Fetch History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch History": {
+      "main": [
+        [
+          {
+            "node": "Filter Research Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Research Links": {
+      "main": [
+        [
+          {
+            "node": "Count Per User & Percentage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "a5c0092d-c284-4834-8d20-ab1ae7c1bc94",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

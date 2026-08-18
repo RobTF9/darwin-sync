@@ -1,0 +1,161 @@
+{
+  "id": "mkmatZZHcWjQBZLF",
+  "name": "TEMP - Research Calls",
+  "nodes": [
+    {
+      "id": "26c4bb22-6be3-471f-ae5d-ad2826462df4",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9fa964b2-1e22-4c78-92a6-acbf29a8eb2e",
+      "name": "Get Users",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "user",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "bb83a52d-de84-4451-9ca0-e220ea9b1573"
+    },
+    {
+      "id": "21bc23d6-69be-4aca-89bf-6ed0381f5896",
+      "name": "Get Channel History",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "channel",
+        "operation": "history",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C035KDLD6MP"
+        },
+        "returnAll": true,
+        "filters": {
+          "oldest": "={{ $now.minus({ years: 1 }).toSeconds() }}"
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "executeOnce": true,
+      "webhookId": "6c5a1a29-4e59-4368-935b-a224d186ee39"
+    },
+    {
+      "id": "d56433a5-5737-4a34-9ea1-c5cdfda074b9",
+      "name": "Count & Percentage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Build user-id -> display name map from Get Users node\nconst nameMap = {};\nfor (const u of $('Get Users').all()) {\n  const j = u.json;\n  if (j && j.id) {\n    nameMap[j.id] = (j.profile && (j.profile.real_name || j.profile.display_name)) || j.real_name || j.name || j.id;\n  }\n}\n\nconst linkRe = /gong\\.io|pidgeonhead/i;\nconst counts = {};\nlet total = 0;\nfor (const item of $('Get Channel History').all()) {\n  const text = item.json.text || '';\n  if (linkRe.test(text)) {\n    const uid = item.json.user || item.json.username || 'unknown';\n    counts[uid] = (counts[uid] || 0) + 1;\n    total++;\n  }\n}\n\nconst rows = Object.entries(counts).map(([uid, count]) => ({\n  json: {\n    user: nameMap[uid] || uid,\n    count,\n    percentage: total ? (Math.round((count / total) * 1000) / 10) + '%' : '0%'\n  }\n}));\nrows.sort((a, b) => b.json.count - a.json.count);\nif (rows.length === 0) {\n  return [{ json: { user: 'none', count: 0, percentage: '0%' } }];\n}\nreturn rows;"
+      }
+    },
+    {
+      "id": "e84d53f8-d8de-4aef-bd25-afd8bfdede12",
+      "name": "To HTML Table",
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "operation": "convertToHtmlTable",
+        "options": {
+          "caption": "gong.io / pidgeonhead links per user (last year)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Get Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Users": {
+      "main": [
+        [
+          {
+            "node": "Get Channel History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Channel History": {
+      "main": [
+        [
+          {
+            "node": "Count & Percentage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count & Percentage": {
+      "main": [
+        [
+          {
+            "node": "To HTML Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "040e5ad4-7df5-4ca5-ac70-7029025f73d2",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}
