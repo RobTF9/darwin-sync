@@ -928,26 +928,6 @@
     },
     {
       "parameters": {
-        "model": "z-ai/glm-5.2",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
-      "typeVersion": 1,
-      "position": [
-        -2144,
-        -176
-      ],
-      "id": "73e0976a-e532-4092-900f-da170390a24f",
-      "name": "OpenRouter Chat Model",
-      "credentials": {
-        "openRouterApi": {
-          "id": "BXBT8cTCvefRDsgP",
-          "name": "OpenRouter account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "description": "Fetch bounded context around a search hit — the cheap drill-in, use BEFORE get_transcript. Takes the hit's `path` field from search results (required). Returns kind-specific context: a transcript window (+ summary/profile/persona) for session chunks, sibling chunks for gong calls, the full thread for plain/slack, evidence clips + linked sessions for jobs/opportunities, posts for forum topics.\n\nParameters:\n- path (required, string): the hit's `path`, e.g. 'projects.error_handling_q2.sarah_chen_2026_06_14.chunk_0007'\n- window_secs (optional, number): seconds around a session hit, default 240 (max 900)\n- max_items (optional, number): cap on chunks/posts returned, default 20 (max 50)",
         "workflowId": {
           "__rl": true,
@@ -1076,6 +1056,31 @@
         672,
         -624
       ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-opus-5",
+          "mode": "list",
+          "cachedResultName": "Claude Opus 5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        -2144,
+        -176
+      ],
+      "id": "6bfe6118-fefa-43b6-8506-81478753a5e1",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
     }
   ],
   "connections": {
@@ -1288,17 +1293,6 @@
         ]
       ]
     },
-    "OpenRouter Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "darwin",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "get_resource_context": {
       "ai_tool": [
         [
@@ -1342,6 +1336,17 @@
           }
         ]
       ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "darwin",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1354,7 +1359,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "14d7dff7-1f26-4bab-8b15-1ab644403e6d",
+  "versionId": "3340320d-4b43-4e94-8fc3-59ea4b9202c6",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
