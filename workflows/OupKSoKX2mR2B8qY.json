@@ -547,7 +547,7 @@
         "rule": {
           "interval": [
             {
-              "triggerAtHour": 5
+              "triggerAtHour": 2
             }
           ]
         }
@@ -559,7 +559,7 @@
         0
       ],
       "id": "e08d8d0d-ce34-42b3-a545-32cd0aa17bae",
-      "name": "5am"
+      "name": "2am"
     }
   ],
   "connections": {
@@ -812,7 +812,7 @@
         ]
       ]
     },
-    "5am": {
+    "2am": {
       "main": [
         [
           {
@@ -830,8 +830,8 @@
     "binaryMode": "separate",
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
-  "triggerCount": 0,
-  "versionId": "af26404d-b510-4660-9f85-e77eb3cc0574",
+  "triggerCount": 1,
+  "versionId": "7c2db301-d239-4f71-8826-469f3e9de22c",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

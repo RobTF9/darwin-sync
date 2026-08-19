@@ -1,0 +1,17 @@
+{
+  "id": "IDRgf16JoFvhTNEu",
+  "name": "OpenRouter account 2",
+  "type": "openRouterApi",
+  "data": {
+    "apiKey": ""
+  },
+  "ownedBy": {
+    "type": "personal",
+    "projectId": "gaAiXT3wHyNP6mrE",
+    "projectName": "Robert Squires <robert+darwin@n8n.io>",
+    "personalEmail": "robert+darwin@n8n.io"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

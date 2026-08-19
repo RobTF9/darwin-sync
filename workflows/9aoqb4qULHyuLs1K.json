@@ -92,7 +92,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $('Config').item.json;\nconst category = String(input.category || '').trim();\nconst slug = String(input.slug || '').trim();\nreturn $input.all()\n  .map(i => i.json)\n  .filter(c => (!category || c.category === category) && (!slug || c.slug === slug))\n  .map(c => ({ json: c }));"
+        "jsCode": "const input = $('Config').item.json;\nconst category = String(input.category || '').trim();\nconst slug = String(input.slug || '').trim();\nconst items = $input.all();\nconst out = [];\nfor (let i = 0; i < items.length; i++) {\n  const c = items[i].json;\n  if ((!category || c.category === category) && (!slug || c.slug === slug)) {\n    out.push({ json: c, pairedItem: { item: i } });\n  }\n}\nreturn out;"
       },
       "id": "dd794f22-75b5-430e-9822-0be04f2e02df",
       "name": "Filter Cases",
@@ -551,10 +551,12 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromAList",
+    "callerIds": "StNrgWTWe5ck6piK"
   },
   "triggerCount": 0,
-  "versionId": "76f6a57c-3dda-438a-bb93-0f0080d45219",
+  "versionId": "19387ee5-5c0c-4180-ad9e-ade8db793df7",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

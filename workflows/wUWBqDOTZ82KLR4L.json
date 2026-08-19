@@ -703,7 +703,9 @@
       "parameters": {
         "rule": {
           "interval": [
-            {}
+            {
+              "triggerAtHour": 3
+            }
           ]
         }
       },
@@ -714,7 +716,7 @@
         -16
       ],
       "id": "31649619-5e73-4e4c-babc-31396c444837",
-      "name": "Midnight"
+      "name": "3am"
     }
   ],
   "connections": {
@@ -966,7 +968,7 @@
         ]
       ]
     },
-    "Midnight": {
+    "3am": {
       "main": [
         [
           {
@@ -984,8 +986,8 @@
     "errorWorkflow": "iDcm070UekOYt0f1",
     "binaryMode": "separate"
   },
-  "triggerCount": 0,
-  "versionId": "3c55a35a-0725-425a-8b28-8bc6f5e8b45b",
+  "triggerCount": 1,
+  "versionId": "f190c961-7c93-4ac4-97c4-808b1648c0f9",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
