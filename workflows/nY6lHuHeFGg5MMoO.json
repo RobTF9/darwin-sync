@@ -115,13 +115,13 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "d4737399-9805-43e5-81e8-f5395a29ec75",
+  "versionId": "669726cd-9617-40c1-890e-2c7483f71cbe",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
   "parentFolderId": "wkVsUQ3LVUIdgVe0",
-  "isArchived": false,
+  "isArchived": true,
   "nodeGroups": []
 }

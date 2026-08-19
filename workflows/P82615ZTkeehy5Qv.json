@@ -1,0 +1,335 @@
+{
+  "id": "P82615ZTkeehy5Qv",
+  "name": "Darwin — FanOutWorker",
+  "nodes": [
+    {
+      "id": "a88d5b08-9ea4-4168-8b54-9964e54e6379",
+      "name": "FanOut Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "item",
+              "type": "string"
+            },
+            {
+              "name": "instruction",
+              "type": "string"
+            },
+            {
+              "name": "context",
+              "type": "string"
+            },
+            {
+              "name": "row_id",
+              "type": "string"
+            },
+            {
+              "name": "run_id",
+              "type": "string"
+            },
+            {
+              "name": "env",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ff2fe2a1-7352-4988-8663-bf701cfac0ef",
+      "name": "Call Darwin",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        112
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HDMvthliXrAcZrXp"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chatInput": "={{ $json.chatInput }}",
+            "sessionId": "={{ 'fanout-' + $json.run_id + '-' + $json.row_id }}",
+            "channel": "",
+            "baseline": "",
+            "env": "={{ $json.env }}",
+            "thread_ts": "",
+            "user": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "baseline",
+              "displayName": "baseline",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "env",
+              "displayName": "env",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "user",
+              "displayName": "user",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {}
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "d48c5aab-23cf-4527-86ee-ec0c888f2566",
+      "name": "Update Complete",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        672,
+        16
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "fan_out_item",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('FanOut Input').item.json.row_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "response",
+              "fieldValue": "={{ JSON.stringify({ output: $json.output }) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "complete"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "79a8ba3a-4ce5-4494-95bd-a62f4fe53071",
+      "name": "Update Error",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        672,
+        208
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "fan_out_item",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('FanOut Input').item.json.row_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "response",
+              "fieldValue": "={{ JSON.stringify({ error: ($json.error?.message || $json.error || 'Unknown error') }) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "error"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "b6b10f1f-dc4e-4fd4-a362-14a121cef393",
+      "name": "Build Task",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        112
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "chatInput",
+              "name": "chatInput",
+              "type": "string",
+              "value": "={{ $json.instruction + '\\n\\n## Item\\n' + $json.item + ($json.context ? ('\\n\\n## Shared Context\\n' + $json.context) : '') + '\\n\\nThis is one item from a fan_out batch. Respond with your findings for THIS ITEM ONLY — do not reference other items or assume you have seen the rest of the batch.' }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Call Darwin": {
+      "main": [
+        [
+          {
+            "node": "Update Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FanOut Input": {
+      "main": [
+        [
+          {
+            "node": "Build Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Task": {
+      "main": [
+        [
+          {
+            "node": "Call Darwin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
+  },
+  "triggerCount": 0,
+  "versionId": "289892af-ce88-4003-a8be-c77ddfd84ab0",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

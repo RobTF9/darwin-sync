@@ -21,7 +21,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $input.first().json.body && $input.first().json.body.payload;\nconst payload = JSON.parse(raw);\nlet action_id = null;\nlet action_type = payload.type || null;\nlet action_value = null;\nlet channel_id = (payload.channel && payload.channel.id) || null;\nlet thread_ts = null;\nlet message_ts = null;\nif (payload.type === 'view_submission') {\n  const view = payload.view || {};\n  action_id = view.callback_id || null;\n  action_value = view.state || null;\n  channel_id = channel_id || (view.private_metadata || null);\n} else {\n  const act = (payload.actions && payload.actions[0]) || {};\n  action_id = act.action_id || null;\n  action_value = (act.selected_option && act.selected_option.value) || act.value || null;\n  const msg = payload.message || {};\n  thread_ts = msg.thread_ts || msg.ts || null;\n  message_ts = msg.ts || null;\n}\nconst threadKey = thread_ts || message_ts || null;\nconst session_key = channel_id && threadKey ? channel_id + '_' + threadKey : null;\nreturn [{ json: {\n  action_id,\n  action_type,\n  action_value,\n  trigger_id: payload.trigger_id || null,\n  user_id: (payload.user && payload.user.id) || null,\n  user_name: (payload.user && payload.user.username) || null,\n  channel_id,\n  thread_ts,\n  message_ts,\n  session_key,\n  response_url: payload.response_url || null,\n  full_payload: payload\n} }];"
+        "jsCode": "const raw = $input.first().json.body && $input.first().json.body.payload;\nconst payload = JSON.parse(raw);\nlet action_id = null;\nlet action_type = payload.type || null;\nlet action_value = null;\nlet channel_id = (payload.channel && payload.channel.id) || null;\nlet thread_ts = null;\nlet message_ts = null;\nif (payload.type === 'view_submission') {\n  const view = payload.view || {};\n  action_id = view.callback_id || null;\n  action_value = view.state || null;\n  channel_id = channel_id || (view.private_metadata || null);\n} else {\n  const act = (payload.actions && payload.actions[0]) || {};\n  action_id = act.action_id || null;\n  if (Array.isArray(act.selected_options)) {\n    action_value = act.selected_options.map(o => o.value);\n  } else {\n    action_value = (act.selected_option && act.selected_option.value) || act.value || null;\n  }\n  const msg = payload.message || {};\n  thread_ts = msg.thread_ts || msg.ts || null;\n  message_ts = msg.ts || null;\n}\nconst threadKey = thread_ts || message_ts || null;\nconst session_key = channel_id && threadKey ? channel_id + '_' + threadKey : null;\nreturn [{ json: {\n  action_id,\n  action_type,\n  action_value,\n  trigger_id: payload.trigger_id || null,\n  user_id: (payload.user && payload.user.id) || null,\n  user_name: (payload.user && payload.user.username) || null,\n  channel_id,\n  thread_ts,\n  message_ts,\n  session_key,\n  response_url: payload.response_url || null,\n  full_payload: payload\n} }];"
       },
       "id": "82b28f85-3030-4551-83f4-f9933cb115ad",
       "name": "Parse Payload",
@@ -453,7 +453,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const parsed = $('Parse Payload').first().json;\nconst audienceType = parsed.action_value;\nconst nowIso = new Date().toISOString();\n\nconst nUserFilters = [\n  { id: 'cloud_plan', label: 'Cloud plan', coverage: '~95%', warn: false, options: ['Trial', 'n8n cloud Start', 'n8n cloud Pro', 'n8n cloud Enterprise'] },\n  { id: 'cloud_plan_status', label: 'Plan status', coverage: '~95%', warn: false, options: ['trialing', 'active', 'past_due', 'canceled'] },\n  { id: 'country', label: 'Country', coverage: '~70%', warn: false, type: 'text' },\n  { id: 'utm_user_role', label: 'Role at signup', coverage: '~60%', warn: false, options: ['Product & Design', 'Engineering', 'IT / Ops', 'Marketing', 'Sales', 'Founder / C-level', 'Other'] },\n  { id: 'company_size', label: 'Company size', coverage: '~25%', warn: true, options: ['Only me', '<20', '20-99', '100-499', '500-999', '1000+'] },\n  { id: 'wf_bucket', label: 'Production workflows', coverage: '~12%', warn: true, options: ['1-2', '3-5', '6-20', '21-100', '100+'] },\n  { id: 'services_bucket', label: 'Connected services', coverage: '~12%', warn: true, options: ['≤10', '11-20', '21-40', '41-70', '70+'] },\n  { id: 'ai_wfs_bucket', label: 'AI workflows', coverage: '~12%', warn: true, options: ['0', '1-2', '3-5', '6-10', '10+'] },\n  { id: 'days_bucket', label: 'Account age', coverage: '~12%', warn: true, options: ['<30', '30-180', '180-365', '365-540', '540+'] }\n];\n\nconst nonUserFilters = [\n  { id: 'n8n_usage', label: 'n8n familiarity', coverage: '~100%', warn: false, options: ['aware', 'new', 'explorer'] },\n  { id: 'tech_skills', label: 'Technical skills', coverage: '~90%', warn: false, options: ['tech_high', 'tech_mid', 'tech_low', 'tech_none'] },\n  { id: 'company_size', label: 'Company size', coverage: '~85%', warn: false, options: ['Only me', '<20', '20-99', '100-499', '500-999', '1000+'] }\n];\n\nconst filters = audienceType === 'n8n_users' ? nUserFilters : nonUserFilters;\nconst audienceLabel = audienceType === 'n8n_users' ? 'n8n users' : 'Non-users';\n\nconst blocks = [\n  { type: 'section', text: { type: 'mrkdwn', text: ':busts_in_silhouette: *Audience: ' + audienceLabel + '*\\n\\nSelect any filters you want to apply. All are optional — skip any you don’t need.' } },\n  { type: 'divider' }\n];\n\nfor (const f of filters) {\n  if (f.type === 'text') {\n    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*' + f.label + '* · ' + f.coverage + (f.warn ? ' :warning:' : '') + '\\n_Type the country name in the thread after applying other filters, or skip._' } });\n  } else {\n    const options = f.options.map(o => ({ text: { type: 'plain_text', text: o, emoji: true }, value: o }));\n    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*' + f.label + '* · ' + f.coverage + (f.warn ? ' :warning:' : '') }, accessory: { type: 'static_select', placeholder: { type: 'plain_text', text: 'Any', emoji: true }, action_id: 'uxr_filter_' + f.id, options: options } });\n  }\n}\n\nblocks.push({ type: 'divider' });\nblocks.push({ type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Apply Filters', emoji: true }, style: 'primary', action_id: 'uxr_filter_apply', value: 'apply' }, { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, style: 'danger', action_id: 'uxr_cancel', value: 'cancel' } ] });\n\nreturn [{ json: {\n  channel_id: parsed.channel_id,\n  thread_ts: parsed.thread_ts,\n  text: 'Filters for ' + audienceLabel,\n  blocks: JSON.stringify(blocks),\n  sess: {\n    session_key: parsed.session_key || '__none__',\n    channel: parsed.channel_id || '',\n    thread_ts: parsed.thread_ts || '',\n    slack_user: parsed.user_id || '',\n    state: 'filters',\n    audience: audienceType || '',\n    filters_json: '{}',\n    requested_count: 0,\n    batch_id: '',\n    email_subject: '',\n    email_body: '',\n    calendly_link: '',\n    last_step_ts: '',\n    updated_at: nowIso\n  }\n} }];"
+        "jsCode": "const parsed = $('Parse Payload').first().json;\nconst audienceType = parsed.action_value;\nconst nowIso = new Date().toISOString();\n\nconst nUserFilters = [\n  { id: 'cloud_plan', label: 'Cloud plan', coverage: '~95%', warn: false, options: ['Trial', 'n8n cloud Start', 'n8n cloud Pro', 'n8n cloud Enterprise'] },\n  { id: 'cloud_plan_status', label: 'Plan status', coverage: '~95%', warn: false, options: ['trialing', 'active', 'past_due', 'canceled'] },\n  { id: 'country', label: 'Country', coverage: '~70%', warn: false, type: 'text' },\n  { id: 'utm_user_role', label: 'Role at signup', coverage: '~60%', warn: false, options: ['Product & Design', 'Engineering', 'IT / Ops', 'Marketing', 'Sales', 'Founder / C-level', 'Other'] },\n  { id: 'company_size', label: 'Company size', coverage: '~25%', warn: true, options: ['Only me', '<20', '20-99', '100-499', '500-999', '1000+'] },\n  { id: 'wf_bucket', label: 'Production workflows', coverage: '~12%', warn: true, options: ['1-2', '3-5', '6-20', '21-100', '100+'] },\n  { id: 'services_bucket', label: 'Connected services', coverage: '~12%', warn: true, options: ['≤10', '11-20', '21-40', '41-70', '70+'] },\n  { id: 'ai_wfs_bucket', label: 'AI workflows', coverage: '~12%', warn: true, options: ['0', '1-2', '3-5', '6-10', '10+'] },\n  { id: 'days_bucket', label: 'Account age', coverage: '~12%', warn: true, options: ['<30', '30-180', '180-365', '365-540', '540+'] }\n];\n\nconst nonUserFilters = [\n  { id: 'n8n_usage', label: 'n8n familiarity', coverage: '~100%', warn: false, options: ['aware', 'new', 'explorer'] },\n  { id: 'tech_skills', label: 'Technical skills', coverage: '~90%', warn: false, options: ['tech_high', 'tech_mid', 'tech_low', 'tech_none'] },\n  { id: 'company_size', label: 'Company size', coverage: '~85%', warn: false, options: ['Only me', '<20', '20-99', '100-499', '500-999', '1000+'] }\n];\n\nconst filters = audienceType === 'n8n_users' ? nUserFilters : nonUserFilters;\nconst audienceLabel = audienceType === 'n8n_users' ? 'n8n users' : 'Non-users';\n\nconst blocks = [\n  { type: 'section', text: { type: 'mrkdwn', text: ':busts_in_silhouette: *Audience: ' + audienceLabel + '*\\n\\nSelect any filters you want to apply (you can pick more than one value per filter). All are optional — skip any you don’t need.' } },\n  { type: 'divider' }\n];\n\nfor (const f of filters) {\n  if (f.type === 'text') {\n    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*' + f.label + '* · ' + f.coverage + (f.warn ? ' :warning:' : '') + '\\n_Type the country name in the thread after applying other filters, or skip._' } });\n  } else {\n    const options = f.options.map(o => ({ text: { type: 'plain_text', text: o, emoji: true }, value: o }));\n    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: '*' + f.label + '* · ' + f.coverage + (f.warn ? ' :warning:' : '') }, accessory: { type: 'multi_static_select', placeholder: { type: 'plain_text', text: 'Select one or more', emoji: true }, action_id: 'uxr_filter_' + f.id, options: options } });\n  }\n}\n\nblocks.push({ type: 'divider' });\nblocks.push({ type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Apply Filters', emoji: true }, style: 'primary', action_id: 'uxr_filter_apply', value: 'apply' }, { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, style: 'danger', action_id: 'uxr_cancel', value: 'cancel' } ] });\n\nreturn [{ json: {\n  channel_id: parsed.channel_id,\n  thread_ts: parsed.thread_ts,\n  text: 'Filters for ' + audienceLabel,\n  blocks: JSON.stringify(blocks),\n  sess: {\n    session_key: parsed.session_key || '__none__',\n    channel: parsed.channel_id || '',\n    thread_ts: parsed.thread_ts || '',\n    slack_user: parsed.user_id || '',\n    state: 'filters',\n    audience: audienceType || '',\n    filters_json: '{}',\n    requested_count: 0,\n    batch_id: '',\n    email_subject: '',\n    email_body: '',\n    calendly_link: '',\n    last_step_ts: '',\n    updated_at: nowIso\n  }\n} }];"
       },
       "id": "77452a3d-4224-48d0-a31d-83b75b2af88d",
       "name": "Build Audience Filters",
@@ -864,16 +864,7 @@
       }
     },
     {
-      "id": "a0455061-99f6-4307-bc3e-1fae19ea1b26",
-      "name": "Load Session",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        592,
-        592
-      ],
       "parameters": {
-        "resource": "row",
         "operation": "get",
         "dataTableId": {
           "__rl": true,
@@ -886,27 +877,24 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $('Parse Payload').item.json.session_key }}"
             }
           ]
         },
-        "returnAll": false,
         "limit": 1
       },
-      "alwaysOutputData": true
-    },
-    {
-      "id": "a01dcbde-c4df-492a-b123-7eb82c542dbb",
-      "name": "Save Session (Audience)",
+      "id": "a0455061-99f6-4307-bc3e-1fae19ea1b26",
+      "name": "Load Session",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        2704,
-        150
+        592,
+        592
       ],
+      "alwaysOutputData": true
+    },
+    {
       "parameters": {
-        "resource": "row",
         "operation": "upsert",
         "dataTableId": {
           "__rl": true,
@@ -919,7 +907,6 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $json.sess.session_key }}"
             }
           ]
@@ -1073,21 +1060,21 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
+        },
+        "options": {}
       },
-      "alwaysOutputData": true
-    },
-    {
-      "id": "b273c900-bdb7-404c-93b4-92269b54864e",
-      "name": "Save Session (Filter)",
+      "id": "a01dcbde-c4df-492a-b123-7eb82c542dbb",
+      "name": "Save Session (Audience)",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
         2704,
-        300
+        160
       ],
+      "alwaysOutputData": true
+    },
+    {
       "parameters": {
-        "resource": "row",
         "operation": "update",
         "dataTableId": {
           "__rl": true,
@@ -1100,7 +1087,6 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $json.sess.session_key }}"
             }
           ]
@@ -1144,21 +1130,21 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
+        },
+        "options": {}
       },
-      "alwaysOutputData": true
-    },
-    {
-      "id": "4c251b0b-5270-479c-9c64-1c8c973c6026",
-      "name": "Save Session (Candidates)",
+      "id": "b273c900-bdb7-404c-93b4-92269b54864e",
+      "name": "Save Session (Filter)",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
         2704,
-        450
+        304
       ],
+      "alwaysOutputData": true
+    },
+    {
       "parameters": {
-        "resource": "row",
         "operation": "update",
         "dataTableId": {
           "__rl": true,
@@ -1171,7 +1157,6 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $json.sess.session_key }}"
             }
           ]
@@ -1225,38 +1210,35 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
+        },
+        "options": {}
       },
+      "id": "4c251b0b-5270-479c-9c64-1c8c973c6026",
+      "name": "Save Session (Candidates)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2704,
+        464
+      ],
       "alwaysOutputData": true
     },
     {
+      "parameters": {
+        "jsCode": "const b = $('Build Candidates').first().json;\nconst batchId = b.batch_id || '';\nconst candidates = Array.isArray(b.candidates) ? b.candidates : [];\nif (!batchId || candidates.length === 0) return [];\nreturn candidates.map(c => ({ json: {\n  batch_id: batchId,\n  email: c.email || '',\n  first_name: c.first_name || '',\n  summary: c.summary || '',\n  attributes_json: JSON.stringify(c),\n  status: 'staged',\n  sent_at: ''\n} }));"
+      },
       "id": "4fec7b96-a10a-4f08-9421-cb702d851cf4",
       "name": "Stage Candidates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2928,
-        520
+        528
       ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const b = $('Build Candidates').first().json;\nconst batchId = b.batch_id || '';\nconst candidates = Array.isArray(b.candidates) ? b.candidates : [];\nif (!batchId || candidates.length === 0) return [];\nreturn candidates.map(c => ({ json: {\n  batch_id: batchId,\n  email: c.email || '',\n  first_name: c.first_name || '',\n  summary: c.summary || '',\n  attributes_json: JSON.stringify(c),\n  status: 'staged',\n  sent_at: ''\n} }));"
-      },
       "executeOnce": true
     },
     {
-      "id": "0c35ab0b-1718-4a5a-9461-fd2959a88a07",
-      "name": "Insert Candidates",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        3152,
-        520
-      ],
       "parameters": {
-        "resource": "row",
-        "operation": "insert",
         "dataTableId": {
           "__rl": true,
           "mode": "id",
@@ -1339,20 +1321,20 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
-      }
-    },
-    {
-      "id": "bb2e0586-f65f-4df5-9136-f9888e4c6c97",
-      "name": "Save Session (Email Preview)",
+        },
+        "options": {}
+      },
+      "id": "0c35ab0b-1718-4a5a-9461-fd2959a88a07",
+      "name": "Insert Candidates",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        2704,
-        600
-      ],
+        3152,
+        528
+      ]
+    },
+    {
       "parameters": {
-        "resource": "row",
         "operation": "update",
         "dataTableId": {
           "__rl": true,
@@ -1365,7 +1347,6 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $json.sess.session_key }}"
             }
           ]
@@ -1419,21 +1400,21 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
+        },
+        "options": {}
       },
-      "alwaysOutputData": true
-    },
-    {
-      "id": "bd21a921-2764-4e35-b57b-af16f96f0d9d",
-      "name": "Load Batch Candidates",
+      "id": "bb2e0586-f65f-4df5-9136-f9888e4c6c97",
+      "name": "Save Session (Email Preview)",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        2480,
-        900
+        2704,
+        608
       ],
+      "alwaysOutputData": true
+    },
+    {
       "parameters": {
-        "resource": "row",
         "operation": "get",
         "dataTableId": {
           "__rl": true,
@@ -1446,26 +1427,24 @@
           "conditions": [
             {
               "keyName": "batch_id",
-              "condition": "eq",
               "keyValue": "={{ $('Session State').item.json.session_state ? ($('Session State').item.json.session_state.batch_id || '__none__') : '__none__' }}"
             }
           ]
         },
         "returnAll": true
       },
-      "alwaysOutputData": true
-    },
-    {
-      "id": "9710f6c5-9e3f-401e-a1bd-14e3587849c1",
-      "name": "Save Session (Complete)",
+      "id": "bd21a921-2764-4e35-b57b-af16f96f0d9d",
+      "name": "Load Batch Candidates",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        2928,
-        900
+        2480,
+        912
       ],
+      "alwaysOutputData": true
+    },
+    {
       "parameters": {
-        "resource": "row",
         "operation": "update",
         "dataTableId": {
           "__rl": true,
@@ -1478,7 +1457,6 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $json.sess.session_key }}"
             }
           ]
@@ -1522,21 +1500,21 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
+        },
+        "options": {}
       },
-      "alwaysOutputData": true
-    },
-    {
-      "id": "13dba6ae-b01e-4aca-96f6-e2e6fab1cc08",
-      "name": "Save Session (Cancel)",
+      "id": "9710f6c5-9e3f-401e-a1bd-14e3587849c1",
+      "name": "Save Session (Complete)",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        2480,
-        1050
+        2928,
+        912
       ],
+      "alwaysOutputData": true
+    },
+    {
       "parameters": {
-        "resource": "row",
         "operation": "update",
         "dataTableId": {
           "__rl": true,
@@ -1549,7 +1527,6 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $('Parse Payload').item.json.session_key || '__none__' }}"
             }
           ]
@@ -1583,8 +1560,17 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
+        },
+        "options": {}
       },
+      "id": "13dba6ae-b01e-4aca-96f6-e2e6fab1cc08",
+      "name": "Save Session (Cancel)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2480,
+        1056
+      ],
       "alwaysOutputData": true
     }
   ],
@@ -2053,10 +2039,11 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
-  "versionId": "3af70dae-35cc-40ad-b28d-21428687b815",
+  "versionId": "c813e360-3ea8-484e-b6c0-d26115e9317b",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

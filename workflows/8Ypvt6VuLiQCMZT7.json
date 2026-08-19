@@ -29,9 +29,7 @@
     },
     {
       "parameters": {
-        "jsCode": "var j = $input.first().json;\nvar channelId = (j.channel_id || '').toString().trim();\nvar threadTs = (j.thread_ts || '').toString().trim();\nvar userId = (j.user_id || '').toString().trim();\nvar tsOk = /^\\d+\\.\\d+$/.test(threadTs);\nif (!channelId || !tsOk) {\n  return [{ json: { valid: false, error: 'Missing or invalid Slack context (channel_id=' + (channelId || 'empty') + ', thread_ts=' + (threadTs || 'empty') + '). Tell the user something went wrong and the recruiting wizard did not start.' } }];\n}\nreturn [{ json: { valid: true, session_key: channelId + '_' + threadTs, channel_id: channelId, thread_ts: threadTs, user_id: userId, now: new Date().toISOString() } }];",
-        "mode": "runOnceForAllItems",
-        "language": "javaScript"
+        "jsCode": "var j = $input.first().json;\nvar channelId = (j.channel_id || '').toString().trim();\nvar threadTs = (j.thread_ts || '').toString().trim();\nvar userId = (j.user_id || '').toString().trim();\nvar tsOk = /^\\d+\\.\\d+$/.test(threadTs);\nif (!channelId || !tsOk) {\n  return [{ json: { valid: false, error: 'Missing or invalid Slack context (channel_id=' + (channelId || 'empty') + ', thread_ts=' + (threadTs || 'empty') + '). Tell the user something went wrong and the recruiting wizard did not start.' } }];\n}\nreturn [{ json: { valid: true, session_key: channelId + '_' + threadTs, channel_id: channelId, thread_ts: threadTs, user_id: userId, now: new Date().toISOString() } }];"
       },
       "id": "65e52e89-b6ba-4a2f-a8a2-239beaa74680",
       "name": "Validate Input",
@@ -162,20 +160,13 @@
       ]
     },
     {
-      "id": "b514357d-da4a-43b2-a70b-153793e5bee6",
-      "name": "Input Valid?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        448,
-        0
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "strict",
+            "version": 2
           },
           "conditions": [
             {
@@ -184,25 +175,25 @@
                 "type": "boolean",
                 "operation": "true",
                 "singleValue": true
-              }
+              },
+              "id": "61408e7a-2cad-463a-9225-64ca6fedc976"
             }
           ],
           "combinator": "and"
         },
         "options": {}
-      }
+      },
+      "id": "b514357d-da4a-43b2-a70b-153793e5bee6",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        0
+      ]
     },
     {
-      "id": "e020f013-3141-44f1-9a1c-8b73e4edede4",
-      "name": "Upsert Session",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        672,
-        -96
-      ],
       "parameters": {
-        "resource": "row",
         "operation": "upsert",
         "dataTableId": {
           "__rl": true,
@@ -215,7 +206,6 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $('Validate Input').item.json.session_key }}"
             }
           ]
@@ -369,20 +359,20 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
-      }
-    },
-    {
-      "id": "57f7160c-7663-4542-8c67-a1f218c0a147",
-      "name": "Return Invalid Input",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.5,
+        },
+        "options": {}
+      },
+      "id": "e020f013-3141-44f1-9a1c-8b73e4edede4",
+      "name": "Upsert Session",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
       "position": [
         672,
-        160
-      ],
+        -160
+      ]
+    },
+    {
       "parameters": {
-        "mode": "manual",
         "assignments": {
           "assignments": [
             {
@@ -400,7 +390,15 @@
           ]
         },
         "options": {}
-      }
+      },
+      "id": "57f7160c-7663-4542-8c67-a1f218c0a147",
+      "name": "Return Invalid Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        672,
+        160
+      ]
     }
   ],
   "connections": {
@@ -488,10 +486,11 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "3a451f37-b455-4354-8785-34129ff78dd1",
+  "versionId": "894327aa-79dc-42a0-89bb-c24cd22bd08e",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

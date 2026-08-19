@@ -1,0 +1,620 @@
+{
+  "id": "6lVlut82xPoebENQ",
+  "name": "FanOut",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "items"
+            },
+            {
+              "name": "instruction"
+            },
+            {
+              "name": "context"
+            },
+            {
+              "name": "parent_session_id"
+            },
+            {
+              "name": "parent_env"
+            }
+          ]
+        }
+      },
+      "id": "57bba565-d9da-4727-befb-f4fd58fbee77",
+      "name": "Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst runId = crypto.randomUUID();\nconst input = $input.first().json;\n\nlet items = input.items;\nif (typeof items === 'string') {\n  try { items = JSON.parse(items); } catch (e) { items = items.trim() ? [items] : []; }\n}\nif (!Array.isArray(items)) items = (items === null || items === undefined) ? [] : [items];\n\nconst MAX_ITEMS = 25;\nconst parentSessionId = String(input.parent_session_id || '');\nconst isNestedFanOut = parentSessionId.indexOf('fanout-') === 0;\n\nif (isNestedFanOut) {\n  return [{ json: { run_id: runId, blocked: true, error: 'fan_out cannot be called recursively from within an already-fanned-out sub-run (max depth 1). Do this step without fan_out, or restructure so fan_out is only called from the top-level conversation.' } }];\n}\nif (!items.length) {\n  return [{ json: { run_id: runId, blocked: true, error: 'fan_out requires a non-empty items array.' } }];\n}\nif (items.length > MAX_ITEMS) {\n  return [{ json: { run_id: runId, blocked: true, error: 'fan_out supports at most ' + MAX_ITEMS + ' items per call (got ' + items.length + '). Split into multiple calls or narrow the item list.' } }];\n}\n\nreturn [{\n  json: {\n    run_id: runId,\n    items,\n    instruction: input.instruction,\n    context: input.context || '',\n    parent_env: input.parent_env || 'staging',\n    deadline: $now.plus({ minutes: 25 }).toISO(),\n    blocked: false\n  }\n}];"
+      },
+      "id": "8da5b3c6-1a34-4d60-a30a-5eb9faedc8c2",
+      "name": "Generate Run ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.blocked }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f4582097-b45e-4a41-b149-713905372c60",
+      "name": "Is Blocked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "fan_out_item",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "item_index",
+              "fieldValue": "={{ $itemIndex }}"
+            },
+            {
+              "fieldId": "item",
+              "fieldValue": "={{ $json.item }}"
+            },
+            {
+              "fieldId": "instruction",
+              "fieldValue": "={{ $json.instruction }}"
+            },
+            {
+              "fieldId": "context",
+              "fieldValue": "={{ $json.context }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            }
+          ]
+        }
+      },
+      "id": "a1fee944-7a4a-4419-a552-fdcabf1f34a9",
+      "name": "Insert Tracking Rows",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        80
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HDMvthliXrAcZrXp",
+          "cachedResultName": "Darwin"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chatInput": "={{ $json.instruction + '\\n\\n## Item\\n' + (typeof $json.item === 'string' ? $json.item : JSON.stringify($json.item)) + ($json.context ? ('\\n\\n## Shared Context\\n' + $json.context) : '') + '\\n\\nThis is one item from a fan_out batch. Respond with your findings for THIS ITEM ONLY — do not reference other items or assume you have seen the rest of the batch.' }}",
+            "sessionId": "={{ 'fanout-' + $json.run_id + '-' + $json.id }}",
+            "channel": "",
+            "baseline": "",
+            "env": "={{ $('Generate Run ID').first().json.parent_env }}",
+            "thread_ts": "",
+            "user": "",
+            "fan_out_row_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "baseline",
+              "displayName": "baseline",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "env",
+              "displayName": "env",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "user",
+              "displayName": "user",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fan_out_row_id",
+              "displayName": "fan_out_row_id",
+              "type": "string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "f2c1c4f1-64e7-4000-80b5-ebd56b73aac5",
+      "name": "Call Darwin",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $now }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              },
+              "rightValue": "={{ $('Generate Run ID').first().json.deadline }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "764b18d8-ece1-4679-b4cd-06c7eb2d225a",
+      "name": "Check Timeout?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2016,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "cdffee65-747a-4727-a03a-bb1b372308bd",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        80
+      ],
+      "webhookId": "34e9f0f0-26ed-44af-9233-1c95251b0cfa"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "fan_out_item",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Generate Run ID').first().json.run_id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "5e7c2c0a-d4c0-49db-ab7e-6358091d04aa",
+      "name": "Check Progress",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Check Progress').all().filter(r => r.json.id).length }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 0
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "16d94953-d929-4495-a69d-e0c87d127b31",
+      "name": "Is Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1792,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "fan_out_item",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Generate Run ID').first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "id": "5a499c1a-0532-44bc-bdb0-f62eb0d09b93",
+      "name": "Fetch Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        -48
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $('Fetch Results').all();\nconst runId = $('Generate Run ID').first().json.run_id;\nconst instruction = $('Generate Run ID').first().json.instruction;\n\nconst completed = results.filter(r => r.json.status === 'complete');\nconst errors = results.filter(r => r.json.status === 'error');\n\nreturn [{\n  json: {\n    run_id: runId,\n    instruction,\n    total_items: results.length,\n    completed: completed.length,\n    errors: errors.length,\n    results: results.map(r => {\n      let resp = r.json.response;\n      if (typeof resp === 'string') {\n        try { resp = JSON.parse(resp); } catch (e) {}\n      }\n      let item = r.json.item;\n      if (typeof item === 'string') {\n        try { item = JSON.parse(item); } catch (e) {}\n      }\n      return { item_index: r.json.item_index, item, status: r.json.status, response: resp };\n    })\n  }\n}];"
+      },
+      "id": "1110428a-dff5-42a9-ab06-7fea0259e5b9",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "include": "allOtherFields",
+        "options": {
+          "destinationFieldName": "item"
+        }
+      },
+      "id": "e0b8a384-4039-41e1-9bdf-489c86e6220a",
+      "name": "Split Out Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        672,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "run_id",
+              "name": "run_id",
+              "type": "string",
+              "value": "={{ $('Generate Run ID').first().json.run_id }}"
+            },
+            {
+              "id": "instruction",
+              "name": "instruction",
+              "type": "string",
+              "value": "={{ $('Generate Run ID').first().json.instruction }}"
+            },
+            {
+              "id": "error",
+              "name": "error",
+              "type": "string",
+              "value": "fan_out polling timed out after 25 minutes. Some items may still be processing."
+            },
+            {
+              "id": "timed_out",
+              "name": "timed_out",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c4330958-977f-4abc-8630-9c4045d9e67f",
+      "name": "Timeout Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2240,
+        176
+      ]
+    }
+  ],
+  "connections": {
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Run ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Run ID": {
+      "main": [
+        [
+          {
+            "node": "Is Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Progress": {
+      "main": [
+        [
+          {
+            "node": "Is Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Complete?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Timeout?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Results": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Blocked?": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Split Out Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Items": {
+      "main": [
+        [
+          {
+            "node": "Insert Tracking Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Timeout?": {
+      "main": [
+        [
+          {
+            "node": "Timeout Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Tracking Rows": {
+      "main": [
+        [
+          {
+            "node": "Call Darwin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Darwin": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "87e2e896-6431-43d6-b368-47bfa61446ae",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

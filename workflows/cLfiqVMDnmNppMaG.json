@@ -90,7 +90,10 @@
         },
         "needsFallback": false
       },
-      "onError": "continueErrorOutput"
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
     },
     {
       "id": "763f25c7-418d-40d4-9280-ccda485bd9d7",
@@ -326,16 +329,17 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "92e07531-3325-4091-ad2f-e6f01566dbcc",
+  "versionId": "cae3f114-cb59-4536-bdea-96279aed8456",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
   "parentFolderId": "wkVsUQ3LVUIdgVe0",
-  "isArchived": false,
+  "isArchived": true,
   "nodeGroups": []
 }

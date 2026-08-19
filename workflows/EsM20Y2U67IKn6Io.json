@@ -1,0 +1,284 @@
+{
+  "id": "EsM20Y2U67IKn6Io",
+  "name": "UXR Response rate",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "512df5cc-3d4c-4e1f-83e7-1620ce6f52dd",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -704,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "bwOgNKo1fCRR0BMv",
+          "cachedResultName": "UXR Config"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "b0ebbb6b-2efb-4f48-98ac-f44614616f7f",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -480,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.customer.io/v1/campaigns",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "d82d37c0-cfa9-4e79-9b85-9161f310fc4c",
+      "name": "List Broadcasts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -256,
+        480
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "J7C09wvLzVTNh2Q2",
+          "name": "Plain"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Load Config').first().json;\nconst filterText = (cfg.emailSubject || '').toLowerCase();\nconst lookback = Number(cfg.responseRateLookbackCount) || 10;\n\nconst resp = $input.first().json;\nconst list = (resp && (resp.broadcasts || resp.campaigns || resp.results || resp.data))\n  || (Array.isArray(resp) ? resp : []);\n\nfunction messageSubject(b) {\n  // Subject usually lives on a nested message/action, not the top-level broadcast object —\n  // trying a few likely spots.\n  return (b.subject || (b.actions && b.actions[0] && b.actions[0].subject) || (b.message && b.message.subject) || '') + '';\n}\n\nconst matched = list\n  .filter(b => filterText && messageSubject(b).toLowerCase().includes(filterText))\n  .sort((a, b) => (b.created_at || b.id || 0) - (a.created_at || a.id || 0))\n  .slice(0, lookback);\n\nif (matched.length === 0) {\n  return [{ json: { noMatches: true, cfg, __debug_raw_response: resp, __debug_list_length: list.length } }];\n}\n\nreturn matched.map(b => ({ json: { broadcastId: b.id, subject: messageSubject(b), cfg } }));"
+      },
+      "id": "26805a2a-1b1e-44b1-a904-32d43e4cc1af",
+      "name": "Filter & Sort Broadcasts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.noMatches }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "663d4438-02fa-4316-900b-a6a52d985bbb",
+      "name": "No Matches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $input.first().json.cfg;\nconst fallback = Number(cfg.responseRateFallback) || 0.10;\nreturn [{ json: {\n  responseRate: fallback,\n  clickRate: null,\n  conversionFactor: Number(cfg.responseRateConversionFactor) || 0.5,\n  source: 'fallback',\n  broadcastsUsed: [],\n  fallbackRate: fallback,\n  maxContactCount: Number(cfg.maxContactCount) || 300,\n  reason: 'No matching broadcasts found for filter \"' + (cfg.responseRateBroadcastFilter || '') + '\".'\n} }];"
+      },
+      "id": "792471f3-6f38-4d0f-abcb-d0e9dbf5f207",
+      "name": "No Matches Fallback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.customer.io/v1/broadcasts/' + $json.broadcastId + '/metrics' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "8daf7bcd-116b-4814-8d33-5ae2517f2a11",
+      "name": "Get Broadcast Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        416,
+        384
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "J7C09wvLzVTNh2Q2",
+          "name": "Plain"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const metricItems = $input.all().map(i => i.json);\nconst broadcastMeta = $('Filter & Sort Broadcasts').all().map(i => i.json);\nconst cfg = broadcastMeta[0] && broadcastMeta[0].cfg;\n\nlet totalDelivered = 0;\nlet totalClicked = 0;\nconst broadcastsUsed = [];\n\nfor (let i = 0; i < metricItems.length; i++) {\n  const m = metricItems[i].metrics || metricItems[i]; // NOTE: adjust to match actual response shape\n  const delivered = Number(m.delivered ?? m.sent ?? 0);\n  const clicked = Number(m.clicked ?? 0);\n  totalDelivered += delivered;\n  totalClicked += clicked;\n  broadcastsUsed.push({ id: broadcastMeta[i] && broadcastMeta[i].broadcastId, name: broadcastMeta[i] && broadcastMeta[i].name, delivered, clicked });\n}\n\nconst conversionFactor = Number(cfg.responseRateConversionFactor) || 0.5;\nconst fallback = Number(cfg.responseRateFallback) || 0.10;\n\nlet responseRate = fallback;\nlet source = 'fallback';\nlet clickRate = null;\n\nif (totalDelivered > 0) {\n  clickRate = totalClicked / totalDelivered; // NOTE: denominator assumption - delivered, not sent. Adjust if you'd rather use sent.\n  responseRate = clickRate * conversionFactor;\n  source = 'dynamic';\n}\n\nreturn [{ json: {\n  responseRate,\n  clickRate,\n  conversionFactor,\n  source,\n  broadcastsUsed,\n  fallbackRate: fallback,\n  maxContactCount: Number(cfg.maxContactCount) || 300\n} }];"
+      },
+      "id": "df080827-3bb3-40c7-aa61-65f22fedb38c",
+      "name": "Aggregate Click Rate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        384
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "content": "## UXR Response Rate\nCalled by the wizard when the user submits their interviews-target. Returns { responseRate, clickRate, source, broadcastsUsed, maxContactCount }.\n\n**TODO before this is production-ready:**\n1. Confirm the real Customer.io App API endpoints for listing broadcasts and per-broadcast metrics (paths above are best-guess from public docs, not verified against your workspace's API version).\n2. Confirm the actual field names in the metrics response (delivered/clicked assumed).\n3. Create an HTTP Header Auth credential named \"Customer.io App API\" with `Authorization: Bearer <your App API key>` (this is a different key than the Track API credential already used elsewhere — App API keys are generated separately in Customer.io's settings).",
+        "height": 260,
+        "width": 1548,
+        "color": 4
+      },
+      "id": "01083c8c-8d28-4c97-af23-0ea642ff4861",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        64
+      ]
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "List Broadcasts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Broadcasts": {
+      "main": [
+        [
+          {
+            "node": "Filter & Sort Broadcasts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Sort Broadcasts": {
+      "main": [
+        [
+          {
+            "node": "No Matches?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Matches?": {
+      "main": [
+        [
+          {
+            "node": "No Matches Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Broadcast Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Broadcast Metrics": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Click Rate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "triggerCount": 0,
+  "versionId": "8c86a163-1c3a-4c84-94a3-0b8477573476",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "prCy2Gu2VEMt3ALB",
+  "isArchived": false,
+  "nodeGroups": []
+}
