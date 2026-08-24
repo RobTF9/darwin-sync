@@ -46,9 +46,8 @@
     },
     {
       "parameters": {
-        "url": "https://api.customer.io/v1/campaigns",
+        "url": "https://api.customer.io/v1/broadcasts",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
         "options": {
           "response": {
             "response": {
@@ -70,6 +69,10 @@
         "httpHeaderAuth": {
           "id": "J7C09wvLzVTNh2Q2",
           "name": "Plain"
+        },
+        "customerIoApi": {
+          "id": "CrTYaKurGo2NuxoL",
+          "name": "Customer.io account"
         }
       }
     },
@@ -127,8 +130,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        416,
-        608
+        384,
+        368
       ]
     },
     {
@@ -150,8 +153,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        416,
-        384
+        368,
+        560
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -169,8 +172,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        640,
-        384
+        560,
+        560
       ],
       "executeOnce": true
     },
@@ -272,7 +275,7 @@
     "availableInMCP": false
   },
   "triggerCount": 0,
-  "versionId": "8c86a163-1c3a-4c84-94a3-0b8477573476",
+  "versionId": "6305ca53-6739-4909-9adf-f4e87ab37957",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

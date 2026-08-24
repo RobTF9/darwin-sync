@@ -1,0 +1,105 @@
+{
+  "id": "pIrQ1dP2Le0BYHq5",
+  "name": "GongSchemaInspect (temp diagnostic)",
+  "nodes": [
+    {
+      "id": "93387237-9c50-48c1-87a7-837550e84f48",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -640,
+        300
+      ],
+      "parameters": {
+        "public": false,
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "webhookId": "6fc3f7a2-b8e2-466f-bd29-16c7fa33911e"
+    },
+    {
+      "id": "fc7250b9-c828-4648-9eeb-e22a9a37bb80",
+      "name": "Fetch One Call",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        -416,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "projectId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "n8n-telemetry"
+        },
+        "sqlQuery": "={{ \"SELECT * FROM `n8n-telemetry.gong.gong_calls` WHERE call_id = '\" + ($json.chatInput || '4306397586413091268') + \"' LIMIT 1\" }}",
+        "options": {
+          "location": "EU"
+        }
+      },
+      "credentials": {
+        "googleBigQueryOAuth2Api": {
+          "id": "92ZMRuOZEOJHwoRi",
+          "name": "Nik's Big Query"
+        }
+      }
+    },
+    {
+      "id": "f44b7b75-c594-45c5-88a9-aacb44fa0a63",
+      "name": "Inspect Shape",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const row = $input.first().json;\nconst transcript = Array.isArray(row.transcript) ? row.transcript : (row.transcript ? [row.transcript] : []);\nconst turn0 = transcript[0] || {};\nconst sentence0 = (turn0.sentences || [])[0] || {};\nconst out = {\n  topLevelKeys: Object.keys(row),\n  transcriptLength: transcript.length,\n  turnKeys: Object.keys(turn0),\n  sentenceKeys: Object.keys(sentence0),\n  sampleTurn: turn0,\n  sampleSentence: sentence0\n};\nreturn [{ json: { output: JSON.stringify(out, null, 2) } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch One Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch One Call": {
+      "main": [
+        [
+          {
+            "node": "Inspect Shape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "151dda68-420b-437e-90c6-2756a08d6713",
+  "owner": {
+    "type": "personal",
+    "projectId": "gaAiXT3wHyNP6mrE",
+    "projectName": "Robert Squires <robert+darwin@n8n.io>",
+    "personalEmail": "robert+darwin@n8n.io"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

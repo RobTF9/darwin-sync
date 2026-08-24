@@ -1,0 +1,263 @@
+{
+  "id": "MqMcKiTTrKobCaxW",
+  "name": "GongTimestampBackfill (manual, metadata-only)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "394b85da-e964-4dee-a15c-ae564084b1cf",
+      "name": "Start (manual only)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT call_id FROM public.gong_calls ORDER BY call_id",
+        "options": {}
+      },
+      "id": "b833ff2b-356b-4716-a3b9-ec06bb542197",
+      "name": "Get Call IDs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1360,
+        304
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "maxItems": 5
+      },
+      "id": "b387fbd9-c8d3-48f2-bce6-fb0993f4405b",
+      "name": "Limit (raise before full run)",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "projectId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "n8n-telemetry"
+        },
+        "sqlQuery": "{{ \"SELECT * FROM `n8n-telemetry.gong.gong_calls` WHERE call_id = '\" + $json.call_id + \"' LIMIT 1\" }}",
+        "options": {
+          "location": "EU"
+        }
+      },
+      "id": "3727b117-098d-493a-9ed8-49504edc6e88",
+      "name": "Fetch Transcript",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        -880,
+        304
+      ],
+      "credentials": {
+        "googleBigQueryOAuth2Api": {
+          "id": "92ZMRuOZEOJHwoRi",
+          "name": "Nik's Big Query"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, content FROM public.gong WHERE metadata->>'call_id' = $1 AND metadata->>'doc_type' = 'transcript' ORDER BY id ASC",
+        "options": {
+          "queryReplacement": "={{ [$json.call_id] }}"
+        }
+      },
+      "id": "a818b307-52cf-4473-b35c-86d03d7b9722",
+      "name": "Get Existing Chunks",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -640,
+        304
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Metadata-ONLY backfill (no re-embedding, no vector insert/delete).\n//\n// BUG FIX (2026-08-19, after a real run corrupted 11 rows across 4 calls):\n// this originally used `$('Fetch Transcript').item.json` inside a manual\n// `.forEach()` loop. `.item` resolves ONCE for the whole runOnceForAllItems\n// execution — it does NOT re-pair per iteration of a hand-rolled loop. When\n// multiple calls' existing-chunk rows converged into one execution (Limit(5)\n// over 5 calls, each expanding to N rows via Get Existing Chunks), every item\n// after the first silently got the FIRST call's transcript/timing, producing\n// plausible-looking but WRONG start_ms/end_ms for every other call. Fixed by\n// resolving each item's true originating call via `itemMatching(idx)` (the\n// correct n8n API for exactly this case), then grouping items by their\n// resolved call_id before computing anything — this also fixes a second,\n// subtler bug: the proportional-fallback math used the GLOBAL item index/count\n// across the whole batch, not this call's own chunk index/count, which would\n// have been wrong even with pairing fixed.\nconst inputItems = $input.all();\n\nconst resolved = inputItems.map((item, idx) => ({\n  item,\n  raw: $('Fetch Transcript').itemMatching(idx).json,\n}));\n\nconst groups = new Map();\nfor (const r of resolved) {\n  const callId = r.raw.call_id;\n  if (!groups.has(callId)) groups.set(callId, { raw: r.raw, items: [] });\n  groups.get(callId).items.push(r.item);\n}\n\nconst results = [];\n\nfor (const [callId, group] of groups) {\n  const raw = group.raw;\n  const parties = raw.parties || [];\n  const transcript = raw.transcript || [];\n\n  const speakerLabels = {};\n  parties.forEach((p, i) => {\n    const affiliation = p.affiliation || 'Unknown';\n    const label = (p.name || 'Speaker ' + (i + 1)) + ' (' + affiliation + ')';\n    if (p.speakerId !== undefined && p.speakerId !== null) speakerLabels[p.speakerId] = label;\n  });\n\n  const segments = [];\n  const lines = [];\n  let cursor = 0;\n  for (const turn of transcript) {\n    const sentences = turn.sentences || [];\n    if (sentences.length === 0) continue;\n    const speaker = speakerLabels[turn.speakerId] || ('Speaker ' + turn.speakerId);\n    const topic = turn.topic ? ' [' + turn.topic + ']' : '';\n    const sentenceText = sentences.map(s => s.text).join(' ');\n    const line = speaker + topic + ': ' + sentenceText;\n    const startMs = Number(sentences[0].start);\n    const endMs = Number(sentences[sentences.length - 1].end);\n    const charStart = cursor;\n    const charEnd = cursor + line.length;\n    segments.push({ charStart, charEnd, startMs, endMs });\n    lines.push(line);\n    cursor = charEnd + 2; // '\\n\\n' separator, matches Prepare Calls join\n  }\n  const transcriptText = lines.join('\\n\\n');\n  const totalStart = segments.length ? segments[0].startMs : null;\n  const totalEnd = segments.length ? segments[segments.length - 1].endMs : null;\n\n  const n = group.items.length;\n  group.items.forEach((item, idx) => {\n    const row = item.json;\n    const content = row.content || '';\n    let startMs = null, endMs = null, method = 'unmatched';\n\n    const foundIndex = content ? transcriptText.indexOf(content) : -1;\n    if (foundIndex >= 0) {\n      const matchStart = foundIndex;\n      const matchEnd = foundIndex + content.length;\n      const overlapping = segments.filter(s => s.charStart < matchEnd && s.charEnd > matchStart);\n      if (overlapping.length > 0) {\n        startMs = Math.min(...overlapping.map(s => s.startMs));\n        endMs = Math.max(...overlapping.map(s => s.endMs));\n        method = 'exact';\n      }\n    }\n\n    if (startMs === null && totalStart !== null && totalEnd !== null) {\n      const frac0 = n > 0 ? idx / n : 0;\n      const frac1 = n > 0 ? (idx + 1) / n : 1;\n      const span = totalEnd - totalStart;\n      startMs = totalStart + span * frac0;\n      endMs = totalStart + span * frac1;\n      method = 'proportional_fallback';\n    }\n\n    results.push({\n      json: { id: row.id, start_ms: startMs, end_ms: endMs, method, call_id: callId }\n    });\n  });\n}\n\nreturn results;"
+      },
+      "id": "06cd51ea-e2af-4d6d-841b-42c14bc5f280",
+      "name": "Match & Compute Timestamps",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.gong SET metadata = metadata || jsonb_build_object('start_ms', $2::double precision, 'end_ms', $3::double precision) WHERE id = $1::bigint RETURNING id",
+        "options": {
+          "queryReplacement": "={{ [$json.id, $json.start_ms, $json.end_ms] }}"
+        }
+      },
+      "id": "787555a6-9eef-4e56-8929-a746130670e3",
+      "name": "Update Metadata",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -160,
+        304
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "field": "id"
+            }
+          ]
+        },
+        "fieldsToSplitBy": "method",
+        "options": {}
+      },
+      "id": "d50628a3-0be0-41a2-bad1-76aa4c581e42",
+      "name": "Summary by Method",
+      "type": "n8n-nodes-base.summarize",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Gong timestamp backfill — metadata ONLY\n\nBackfills start_ms/end_ms on EXISTING gong rows so search_all / get_resource_context\ncan build from=/to= timestamped deep links (retrieval plan §7.1). Does NOT re-embed,\ndoes NOT insert/delete any vector rows, does NOT touch the resource tree — pure\n`UPDATE ... SET metadata = metadata || ...` per existing row.\n\nSafe to re-run (idempotent, always overwrites start_ms/end_ms with a fresh computation).\n\nLimit node defaults to 5 calls for a cheap first test — raise/remove it for the full run\n(3,835+ calls on staging). Manual trigger only — never schedule this.\n\nMatching: rebuilds the exact same flat transcript text Prepare Calls builds, finds each\nexisting row's stored content as a substring in it (deterministic — same input, same\ntext), maps the matched character range back to turn timing. Falls back to a\nproportional-position estimate only if the exact match fails. Check the Summary by\nMethod node's counts after a run — `exact` should dominate; a high `proportional_fallback`\nor `unmatched` count means something drifted (e.g. content trimmed differently) and is\nworth investigating before trusting the links.",
+        "height": 504,
+        "width": 1980,
+        "color": 5
+      },
+      "id": "3c357d49-29cf-4bd1-8ef5-459355cf3d8a",
+      "name": "Sticky Note e5c8f678",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1616,
+        -256
+      ]
+    }
+  ],
+  "connections": {
+    "Start (manual only)": {
+      "main": [
+        [
+          {
+            "node": "Get Call IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Call IDs": {
+      "main": [
+        [
+          {
+            "node": "Limit (raise before full run)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit (raise before full run)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transcript": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Chunks": {
+      "main": [
+        [
+          {
+            "node": "Match & Compute Timestamps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match & Compute Timestamps": {
+      "main": [
+        [
+          {
+            "node": "Update Metadata",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Summary by Method",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "6263d1b8-6d67-4f95-93fd-89ecb93478f0",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}
