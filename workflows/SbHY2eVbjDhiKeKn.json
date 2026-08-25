@@ -1,0 +1,233 @@
+{
+  "id": "SbHY2eVbjDhiKeKn",
+  "name": "TEMP - Backfill NPS Embeddings",
+  "nodes": [
+    {
+      "id": "bbda27d1-0163-427b-a9f6-8405d395024a",
+      "name": "Manual Fire",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "258cb1e7-50f7-4443-b739-64c05f896c2a",
+      "name": "Fetch Unembedded Rows",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, feedback FROM public.nps_open_text_insights WHERE embedding IS NULL ORDER BY id;"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "8e52b529-362d-44b1-9570-f91d76784dfd",
+      "name": "Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "f8950d12-9970-418b-b862-86cd3bba32fc",
+      "name": "Build Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nreturn [{ json: { ids: items.map(it => it.id), texts: items.map(it => it.feedback) } }];"
+      }
+    },
+    {
+      "id": "c57ef9fb-f78d-4af5-98f2-3682fea70aec",
+      "name": "Embed Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"text-embedding-3-large\", input: $json.texts }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "id": "562d94f4-5f96-4cf7-90bf-74305dcc670a",
+      "name": "Zip And Build SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "jsCode": "const ids = $('Build Batch').first().json.ids;\nconst data = ($json.data || []).slice().sort((a, b) => a.index - b.index);\nconst values = ids.map((id, idx) => {\n  const emb = data[idx] && Array.isArray(data[idx].embedding) ? data[idx].embedding : null;\n  if (!emb) return null;\n  const vec = emb.map(x => Number(x.toFixed(6))).join(',');\n  return `(${id}, '[${vec}]'::vector(3072))`;\n}).filter(Boolean);\nif (!values.length) return [{ json: { sql: 'SELECT 1;', count: 0 } }];\nconst sql = `UPDATE public.nps_open_text_insights AS t SET embedding = v.emb FROM (VALUES ${values.join(',')}) AS v(id, emb) WHERE t.id = v.id;`;\nreturn [{ json: { sql, count: values.length } }];"
+      }
+    },
+    {
+      "id": "8fd0fcc0-8129-4768-8c5a-d4485e44a7c0",
+      "name": "Write Back Embeddings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1344,
+        272
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.sql }}"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "466c5c1c-2767-40d1-9bba-32a46f4740ab",
+      "name": "Batch 100",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        448,
+        192
+      ],
+      "parameters": {
+        "batchSize": 100
+      }
+    }
+  ],
+  "connections": {
+    "Manual Fire": {
+      "main": [
+        [
+          {
+            "node": "Fetch Unembedded Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Unembedded Rows": {
+      "main": [
+        [
+          {
+            "node": "Batch 100",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Batch": {
+      "main": [
+        [
+          {
+            "node": "Embed Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Batch": {
+      "main": [
+        [
+          {
+            "node": "Zip And Build SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zip And Build SQL": {
+      "main": [
+        [
+          {
+            "node": "Write Back Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Back Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Batch 100",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch 100": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "91bcbc29-512e-49bd-88ec-66b4e256ed8a",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}
