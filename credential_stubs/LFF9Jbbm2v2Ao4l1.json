@@ -1,0 +1,14 @@
+{
+  "id": "LFF9Jbbm2v2Ao4l1",
+  "name": "Notion account",
+  "type": "notionOAuth2Api",
+  "data": {},
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

@@ -1,0 +1,17 @@
+{
+  "id": "HhZhC7gGHfWDMasj",
+  "name": "Aniol's slack NPS bot",
+  "type": "slackApi",
+  "data": {
+    "accessToken": "",
+    "signatureSecret": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

@@ -1,0 +1,434 @@
+{
+  "id": "O2Co5oWJSdKtonBm",
+  "name": "NPS - Monthly summary",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "period_label"
+            },
+            {
+              "name": "page_id"
+            }
+          ]
+        }
+      },
+      "id": "ed1da401-103d-4e78-9f06-1a3f1bb35707",
+      "name": "Called By Report Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Feeds the summary model a DELIBERATELY NARROW slice, shaped to the fixed\n// structure the summary uses. Handing over the full results object would let\n// the model pick any number it liked and present it as a finding.\nconst rows = $input.all().map((i) => i.json).filter((r) => r && r.results_json);\nif (!rows.length) throw new Error('No stored results found for this period - the report workflow should write them before calling this.');\n\nrows.sort((a, b) => String(b.generated_at || '').localeCompare(String(a.generated_at || '')));\nconst stored = rows[0];\nconst r = JSON.parse(stored.results_json);\nconst th = r.themes || {};\nconst st = r.stats || {};\n\n// The overall score is stored alongside the tables. It is NOT in r.scores,\n// which only covers the five segment dimensions.\nconst o = r.overall_score || null;\nconst score = o ? {\n  nps: o.nps, responses: o.responses, promoters: o.promoters, passives: o.passives, detractors: o.detractors,\n  pct_with_text: o.pct_with_text,\n  change_since_last_month: o.nps_delta,\n  change_is_real: o.delta_moved === true,\n} : null;\n\nconst find = (dim, group) => (r.scores || []).find((x) => x.dimension === dim && String(x.group) === group) || null;\nconst pick = (x) => (x ? { group: x.group, nps: x.nps, vs_average: x.vs_average, responses: x.responses, change: x.change } : null);\n\n// Enterprise means the Enterprise TIER ONLY. An earlier summary lumped\n// Business in with it, which is a different commercial tier.\nconst enterprise = pick(find('Enterprise tier', 'Enterprise'));\nconst cloud = pick(find('Cloud vs self-hosted', 'cloud'));\nconst selfHosted = pick(find('Cloud vs self-hosted', 'self_hosted'));\n\n// Only movements the code marked significant. A star in the change column is\n// the code's verdict, not a judgement the model gets to make.\nconst movements = (r.scores || [])\n  .filter((x) => /\\*/.test(String(x.change || '')))\n  .map((x) => ({ segment: x.dimension, group: x.group, nps: x.nps, change: x.change, responses: x.responses }));\n\nconst independent = (r.findings || [])\n  .filter((f) => f.real_effect === 'YES')\n  .map((f) => ({ segment: f.dimension, group: f.group, topic: f.topic, direction: f.direction, this_group: f.this_group, everyone_else: f.everyone_else, n: f.responses }));\n\nconst payload = {\n  period: r.period,\n  score,\n  top_topics: (r.topics || []).filter((t) => !t.note).slice(0, 4),\n  top_requests: (th.request_themes || []).slice(0, 4).map((t) => ({ theme: t.label, mentions: t.mentions, share: t.share_pct + '%' })),\n  top_complaints: (th.complaint_themes || []).slice(0, 4).map((t) => ({ theme: t.label, mentions: t.mentions, share: t.share_pct + '%' })),\n  enterprise_tier_only: enterprise,\n  cloud: cloud,\n  self_hosted: selfHosted,\n  significant_score_changes: movements,\n  independent_segment_differences: independent,\n  unassigned_alert: th.alert === true,\n  unassigned: th.unassigned || null,\n};\n\nconsole.log('[Summary] ' + r.period + ': NPS ' + (score ? score.nps : 'missing') + ', enterprise ' + (enterprise ? enterprise.nps : 'n/a') + ', ' + movements.length + ' real movements, ' + independent.length + ' independent findings');\n\nreturn [{ json: {\n  period_label: r.period,\n  page_id: stored.page_id,\n  page_url: stored.page_url,\n  promptText: JSON.stringify(payload),\n} }];"
+      },
+      "id": "047b3934-f1f9-4f4c-a67c-5083886e7245",
+      "name": "Build Summary Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.promptText }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You write the summary at the top of n8n's monthly NPS report. It sits above the tables and is the only part most readers will read. They are product and design people who do not track NPS and will not read further.\n\nWrite FOUR fixed sentences, plus one optional fifth. Plain prose, no bullets, no statistics jargon.\n\n1. SCORE. Where the score is and whether it moved. Only call it a change if change_is_real is true; otherwise say it held steady or was essentially flat.\n\n2. WHAT THEY TALKED ABOUT AND ASKED FOR. The most common topics, the most common request theme and the most common complaint theme. This is the sentence most readers care about most, so make it concrete and specific: name the actual themes, not \"various topics\".\n\n3. ENTERPRISE. The score for the Enterprise tier only, and how far it sits from the overall average. enterprise_tier_only is the ONLY source for this. Never include the Business tier, Business for Startups or Embed - they are different commercial tiers and merging them is wrong.\n\n4. CLOUD VS SELF-HOSTED. The two scores and the gap between them.\n\n5. OPTIONAL - WORTH NOTING. Include a fifth sentence ONLY if something genuinely unusual happened: a score movement in significant_score_changes, a difference in independent_segment_differences, or unassigned_alert being true. If none of those apply, OMIT this entirely. Most months it should be absent. Do not stretch to fill it.\n\nRULES\n- Use ONLY the numbers given. Never compute, re-round, estimate, or infer a number that is not present.\n- Sentences 3 and 4 describe STANDING POSITIONS, not movements. Never say Enterprise \"dropped\" or self-hosted \"rose\" there - they sit where they sit.\n- ALWAYS disambiguate role names. Write \"users in customer-support roles\", never bare \"customer-support\", which reads as the support team rather than the respondents.\n- Never state something that is true every month as if it were news. \"Self-hosted users talk about self-hosting\" and \"cloud users mention pricing\" are tautologies - never write them.\n- No adjectives doing work numbers should do: not \"sharp\", \"dramatic\", \"concerning\", \"significant\".\n- Do not recommend actions. This is a summary, not a plan.\n- Write for someone who has never seen this report. Say \"the Enterprise tier\" not \"enterprise_tier\".\n\nOUTPUT FORMAT - CRITICAL\nRAW JSON ONLY. No prose outside it, no markdown fences, no backticks. First character { and last }.\n{\n  \"one_liner\": \"\",\n  \"talked_about\": \"\",\n  \"enterprise\": \"\",\n  \"deployment\": \"\",\n  \"worth_noting\": \"\"\n}\nEach field is ONE complete sentence. Set worth_noting to \"\" when nothing qualifies."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "5368bd76-f2ab-472e-a6da-fa3097c7e400",
+      "name": "Write Summary",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        672,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5"
+        },
+        "builtInTools": {},
+        "options": {
+          "reasoningEffort": "medium"
+        }
+      },
+      "id": "0e4010b4-0ac3-426e-ab83-ad3d549c8b22",
+      "name": "Summary Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        224
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse defensively. A failed summary must leave the page's placeholder alone\n// rather than overwriting it with an error - the report itself is unaffected.\nconst raw = $json.output ?? $json.text ?? '';\nconst ctx = $('Build Summary Input').first().json;\n\nlet parsed = null, parseError = '';\ntry {\n  parsed = JSON.parse(String(raw).replace(/^\\s*```(?:json)?/i, '').replace(/```\\s*$/, '').trim());\n} catch (e) { parseError = e.message; }\n\nconst s = (v) => (typeof v === 'string' ? v.trim() : '');\nconst oneLiner = parsed ? s(parsed.one_liner) : '';\n\n// The three standing sentences read as one paragraph. worth_noting is optional\n// by design and absent most months.\nconst body = parsed ? [s(parsed.talked_about), s(parsed.enterprise), s(parsed.deployment)].filter(Boolean) : [];\nconst worthNoting = parsed ? s(parsed.worth_noting) : '';\n\nif (!oneLiner) {\n  console.warn('[Summary] no usable summary returned (' + parseError + ') - leaving the placeholder untouched');\n  return [{ json: { ok: false, parseError, page_id: ctx.page_id, page_url: ctx.page_url, period_label: ctx.period_label } }];\n}\n\nconsole.log('[Summary] ' + ctx.period_label + ': one-liner + ' + body.length + ' standing sentence(s)' + (worthNoting ? ' + worth noting' : ', nothing unusual'));\n\nreturn [{ json: {\n  ok: true, parseError: '',\n  page_id: ctx.page_id, page_url: ctx.page_url, period_label: ctx.period_label,\n  one_liner: oneLiner, body, worth_noting: worthNoting,\n} }];"
+      },
+      "id": "dde6c75a-3020-4003-b485-e71519c12acb",
+      "name": "Parse Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.notion.com/v1/blocks/{{ $json.page_id }}/children?page_size=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ae1c75c-a422-44a8-a0ab-f81d1cd0e945",
+      "name": "Get Page Blocks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ],
+      "credentials": {
+        "notionOAuth2Api": {
+          "id": "LFF9Jbbm2v2Ao4l1",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Finds the placeholder paragraph the report workflow left under the Summary\n// heading, so the summary lands at the TOP of the page rather than appended to\n// the bottom. Matching on the placeholder text rather than on position means an\n// edited page does not get its content overwritten.\nconst parsed = $('Parse Summary').first().json;\nif (!parsed.ok) throw new Error('No summary to write: ' + parsed.parseError);\n\nconst blocks = ($json.results || []).length ? $json.results : ($json.body && $json.body.results) || $json.results || [];\nif (!Array.isArray(blocks) || !blocks.length) throw new Error('Notion returned no blocks for page ' + parsed.page_id);\n\nconst textOf = (b) => {\n  const t = b && b[b.type];\n  const rt = t && t.rich_text;\n  return Array.isArray(rt) ? rt.map((x) => (x.plain_text || (x.text && x.text.content) || '')).join('') : '';\n};\n\nlet target = blocks.find((b) => b.type === 'paragraph' && textOf(b).trim().toLowerCase().startsWith('to be written'));\nif (!target) {\n  const hIdx = blocks.findIndex((b) => (b.type === 'heading_2' || b.type === 'heading_1') && textOf(b).trim().toLowerCase() === 'summary');\n  if (hIdx >= 0) target = blocks.slice(hIdx + 1).find((b) => b.type === 'paragraph');\n}\nif (!target) throw new Error('Could not find the Summary placeholder on page ' + parsed.page_id + '. It may have been removed.');\n\nconst txt = (content, annotations) => ({ type: 'text', text: { content: String(content).slice(0, 2000) }, ...(annotations ? { annotations } : {}) });\n\n// One-liner goes bold into the placeholder itself. The three standing sentences\n// follow as a single readable paragraph rather than a list of statistics - the\n// bulleted version was accurate and unreadable.\nconst headline_rich = [txt(parsed.one_liner, { bold: true })];\nconst detail_blocks = [];\nif (parsed.body.length) {\n  detail_blocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: [txt(parsed.body.join(' '))] } });\n}\nif (parsed.worth_noting) {\n  // A plain paragraph with the pin inline, NOT a callout box. As a callout it\n  // outranked the bold headline and read as the main message, when it is the\n  // optional aside.\n  detail_blocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: [txt('\\uD83D\\uDCCC ' + parsed.worth_noting)] } });\n}\ndetail_blocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: [txt('Want the detail? It is all below.', { italic: true })] } });\n\nconsole.log('[Summary] writing into block ' + target.id + ' on page ' + parsed.page_id);\n\nreturn [{ json: {\n  page_id: parsed.page_id, block_id: target.id,\n  headline_rich, detail_blocks,\n}}];"
+      },
+      "id": "65492991-6e20-4297-97ac-d373661b5885",
+      "name": "Locate Summary Block",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/blocks/{{ $json.block_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ paragraph: { rich_text: $json.headline_rich } }) }}",
+        "options": {}
+      },
+      "id": "0d84ef0d-e7e8-472e-85ca-12b9022ca180",
+      "name": "Write Summary To Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        0
+      ],
+      "credentials": {
+        "notionOAuth2Api": {
+          "id": "LFF9Jbbm2v2Ao4l1",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/blocks/{{ $('Locate Summary Block').first().json.page_id }}/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ children: $('Locate Summary Block').first().json.detail_blocks, after: $('Locate Summary Block').first().json.block_id }) }}",
+        "options": {}
+      },
+      "id": "0308fa08-964c-4f8f-bf65-afbfd78065f5",
+      "name": "Append Summary Detail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        0
+      ],
+      "credentials": {
+        "notionOAuth2Api": {
+          "id": "LFF9Jbbm2v2Ao4l1",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "cachedResultName": "test-aniol-nps",
+          "mode": "name",
+          "value": "test-aniol-nps"
+        },
+        "text": "={{ $('Build Slack Message').first().json.slack_text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "45422528-e220-48af-9579-9ad1932533bb",
+      "name": "Post Summary To Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        2400,
+        0
+      ],
+      "webhookId": "806ad769-93ea-4581-b45c-dc0fe75343cf",
+      "credentials": {
+        "slackApi": {
+          "id": "HhZhC7gGHfWDMasj",
+          "name": "Aniol's slack NPS bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Posted from HERE rather than from the report workflow, because the summary\n// does not exist until it has been written. Slack carries the WHOLE summary\n// now that it is four short sentences: it is short enough to read in the\n// channel, and anything longer belongs in Notion rather than being duplicated.\nconst p = $('Parse Summary').first().json;\nconst period = p.period_label || '';\nconst url = p.page_url || '';\n\nconst lines = [];\nlines.push(`*NPS monthly* \\u00b7 ${period}`);\nlines.push('');\nlines.push(`*${p.one_liner}*`);\n\nif ((p.body || []).length) {\n  lines.push('');\n  lines.push(p.body.join(' '));\n}\n\n// The optional aside keeps the pin so it reads the same way in both places,\n// but stays plain text so it does not outrank the headline.\nif (p.worth_noting) {\n  lines.push('');\n  lines.push(`\\uD83D\\uDCCC ${p.worth_noting}`);\n}\n\nlines.push('');\nlines.push(url ? `<${url}|Read the full report>` : '_The full report is in the NPS DB in Notion._');\n\nconsole.log('[Slack] posting full summary for ' + period + (url ? ' with page link' : ' WITHOUT a page link - page_url was empty'));\nreturn [{ json: { slack_text: lines.join('\\n'), period_label: period, page_url: url } }];"
+      },
+      "id": "2f425a3b-d8a3-4795-a4e6-261103958055",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "nps_monthly_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "period_label",
+              "condition": "eq",
+              "keyValue": "={{ $json.period_label }}"
+            }
+          ]
+        }
+      },
+      "id": "87e596e5-0b81-4817-85d9-5bb0b4bcd57f",
+      "name": "Fetch Stored Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Build Summary Input": {
+      "main": [
+        [
+          {
+            "node": "Write Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Summary": {
+      "main": [
+        [
+          {
+            "node": "Parse Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Summary": {
+      "main": [
+        [
+          {
+            "node": "Get Page Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Page Blocks": {
+      "main": [
+        [
+          {
+            "node": "Locate Summary Block",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Locate Summary Block": {
+      "main": [
+        [
+          {
+            "node": "Write Summary To Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Summary To Notion": {
+      "main": [
+        [
+          {
+            "node": "Append Summary Detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Summary Detail": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Post Summary To Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called By Report Workflow": {
+      "main": [
+        [
+          {
+            "node": "Fetch Stored Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Stored Results": {
+      "main": [
+        [
+          {
+            "node": "Build Summary Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "5e4cb161-438a-459b-818c-00d8ac6fbec6",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "sSJsP2ZRjaFCHn95",
+  "isArchived": false,
+  "nodeGroups": []
+}

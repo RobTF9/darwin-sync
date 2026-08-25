@@ -1,0 +1,518 @@
+{
+  "id": "78FVoqhcsy0Ku4Jy",
+  "name": "NPS daily swipe",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "d6ed78c4-da74-458e-a92b-785474352bc4",
+      "name": "Daily NPS Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "projectId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "n8n-telemetry"
+        },
+        "sqlQuery": "-- Daily ingest, last 24h. Now also resolves five segmentation fields per\n-- response for future segmented reporting (deployment, enterprise tier, role,\n-- company size, tech skill count). None of this feeds today's digest - it's\n-- pure data capture for later analysis. Missing values are the literal string\n-- 'NA', matching this pipeline's existing convention (e.g. category_secondary).\nWITH raw AS (\n  SELECT feedback, nps, timestamp, instance_id, user_id, context_page_url\n  FROM `n8n-telemetry.rudder_schema.user_responded_value_survey_feedback`\n  WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)\n    AND feedback IS NOT NULL AND TRIM(feedback) != ''\n),\n-- dim_enterprise_instances.consumer_device_fingerprint is NOT 1:1 in practice:\n-- SHA-256('') is a placeholder used by thousands of instances that never sent\n-- a real fingerprint, and must be excluded or it fans out the join massively.\nent_dedup AS (\n  SELECT consumer_device_fingerprint, account_license_type,\n    ROW_NUMBER() OVER (PARTITION BY consumer_device_fingerprint ORDER BY latest_activated_at DESC) AS rn\n  FROM `n8n-telemetry.marts.dim_enterprise_instances`\n  WHERE consumer_device_fingerprint IS NOT NULL\n    AND consumer_device_fingerprint != 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'\n),\nresolved AS (\n  SELECT\n    r.feedback, r.nps, r.timestamp,\n    -- Deployment: authoritative survey_deployment field (78% coverage) with a\n    -- URL-pattern fallback (100% coverage, cross-validated to agree exactly\n    -- wherever both exist), so this is essentially never 'NA' in practice.\n    COALESCE(\n      u.survey_deployment,\n      CASE WHEN REGEXP_CONTAINS(IFNULL(r.context_page_url,''), r'\\.app\\.n8n\\.cloud') THEN 'cloud' ELSE 'self_hosted' END\n    ) AS deployment,\n    -- Full Salesforce tier string (Enterprise/Business/Business for Startups/\n    -- Embed), not a boolean - per Aniol's call, keeps sub-tiers distinguishable\n    -- for a future enterprise-specific report.\n    COALESCE(e.account_license_type, 'NA') AS enterprise_tier,\n    COALESCE(u.role, 'NA') AS role,\n    COALESCE(u.company_size, 'NA') AS company_size,\n    u.technical_skills AS technical_skills\n  FROM raw r\n  LEFT JOIN `n8n-telemetry.marts.dim_users` u ON u.user_id = r.user_id\n  LEFT JOIN ent_dedup e ON e.consumer_device_fingerprint = r.instance_id AND e.rn = 1\n)\nSELECT\n  feedback, nps, timestamp, deployment, enterprise_tier, role, company_size,\n  -- technical_skills is a cloud-only onboarding question. It is never SQL NULL\n  -- (always at least an empty array), so ARRAY_LENGTH alone would show '0' for\n  -- every self-hosted user - not 'zero skills', but 'never asked'. Force NA\n  -- for anyone not resolved to cloud.\n  CASE WHEN deployment = 'cloud' THEN CAST(ARRAY_LENGTH(technical_skills) AS STRING) ELSE 'NA' END AS tech_skills_count\nFROM resolved",
+        "options": {}
+      },
+      "id": "91620201-71b8-40f8-b5ef-3f3f1990f362",
+      "name": "Fetch Daily Open-Text Feedback",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        304,
+        0
+      ],
+      "credentials": {
+        "googleBigQueryOAuth2Api": {
+          "id": "92ZMRuOZEOJHwoRi",
+          "name": "Nik's Big Query"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "[{ \"index\": 0, \"evidence\": \"the page goes white and I need to refresh\", \"category\": \"Reliability\", \"evidence_secondary\": \"\", \"category_secondary\": \"\", \"is_request\": false, \"actionable\": true, \"sentiment\": \"negative\", \"strategy_pillar\": \"None\" }, { \"index\": 1, \"evidence\": \"the AI assistant builds most of my workflow\", \"category\": \"UX\", \"evidence_secondary\": \"\", \"category_secondary\": \"\", \"is_request\": false, \"actionable\": true, \"sentiment\": \"positive\", \"strategy_pillar\": \"AI Building\" }]"
+      },
+      "id": "de5644c6-962b-476a-bdce-ff7265a2e410",
+      "name": "NPS Driver Output Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst lines = items.map((it, idx) => `${idx}. NPS=${it.nps} | ${(it.feedback || '').replace(/\\n/g, ' ')}`).join('\\n');\nreturn [{ json: { items, promptText: lines } }];"
+      },
+      "id": "f3ba9dd6-337a-4c6b-8b25-fb2e399a9cda",
+      "name": "Build Batch Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.promptText }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You classify a BATCH of open-text NPS feedback comments for n8n, an AI-first workflow automation product used by both technical and non-technical users.\n\nYou assign TWO INDEPENDENT AXES to every comment:\n- AXIS 1 (category): what part of the product the comment is about. Every comment gets one.\n- AXIS 2 (strategy_pillar): which strategic bet the comment speaks to, if any. MOST COMMENTS GET \"None\" HERE. That is the expected and correct outcome.\nThe axes do not constrain each other. A comment can be Reliability on Axis 1 and AI Building on Axis 2, and both readings are correct.\n\nINPUT\nEach line is formatted: \"INDEX. NPS=<score> | <feedback text>\"\nComments arrive in many languages. Classify all of them. Emit labels in English, but quote evidence verbatim in the original language.\n\nOUTPUT\nA JSON array, exactly one object per input line, same order, fields in this order:\nindex, evidence, category, evidence_secondary, category_secondary, is_request, actionable, sentiment, strategy_pillar\nFill the fields in the order listed. Quote the evidence BEFORE choosing the category - the quote justifies the label, not the other way round.\nUse an empty string \"\" for absent values. Never use null.\n\nSTEP 1 - evidence\nQuote, verbatim, the shortest contiguous phrase naming a CONCRETE, CHANGEABLE SPECIFIC: a named UI element, a described failure, a named third-party service, a named missing capability, a specific cost or limit, a specific documentation gap.\nIf no such phrase exists - only an opinion, a mood, or a bare topic noun - set evidence to \"\".\nDo not paraphrase. Do not stitch words from different parts of the comment. If you cannot point at one contiguous phrase, there is no evidence.\n\nSTEP 2 - category (AXIS 1)\nExactly one. Every line gets one.\n- UX: interaction, flow, layout, visual design, navigation, editor behaviour, credential setup, save/undo, popups, product-language localization. Works but awkward, confusing, or pleasant.\n- Reliability: failures, errors, crashes, blank pages, hangs, stuck loops, dropped connections, wrong results, bugs, debugging difficulty.\n- Performance: speed, latency, execution time. Works correctly, just slowly.\n- Pricing: cost, plan tiers, subscription value, trial length, credit or execution limits, discounts, value for money.\n- Integrations: availability, breadth, quality or absence of connectors and nodes to third-party services.\n- Documentation: quality, existence, coverage or translation of docs, help files, tutorials, the Academy, community learning content.\n- Learning Curve: the PRODUCT being steep, complex, intense, intimidating; suitability for non-developers; time to competence.\n- Self-hosting/Deployment: self-hosting, running locally, Docker, containers, community edition, open source and licensing, deployment platforms, install and setup effort, data on own infrastructure.\n- Support: interactions with n8n's support team or staff.\n- No Driver Named: carries a mood but names NO product topic (\"love it\", \"muito bom\", \"nothing\"), or is unintelligible.\n- Other: IS clearly about a specific product topic that fits none of the above. Use sparingly - a rising Other count signals the taxonomy needs a new category. Do NOT use it for vague comments; those are No Driver Named.\n\nAXIS 1 TIE-BREAKS (in order)\n1. Requests never determine the category. Flag via is_request; the category is the topic area. \"We dont have autosave!\" is UX with is_request true.\n2. Errors, blanks, hangs, crashes -> Reliability. Works but confuses -> UX. Works but slowly -> Performance.\n3. If the cost point exists BECAUSE of deployment (\"free when run locally\") primary is Self-hosting/Deployment, Pricing may be secondary. Purely about what n8n charges -> Pricing.\n4. \"I can't figure this out\", \"not for non-devs\" -> Learning Curve. \"There's no doc for this\" -> Documentation.\n5. Names an external service or connector -> Integrations.\n6. Missing doc translation -> Documentation. Wanting the product UI in another language -> UX with is_request true.\n7. A vague opinion ABOUT a named topic keeps that topic. \"expensive\" -> Pricing. \"not user friendly\" -> UX. \"buggy\" -> Reliability. No Driver Named is only for when no topic is named at all.\n8. Still tied -> pick the one the evidence phrase sits inside.\n\nSTEP 3 - category_secondary and evidence_secondary\nOnly when a distinct second topic carries its OWN separate evidence phrase. Max two categories.\nIf you set category_secondary you must set evidence_secondary to a different contiguous phrase from the same comment.\nCannot quote a second distinct phrase -> both \"\".\nDo not use secondary to hedge between two candidates for one point.\nNever set it on a No Driver Named row.\nMost comments have \"\" for both. That is correct.\n\nSTEP 4 - is_request\ntrue when the comment asks for, wishes for, or implies wanting something that does not exist or does not work as wanted: \"it would be great if\", \"please add\", \"there should be\", \"we don't have\", \"if there were more X I'd give a 10\".\nfalse for description of what exists, praise, or a bug report with no implied ask.\nis_request true and sentiment positive can co-occur.\n\nSTEP 5 - actionable\nCould a product manager write a ticket title from this without inventing any detail the user did not supply?\n- evidence is \"\" -> actionable false. No exceptions.\n- Praise is actionable only when it names a specific mechanism or element. \"most intuitive workflow designer\" -> false. \"run it fully locally in a dockerized container\" -> true.\n- A bare topic noun plus an opinion is not actionable either way: \"convenient interface\", \"not user friendly\", \"expensive\", \"Reliable\" -> false. They still keep their real category.\n- Intensity is not specificity. \"TRAVA DEMAIS!!!\", \"too slow\" -> false.\nactionable false does not mean worthless. Vague comments are counted in aggregate, so they must still be categorised correctly.\n\nSTEP 6 - sentiment\nTone of the comment itself. Independent of NPS score, actionable, and is_request.\n- positive: dominant tone is approval.\n- negative: dominant tone is dissatisfaction or complaint.\n- neutral: genuinely balanced, or no discernible tone.\nFor \"great, but X\", pick whichever dominates; neutral only when truly even.\nONLY positive, negative, neutral are permitted. Never \"mixed\" or anything else. Unsure -> neutral.\n\nSTEP 7 - strategy_pillar (AXIS 2)\nExactly one of the nine values below. \"None\" is the DEFAULT and the most common answer - roughly three quarters of comments should be None. Do not stretch to fill this field.\n- AI Building: the AI is AUTHORING or FIXING the automation. Prompting to generate a workflow, the AI assistant/builder, generation quality, AI-assisted debugging, self-healing.\n- Visual Auditability: comprehending ONE workflow. Canvas, data flow, node inputs and outputs, \"I can see what's happening\", easier to follow than code, inspecting a run to understand it.\n- Runtime Governance: things that only matter with a TEAM or MANY workflows. Execution logs at scale, monitoring, alerting, roles, permissions, SSO, policy, audit trail, budget caps, environments, data-access control.\n- Power & Ceiling: whether n8n can do the HARD thing. Code node, HTTP request, webhooks, arbitrary code, Python/JS, libraries, complex branching and loops, hitting a limit, needing more control over node internals.\n- Setup & Activation: the period BEFORE the user was productive. Installing or running n8n, credentials, OAuth, API keys, connecting the first service, reaching a first working workflow, initial learning burden.\n- Agents vs Workflows: the AI is a COMPONENT INSIDE the automation, or n8n is being driven by an external agent. Agents as a thing you build, agent tools, MCP, orchestration, deterministic vs probabilistic steps, human-in-the-loop.\n- Self-hosting & Openness: sovereignty. Self-hosting, running locally, Docker, community edition, open source and licensing, BYOK, model choice, privacy, avoiding lock-in, own infrastructure.\n- Community & Ecosystem: value produced by OTHER PEOPLE. Community, forum, third-party custom nodes, templates, creators, marketplace, external tools built on n8n.\n- None: no strategic bet is clearly addressed. Use this whenever in doubt.\n\nAXIS 2 TIE-BREAKS (in order)\n1. AI AUTHORING the workflow -> AI Building. AI INSIDE the workflow, or an external agent driving n8n -> Agents vs Workflows.\n2. Understanding ONE workflow -> Visual Auditability. Operating MANY, or organisational control -> Runtime Governance.\n3. The EFFORT of getting running or connected -> Setup & Activation. The FACT of running it yourself -> Self-hosting & Openness.\n4. Learning toward first success -> Setup & Activation. Ongoing creation experience with AI -> AI Building.\n5. Crashes, bugs, hangs, \"doesn't work\" NEVER map to Runtime Governance. They may still map to whichever pillar owns the failing surface - a crashing AI assistant is AI Building.\n6. Price, cost, plans, trials, discounts -> None. Axis 1 Pricing already owns them.\n7. Documentation or tutorial quality -> None, UNLESS the point is specifically community-produced content, which is Community & Ecosystem.\n8. \"community edition\" is Self-hosting & Openness, NOT Community & Ecosystem. It is a licensing tier, not the community.\n9. A passing adjective is not enough. \"very flexible but too slow\" does not earn Power & Ceiling - the flexibility is incidental. The pillar must be what the comment is actually ABOUT.\n10. If two pillars remain plausible and nothing above resolves it -> None. With small weekly volumes a false positive distorts more than a miss, so prefer None over a guess.\n\nSTEP 8 - unintelligible input\nKeyboard mash, random characters, or text you cannot interpret: evidence \"\", category \"No Driver Named\", secondary fields \"\", is_request false, actionable false, sentiment \"neutral\", strategy_pillar \"None\".\nNever skip, merge, reorder or drop a line. Every input line gets exactly one object. Before returning, confirm the object count equals the input line count and the index values match.\n\nEXAMPLE INPUT\n0. NPS=7 | It seems somewhat unreliable, the page goes white and I need to refresh\n1. NPS=10 | convenient interface\n2. NPS=6 | We dont have autosave!\n3. NPS=6 | good, but no claude code integrated\n4. NPS=9 | n8n offers amazing flexibility, ease of use and a wide range native connections. If there were more native connections I would have given it a 10.\n5. NPS=5 | to have it for free, I have to download so many things so its so much effort and its not Worth the price\n6. NPS=10 | פשוט ויעיל, למרות שקצת יקר\n7. NPS=8 | its good but very intense. Would not recommend for non dev users.\n8. NPS=8 | Very powerful but can be tricky. No foreign language (at least for doc or helpfile). Academy is a great way to understand and progress.\n9. NPS=9 | muito bom, adorei\n10. NPS=10 | I appreciate being able to run it fully locally in a dockerized container\n11. NPS=10 | very flexible but too slow for free\n12. NPS=4 | dfgdfg\n13. NPS=0 | expensive\n14. NPS=10 | the AI assistant builds most of my workflow now, its impressive\n15. NPS=9 | I love that I can see the data flowing through each node, much clearer than reading code\n16. NPS=5 | we need better execution logs and role permissions for our team\n\nEXAMPLE OUTPUT\n[{\"index\":0,\"evidence\":\"the page goes white and I need to refresh\",\"category\":\"Reliability\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"None\"},{\"index\":1,\"evidence\":\"\",\"category\":\"UX\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"positive\",\"strategy_pillar\":\"None\"},{\"index\":2,\"evidence\":\"We dont have autosave\",\"category\":\"UX\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"None\"},{\"index\":3,\"evidence\":\"no claude code integrated\",\"category\":\"Integrations\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"Agents vs Workflows\"},{\"index\":4,\"evidence\":\"If there were more native connections\",\"category\":\"Integrations\",\"evidence_secondary\":\"amazing flexibility\",\"category_secondary\":\"UX\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"positive\",\"strategy_pillar\":\"Power & Ceiling\"},{\"index\":5,\"evidence\":\"I have to download so many things so its so much effort\",\"category\":\"Self-hosting/Deployment\",\"evidence_secondary\":\"its not Worth the price\",\"category_secondary\":\"Pricing\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"Setup & Activation\"},{\"index\":6,\"evidence\":\"\",\"category\":\"Pricing\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"positive\",\"strategy_pillar\":\"None\"},{\"index\":7,\"evidence\":\"Would not recommend for non dev users\",\"category\":\"Learning Curve\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"neutral\",\"strategy_pillar\":\"Setup & Activation\"},{\"index\":8,\"evidence\":\"No foreign language (at least for doc or helpfile)\",\"category\":\"Documentation\",\"evidence_secondary\":\"can be tricky\",\"category_secondary\":\"Learning Curve\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"neutral\",\"strategy_pillar\":\"None\"},{\"index\":9,\"evidence\":\"\",\"category\":\"No Driver Named\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"positive\",\"strategy_pillar\":\"None\"},{\"index\":10,\"evidence\":\"run it fully locally in a dockerized container\",\"category\":\"Self-hosting/Deployment\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"positive\",\"strategy_pillar\":\"Self-hosting & Openness\"},{\"index\":11,\"evidence\":\"\",\"category\":\"Performance\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"negative\",\"strategy_pillar\":\"None\"},{\"index\":12,\"evidence\":\"\",\"category\":\"No Driver Named\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"neutral\",\"strategy_pillar\":\"None\"},{\"index\":13,\"evidence\":\"\",\"category\":\"Pricing\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"negative\",\"strategy_pillar\":\"None\"},{\"index\":14,\"evidence\":\"the AI assistant builds most of my workflow\",\"category\":\"UX\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"positive\",\"strategy_pillar\":\"AI Building\"},{\"index\":15,\"evidence\":\"see the data flowing through each node\",\"category\":\"UX\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"positive\",\"strategy_pillar\":\"Visual Auditability\"},{\"index\":16,\"evidence\":\"better execution logs and role permissions\",\"category\":\"Other\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"Runtime Governance\"}]\n\nWHAT THESE ESTABLISH\n- Eleven of seventeen are strategy_pillar None. That ratio is correct - do not inflate it.\n- Index 0: a real actionable bug with no strategic pillar. Crashes do not automatically belong to a bet.\n- Indexes 1, 6, 11, 13: actionable false but they keep a REAL Axis 1 category. \"expensive\" is Pricing and must be counted as Pricing.\n- Index 11: \"very flexible\" is a passing adjective, so it does NOT earn Power & Ceiling (tie-break 9). Index 4 does, because flexibility is what the comment is about.\n- Index 5 vs index 10: the same subject splits by tie-break 3. Effort of getting running -> Setup & Activation. The fact of running it yourself -> Self-hosting & Openness.\n- Index 3: an external AI agent driving n8n -> Agents vs Workflows, not AI Building (tie-break 1).\n- Index 14 vs 15: AI authoring the workflow -> AI Building. Seeing inside one workflow -> Visual Auditability.\n- Index 16: the only Other on Axis 1, because governance features have no Axis 1 bucket - and the only Runtime Governance on Axis 2. Both are correct simultaneously.\n- Index 8: doc quality is None on Axis 2 (tie-break 7). The Academy is n8n-produced, not community."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "07c7f2b1-18b8-40d1-9c16-c1f6cc3750c0",
+      "name": "Classify Batch",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1424,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUMP THIS whenever the strategy pillar set changes, so historical rows stay\n// attributable to the frame they were classified under and trend lines do not\n// silently break across a strategy revision.\nconst STRATEGY_VERSION = '2026-07-v1';\n\nconst original = $('Build Batch Prompt').first().json.items;\nconst classifications = $json.output || [];\n\nconst ALLOWED_CATEGORIES = ['UX', 'Reliability', 'Performance', 'Pricing', 'Integrations', 'Documentation', 'Learning Curve', 'Self-hosting/Deployment', 'Support', 'No Driver Named', 'Other'];\nconst ALLOWED_SENTIMENT = ['positive', 'negative', 'neutral'];\nconst ALLOWED_PILLARS = ['AI Building', 'Visual Auditability', 'Runtime Governance', 'Power & Ceiling', 'Setup & Activation', 'Agents vs Workflows', 'Self-hosting & Openness', 'Community & Ecosystem', 'None'];\n\nconst byIndex = {};\nfor (const c of classifications) {\n  if (c && c.index !== undefined && c.index !== null) byIndex[Number(c.index)] = c;\n}\n\nlet unmatched = 0, violations = 0, pillarViolations = 0;\n\nconst out = original.map((item, idx) => {\n  const c = byIndex[idx];\n\n  // Segmentation fields are pure pass-through on BOTH paths - already resolved\n  // upstream (BigQuery/Triage), never derived here. Not used by today's digest.\n  const segments = {\n    deployment: item.deployment ?? 'NA',\n    enterprise_tier: item.enterprise_tier ?? 'NA',\n    role: item.role ?? 'NA',\n    company_size: item.company_size ?? 'NA',\n    tech_skills_count: item.tech_skills_count ?? 'NA',\n  };\n\n  // Classifier failed to return this line. Surface it as a visible anomaly row\n  // rather than silently dropping the comment.\n  // response_timestamp must be carried on THIS path too, not just the happy\n  // path, or anomaly rows fall outside every reporting window.\n  if (!c) {\n    unmatched++;\n    return { json: {\n      feedback: item.feedback, nps: item.nps,\n      response_timestamp: item.response_timestamp ?? null, backfilled: false,\n      category: 'Other', category_secondary: '', sentiment: 'neutral',\n      evidence: 'UNMATCHED_BY_CLASSIFIER', is_request: false, actionable: false,\n      strategy_pillar: 'None', strategy_version: STRATEGY_VERSION,\n      ...segments,\n    } };\n  }\n\n  const evidence = typeof c.evidence === 'string' ? c.evidence.trim() : '';\n\n  // Clamp enums in code. An out-of-enum Axis 1 category is TAGGED rather than\n  // quietly folded into Other, because Other is the taxonomy-gap alarm.\n  let category = c.category;\n  let marker = '';\n  if (!ALLOWED_CATEGORIES.includes(category)) {\n    violations++;\n    marker = `ENUM_VIOLATION(${category}) | `;\n    category = 'Other';\n  }\n\n  let categorySecondary = ALLOWED_CATEGORIES.includes(c.category_secondary) ? c.category_secondary : '';\n  if (categorySecondary === category) categorySecondary = '';\n  const sentiment = ALLOWED_SENTIMENT.includes(c.sentiment) ? c.sentiment : 'neutral';\n\n  // An invalid pillar defaults to None rather than being tagged: None is the\n  // safe default here, and a bad pillar must never inflate a strategic count.\n  let pillar = c.strategy_pillar;\n  if (!ALLOWED_PILLARS.includes(pillar)) { pillarViolations++; pillar = 'None'; }\n  // A No Driver Named row cannot address a strategic bet by definition.\n  if (category === 'No Driver Named') pillar = 'None';\n\n  return { json: {\n    feedback: item.feedback, nps: item.nps,\n    response_timestamp: item.response_timestamp ?? null, backfilled: false,\n    category, category_secondary: categorySecondary, sentiment,\n    evidence: marker + evidence,\n    is_request: c.is_request === true,\n    // Derived, not trusted: actionable iff a concrete phrase was quoted.\n    // Judged on the real evidence, not on the violation marker.\n    actionable: evidence.length > 0,\n    strategy_pillar: pillar,\n    strategy_version: STRATEGY_VERSION,\n    ...segments,\n  } };\n});\n\nif (unmatched > 0) console.warn(`[Zip] ${unmatched}/${original.length} lines not returned -> UNMATCHED_BY_CLASSIFIER`);\nif (violations > 0) console.warn(`[Zip] ${violations}/${original.length} category outside enum -> tagged ENUM_VIOLATION`);\nif (pillarViolations > 0) console.warn(`[Zip] ${pillarViolations}/${original.length} strategy_pillar outside enum -> defaulted to None`);\n\nreturn out;"
+      },
+      "id": "d74bc82d-e3c5-4dca-b978-a85353441c95",
+      "name": "Zip Batch Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        16
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Drop everything that cannot name a driver, pass the rest to classification.\n// Thresholds derived from 90 days of real response frequencies, not guessed.\nconst LETTER = /\\p{L}/u;\nconst LATIN_ONLY = /^[a-z0-9]+$/;\n\n// Generic responses that carry a mood but name no driver. Multilingual, any\n// length. Dropped, not stored - we are not tracking a junk rate.\nconst GENERIC = new Set([\n  'good', 'goood', 'goog', 'god', 'great', 'nice', 'top', 'best', 'cool',\n  'love', 'wow', 'thx', 'ty', 'thanks', 'thank', 'perfect', 'amazing',\n  'awesome', 'awsome', 'excellent', 'excelent', 'excelente', 'super',\n  'superb', 'otimo', 'bom', 'bien', 'genial', 'fantastic', 'wonderful',\n  'wonderfull', 'happy', 'mantap', 'bagus', 'verygood', 'gracias', 'danke',\n  'merci', 'ok', 'okay', 'oke', 'yes', 'si', 'no', 'na', 'idk', 'fine',\n  'hi', 'hello', 'test', 'teste', 'meh', 'because', 'cause', 'nothing',\n  'muito', 'mucho', 'mucha', 'muchas', 'todas', 'yeah', 'like',\n  'bad', 'poor', 'sad', 'terrible', 'awful', 'horrible',\n]);\n\n// The ONLY short Latin tokens that name a driver. Verified against the full\n// 90-day distribution: the <=4 char single-token space contains essentially no\n// driver feedback apart from these.\nconst MEANINGFUL_SHORT = new Set([\n  'free', 'easy', 'slow', 'fast', 'cost', 'bug', 'bugs', 'lag', 'hard',\n  'ux', 'ui', 'api', 'mcp', 'sql', 'csv', 'crm', 'http', 'ai', 'llm',\n  'docs', 'doc', 'node', 'save', 'paid', 'n8n',\n]);\n\nconst out = [];\nconst dropped = { noLetters: 0, repeatedChar: 0, generic: 0, shortToken: 0, tinyTokens: 0 };\nlet missingTimestamp = 0;\n\nfor (const item of $input.all()) {\n  const raw = (item.json.feedback ?? '').toString();\n  const fb = raw.trim();\n\n  // 1. No letters in any script -> respondent typed their score or a symbol\n  //    into the text box (\"10\" x1,684, \".\" x1,070).\n  if (!LETTER.test(fb)) { dropped.noLetters++; continue; }\n\n  // \\p{M} must be kept: Thai vowel signs, Hebrew niqqud and Arabic diacritics\n  // are combining marks, not letters. Stripping them corrupts those languages.\n  const norm = fb.toLowerCase().replace(/[^\\p{L}\\p{N}\\p{M}\\s]/gu, '').replace(/\\s+/g, ' ').trim();\n  const tokens = norm.split(' ').filter(Boolean);\n\n  // 2. One character repeated, any length: mmm, fff, ddd, aaaa, TT.\n  //    \\1+ not \\1* - with * this matches any single character and would\n  //    wrongly drop single-character Chinese words.\n  if (/^(.)\\1+$/u.test(norm.replace(/\\s/g, ''))) { dropped.repeatedChar++; continue; }\n\n  // 3. A single generic word, any length, any language.\n  if (tokens.length === 1 && GENERIC.has(tokens[0])) { dropped.generic++; continue; }\n\n  // 4. MAIN GATE. A single Latin token of <=4 chars that is not a known driver\n  //    word cannot carry signal. Non-Latin scripts skip this entirely, so\n  //    Chinese and Hebrew short words are never dropped here.\n  if (tokens.length === 1 && LATIN_ONLY.test(tokens[0]) && tokens[0].length <= 4 && !MEANINGFUL_SHORT.has(tokens[0])) {\n    dropped.shortToken++;\n    continue;\n  }\n\n  // 5. Multi-token where every token is Latin and <=2 chars: \"sd sd\", \"a b c\".\n  if (tokens.length > 1 && tokens.every(t => LATIN_ONLY.test(t) && t.length <= 2)) {\n    dropped.tinyTokens++;\n    continue;\n  }\n\n  // response_timestamp is WHEN THE USER ANSWERED, carried from BigQuery.\n  // Distinct from the data table's createdAt (when the row was written).\n  // Period windows must filter on this, otherwise a backfill - where every row\n  // is written on the same day - lands entirely inside one reporting period.\n  if (!item.json.timestamp) missingTimestamp++;\n\n  // Segmentation fields (deployment, enterprise_tier, role, company_size,\n  // tech_skills_count) are pure pass-through, already resolved to 'NA' where\n  // unknown by the BigQuery query. Not used by today's digest - captured for\n  // future segmented reporting.\n  out.push({ json: {\n    feedback: raw,\n    nps: item.json.nps,\n    response_timestamp: item.json.timestamp ?? null,\n    deployment: item.json.deployment ?? 'NA',\n    enterprise_tier: item.json.enterprise_tier ?? 'NA',\n    role: item.json.role ?? 'NA',\n    company_size: item.json.company_size ?? 'NA',\n    tech_skills_count: item.json.tech_skills_count ?? 'NA',\n  } });\n}\n\nconst totalDropped = Object.values(dropped).reduce((a, b) => a + b, 0);\nconsole.log(`[Triage] in=${$input.all().length} dropped=${totalDropped} ${JSON.stringify(dropped)} toClassify=${out.length}`);\nif (missingTimestamp > 0) console.warn(`[Triage] ${missingTimestamp}/${out.length} rows have NO response_timestamp - check the source query selects 'timestamp'`);\n\nreturn out;"
+      },
+      "id": "c4f9dc85-4729-45e2-b52b-6a53b1251e47",
+      "name": "Triage Feedback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "not-no-driver",
+              "leftValue": "={{ $json.category }}",
+              "operator": {
+                "operation": "notEquals",
+                "type": "string"
+              },
+              "rightValue": "No Driver Named"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "id": "f2e546f5-bb4e-4e5b-8efe-dda7655c38cb",
+      "name": "Drop No Driver Named",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        2064,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {
+          "maxTokensToSample": 16000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        1280,
+        320
+      ],
+      "id": "6ae9c710-3fb6-47a5-ae95-bdbfda09e72d",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 50,
+        "options": {}
+      },
+      "id": "6481efa3-6929-474d-b313-64ee2ac8a8be",
+      "name": "Batch Feedback (50 per call)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1024,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "nps_open_text_insights",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "feedback",
+              "fieldValue": "={{ $json.feedback }}"
+            },
+            {
+              "fieldId": "nps",
+              "fieldValue": "={{ $json.nps }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $json.category }}"
+            },
+            {
+              "fieldId": "sentiment",
+              "fieldValue": "={{ $json.sentiment }}"
+            },
+            {
+              "fieldId": "category_secondary",
+              "fieldValue": "={{ $json.category_secondary }}"
+            },
+            {
+              "fieldId": "evidence",
+              "fieldValue": "={{ $json.evidence }}"
+            },
+            {
+              "fieldId": "is_request",
+              "fieldValue": "={{ $json.is_request }}"
+            },
+            {
+              "fieldId": "actionable",
+              "fieldValue": "={{ $json.actionable }}"
+            },
+            {
+              "fieldId": "strategy_pillar",
+              "fieldValue": "={{ $json.strategy_pillar }}"
+            },
+            {
+              "fieldId": "strategy_version",
+              "fieldValue": "={{ $json.strategy_version }}"
+            },
+            {
+              "fieldId": "response_timestamp",
+              "fieldValue": "={{ $json.response_timestamp }}"
+            },
+            {
+              "fieldId": "backfilled",
+              "fieldValue": "={{ $json.backfilled }}"
+            },
+            {
+              "fieldId": "deployment",
+              "fieldValue": "={{ $json.deployment }}"
+            },
+            {
+              "fieldId": "enterprise_tier",
+              "fieldValue": "={{ $json.enterprise_tier }}"
+            },
+            {
+              "fieldId": "role",
+              "fieldValue": "={{ $json.role }}"
+            },
+            {
+              "fieldId": "company_size",
+              "fieldValue": "={{ $json.company_size }}"
+            },
+            {
+              "fieldId": "tech_skills_count",
+              "fieldValue": "={{ $json.tech_skills_count }}"
+            },
+            {
+              "fieldId": "embedding",
+              "fieldValue": "={{ JSON.stringify($json.embedding) }}"
+            }
+          ]
+        }
+      },
+      "id": "a1a0a049-ccf0-4c22-be0f-bae376f6b181",
+      "name": "Store NPS Insight",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        16
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "76907e4c-2d39-4a0e-8f64-579665c63cde",
+      "name": "Build Embedding Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2064,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nreturn [{ json: { items, texts: items.map(it => it.feedback) } }];"
+      }
+    },
+    {
+      "id": "12c19f6f-59ff-4fba-a011-abf00f5eb22f",
+      "name": "Embed Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"text-embedding-3-large\", input: $json.texts }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "id": "bd445e40-1300-47af-a1cf-1b5733ea8c1a",
+      "name": "Zip Embeddings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2260,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const original = $('Build Embedding Batch').first().json.items;\nconst data = ($json.data || []).slice().sort((a, b) => a.index - b.index);\nreturn original.map((item, idx) => ({ json: { ...item, embedding: data[idx] ? data[idx].embedding : null } }));"
+      }
+    }
+  ],
+  "connections": {
+    "Daily NPS Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Daily Open-Text Feedback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Daily Open-Text Feedback": {
+      "main": [
+        [
+          {
+            "node": "Triage Feedback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NPS Driver Output Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Classify Batch",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Batch Prompt": {
+      "main": [
+        [
+          {
+            "node": "Classify Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Batch": {
+      "main": [
+        [
+          {
+            "node": "Zip Batch Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zip Batch Results": {
+      "main": [
+        [
+          {
+            "node": "Batch Feedback (50 per call)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drop No Driver Named",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Triage Feedback": {
+      "main": [
+        [
+          {
+            "node": "Batch Feedback (50 per call)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Batch",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Feedback (50 per call)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Build Batch Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drop No Driver Named": {
+      "main": [
+        [
+          {
+            "node": "Build Embedding Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Embedding Batch": {
+      "main": [
+        [
+          {
+            "node": "Embed Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Batch": {
+      "main": [
+        [
+          {
+            "node": "Zip Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zip Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Store NPS Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "9a737ff8-2212-4e8a-933f-6530b349dc0d",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "sSJsP2ZRjaFCHn95",
+  "isArchived": false,
+  "nodeGroups": []
+}

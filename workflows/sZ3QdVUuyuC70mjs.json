@@ -1,0 +1,910 @@
+{
+  "id": "sZ3QdVUuyuC70mjs",
+  "name": "NPS - Segmented analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 1-3 * *"
+            }
+          ]
+        }
+      },
+      "id": "d8fb9e3d-f326-424e-881c-b5d5bee71d8c",
+      "name": "Segmented Monthly Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3440,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "first-working-day-seg",
+              "leftValue": "={{ $execution.mode === 'test' || ($now.weekday <= 5 && ($now.day === 1 || ($now.weekday === 1 && $now.day <= 3))) }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a0efc8f4-828e-44b1-90cf-676837a50b54",
+      "name": "First Working Day Only (Segmented)",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -3200,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "projectId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "n8n-telemetry"
+        },
+        "sqlQuery": "-- Segmented NPS scores for the last COMPLETE calendar month.\n-- Computed across ALL survey responses, including the ~64% who write no text.\n-- It CANNOT be computed from the nps_open_text_insights data table: two filters\n-- upstream plus the silent majority mean the denominator is not there, and a\n-- score built from writers alone runs ~14 points high.\nWITH bounds AS (\n  SELECT\n    TIMESTAMP(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)) AS cur_start,\n    TIMESTAMP(DATE_TRUNC(CURRENT_DATE(), MONTH))                            AS cur_end,\n    TIMESTAMP(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH), MONTH)) AS prior_start\n),\nraw AS (\n  SELECT SAFE_CAST(f.nps AS INT64) AS score,\n    f.timestamp >= b.cur_start AS cur,\n    (f.timestamp >= b.prior_start AND f.timestamp < b.cur_start) AS prior,\n    (f.feedback IS NOT NULL AND TRIM(f.feedback) != '' AND REGEXP_CONTAINS(f.feedback, r'\\pL')) AS has_text,\n    f.instance_id, f.user_id, f.context_page_url\n  FROM `n8n-telemetry.rudder_schema.user_responded_value_survey_feedback` f\n  CROSS JOIN bounds b\n  WHERE f.timestamp >= b.prior_start AND f.timestamp < b.cur_end\n    AND SAFE_CAST(f.nps AS INT64) BETWEEN 0 AND 10\n),\n-- consumer_device_fingerprint is NOT 1:1: SHA-256('') is a placeholder used by\n-- thousands of instances and must be excluded or it fans out the join.\nent_dedup AS (\n  SELECT consumer_device_fingerprint, account_license_type,\n    ROW_NUMBER() OVER (PARTITION BY consumer_device_fingerprint ORDER BY latest_activated_at DESC) AS rn\n  FROM `n8n-telemetry.marts.dim_enterprise_instances`\n  WHERE consumer_device_fingerprint IS NOT NULL\n    AND consumer_device_fingerprint != 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'\n),\nresolved AS (\n  SELECT r.score, r.cur, r.prior, r.has_text,\n    COALESCE(u.survey_deployment, CASE WHEN REGEXP_CONTAINS(IFNULL(r.context_page_url,''), r'\\.app\\.n8n\\.cloud') THEN 'cloud' ELSE 'self_hosted' END) AS deployment,\n    COALESCE(e.account_license_type, 'NA') AS enterprise_tier,\n    COALESCE(u.role, 'NA') AS role,\n    COALESCE(u.company_size, 'NA') AS company_size,\n    u.technical_skills AS technical_skills\n  FROM raw r\n  LEFT JOIN `n8n-telemetry.marts.dim_users` u ON u.user_id = r.user_id\n  LEFT JOIN ent_dedup e ON e.consumer_device_fingerprint = r.instance_id AND e.rn = 1\n),\ntagged AS (\n  SELECT score, cur, prior, has_text, deployment, enterprise_tier, role, company_size,\n    -- Cloud-only onboarding question, never SQL NULL, so ARRAY_LENGTH alone\n    -- would report '0' for every self-hosted user - 'never asked', not 'zero'.\n    CASE WHEN deployment = 'cloud' THEN CAST(ARRAY_LENGTH(technical_skills) AS STRING) ELSE 'NA' END AS tech_skills_count\n  FROM resolved\n),\nlong AS (\n  SELECT 'overall' AS segment_dim, 'all' AS segment_value, * EXCEPT(deployment, enterprise_tier, role, company_size, tech_skills_count) FROM tagged\n  UNION ALL SELECT 'deployment', deployment, * EXCEPT(deployment, enterprise_tier, role, company_size, tech_skills_count) FROM tagged\n  UNION ALL SELECT 'enterprise_tier', enterprise_tier, * EXCEPT(deployment, enterprise_tier, role, company_size, tech_skills_count) FROM tagged\n  UNION ALL SELECT 'role', role, * EXCEPT(deployment, enterprise_tier, role, company_size, tech_skills_count) FROM tagged\n  UNION ALL SELECT 'company_size', company_size, * EXCEPT(deployment, enterprise_tier, role, company_size, tech_skills_count) FROM tagged\n  UNION ALL SELECT 'tech_skills_count', tech_skills_count, * EXCEPT(deployment, enterprise_tier, role, company_size, tech_skills_count) FROM tagged\n)\nSELECT\n  FORMAT_DATE('%B %Y', DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)) AS period_label,\n  segment_dim, segment_value,\n  COUNTIF(cur) AS responses,\n  COUNTIF(cur AND score >= 9) AS promoters,\n  COUNTIF(cur AND score BETWEEN 7 AND 8) AS passives,\n  COUNTIF(cur AND score <= 6) AS detractors,\n  ROUND(100 * SAFE_DIVIDE(COUNTIF(cur AND score >= 9) - COUNTIF(cur AND score <= 6), COUNTIF(cur)), 1) AS nps,\n  ROUND(SAFE_DIVIDE(SUM(IF(cur, score, 0)), COUNTIF(cur)), 2) AS mean_score,\n  COUNTIF(cur AND has_text) AS responses_with_text,\n  ROUND(100 * SAFE_DIVIDE(COUNTIF(cur AND has_text), COUNTIF(cur)), 1) AS pct_with_text,\n  ROUND(100 * SAFE_DIVIDE(COUNTIF(cur AND has_text AND score >= 9) - COUNTIF(cur AND has_text AND score <= 6), COUNTIF(cur AND has_text))\n      - 100 * SAFE_DIVIDE(COUNTIF(cur AND NOT has_text AND score >= 9) - COUNTIF(cur AND NOT has_text AND score <= 6), COUNTIF(cur AND NOT has_text)), 1) AS writer_bias,\n  COUNTIF(prior) AS responses_prior,\n  -- Needed to compute a noise band on the delta. Without these the report\n  -- printed movements like '-6.7 vs prior month' with no way to know whether\n  -- that was a real shift or sampling noise on a small segment.\n  COUNTIF(prior AND score >= 9) AS promoters_prior,\n  COUNTIF(prior AND score <= 6) AS detractors_prior,\n  ROUND(100 * SAFE_DIVIDE(COUNTIF(prior AND score >= 9) - COUNTIF(prior AND score <= 6), COUNTIF(prior)), 1) AS nps_prior,\n  ROUND(\n    100 * SAFE_DIVIDE(COUNTIF(cur AND score >= 9) - COUNTIF(cur AND score <= 6), COUNTIF(cur))\n    - 100 * SAFE_DIVIDE(COUNTIF(prior AND score >= 9) - COUNTIF(prior AND score <= 6), COUNTIF(prior)), 1) AS nps_delta\nFROM long\nGROUP BY segment_dim, segment_value\nHAVING responses > 0\nORDER BY segment_dim, responses DESC",
+        "options": {}
+      },
+      "id": "08dca824-41fc-478f-ae58-69c9757a0ece",
+      "name": "Compute Segmented NPS Scores",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        -2960,
+        640
+      ],
+      "credentials": {
+        "googleBigQueryOAuth2Api": {
+          "id": "92ZMRuOZEOJHwoRi",
+          "name": "Nik's Big Query"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The BigQuery node emits ~35 rows (one per segment value). Everything\n// downstream needs to run ONCE, not 35 times, so they are collapsed into a\n// single item here. The period window travels with them, so the data table\n// read and the renderer take the window from the same source as the numbers.\nconst rows = $input.all().map((i) => i.json);\nif (!rows.length) throw new Error('Segmented score query returned no rows - check the BigQuery node');\n\nconst overall = rows.find((r) => r.segment_dim === 'overall' && r.segment_value === 'all') || {};\nconst label = overall.period_label || rows[0].period_label || '';\n\n// Derive the window from the label rather than trusting a second date\n// calculation to agree with the SQL one.\nconst d = new Date(`${label} 1 UTC`);\nconst start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));\nconst end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));\n// The prior month is fetched in the SAME data table call and split in the\n// engine, rather than issuing a second read.\nconst priorStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));\nconst iso = (x) => x.toISOString().slice(0, 10);\n\n// A segment value whose score is built on very few responses gets its derived\n// ratios nulled rather than shown. Embed tier (n=2) otherwise reports a\n// writer_bias of -200, which is arithmetically true and completely meaningless.\nconst MIN_SCORE_N = 30;\n\n// NPS is a difference of two proportions, so its sampling error is\n// 100*sqrt((p + d - (p-d)^2)/n). A month-over-month delta combines two such\n// errors.\nconst num = (v) => { const x = Number(v); return isFinite(x) ? x : 0; };\n\n// A REAL p-value for the month-over-month change, so the stars in the score\n// table mean exactly what the stars in the findings table mean. Relabelling a\n// noise band as stars would make two different statistics look identical.\nfunction erf(x) {\n  const sg = x < 0 ? -1 : 1;\n  x = Math.abs(x);\n  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741,\n        a4 = -1.453152027, a5 = 1.061405429, pp = 0.3275911;\n  const t = 1 / (1 + pp * x);\n  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);\n  return sg * y;\n}\nconst normalCdf = (z) => 0.5 * (1 + erf(z / Math.SQRT2));\n\nfunction npsStdErr(promoters, detractors, n) {\n  if (!n) return null;\n  const p = num(promoters) / n, d = num(detractors) / n;\n  const v = (p + d - Math.pow(p - d, 2)) / n;\n  return v > 0 ? 100 * Math.sqrt(v) : 0;\n}\n\nconst scores = rows.map((r) => {\n  const n = num(r.responses);\n  if (n < MIN_SCORE_N) {\n    return { ...r, score_reliable: false, writer_bias: null, nps_delta: null, pct_with_text: null, noise_band: null, delta_p: null, delta_moved: null };\n  }\n  const nPrior = num(r.responses_prior);\n  const seCur = npsStdErr(r.promoters, r.detractors, n);\n  const sePrior = nPrior >= MIN_SCORE_N ? npsStdErr(r.promoters_prior, r.detractors_prior, nPrior) : null;\n\n  // No usable prior month means no verdict, rather than a delta presented bare.\n  if (sePrior === null || r.nps_prior === null || r.nps_prior === undefined) {\n    return { ...r, score_reliable: true, noise_band: null, delta_p: null, delta_moved: null };\n  }\n  const seCombined = Math.sqrt(seCur * seCur + sePrior * sePrior);\n  const band = Math.round(1.96 * seCombined * 10) / 10;\n  const z = seCombined > 0 ? Math.abs(num(r.nps_delta)) / seCombined : 0;\n  const pDelta = 2 * (1 - normalCdf(z));\n  // Same 0.05 threshold as the findings table, so 'significant' means one\n  // thing across the whole report.\n  const moved = pDelta < 0.05;\n  return { ...r, score_reliable: true, noise_band: band, delta_p: pDelta, delta_moved: moved };\n});\n\nreturn [{ json: {\n  period_label: label,\n  period_start: iso(start),\n  period_end: iso(end),\n  prior_start: iso(priorStart),\n  overall,\n  scores,\n  min_score_n: MIN_SCORE_N,\n} }];"
+      },
+      "id": "9a4776ce-da5f-4d3f-9038-a507136fa304",
+      "name": "Collect Segment Scores",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2720,
+        640
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===================================================================\n// PERIOD ANALYSIS - global + segmented, one deterministic pass.\n// The LLM never counts and never decides what is a finding. Selection\n// is arithmetic, so rerunning the same month gives the same answers.\n// ===================================================================\n\nconst SEGMENT_DIMS = ['deployment', 'enterprise_tier', 'role', 'company_size', 'tech_skills_count'];\nconst MIN_SEGMENT_ROWS = 30;\nconst MIN_EXPECTED_COUNT = 5;\nconst FDR_Q = 0.05;\n\nconst ALL_PILLARS = ['AI Building', 'Visual Auditability', 'Runtime Governance', 'Power & Ceiling', 'Setup & Activation', 'Agents vs Workflows', 'Self-hosting & Openness', 'Community & Ecosystem'];\n// Configure-once surfaces: users touch them rarely, so they generate almost no\n// unprompted comment however important they are. A zero is EXPECTED and is not\n// evidence of health - flagged in the data so the report cannot imply it is.\nconst CONFIGURE_ONCE_PILLARS = ['Runtime Governance', 'Setup & Activation'];\n\nfunction erf(x) {\n  const s = x < 0 ? -1 : 1;\n  x = Math.abs(x);\n  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741,\n        a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;\n  const t = 1 / (1 + p * x);\n  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);\n  return s * y;\n}\nconst normalCdf = (z) => 0.5 * (1 + erf(z / Math.SQRT2));\n\n// Tested against THE REST of the population, not the overall total: a segment is\n// a subset of the overall, so comparing to it compares a group with itself.\nfunction twoProportionTest(k1, n1, k2, n2) {\n  if (!n1 || !n2) return null;\n  const p1 = k1 / n1, p2 = k2 / n2;\n  const pPool = (k1 + k2) / (n1 + n2);\n  if (pPool <= 0 || pPool >= 1) return null;\n  if (n1 * pPool < MIN_EXPECTED_COUNT || n2 * pPool < MIN_EXPECTED_COUNT) return null;\n  const se = Math.sqrt(pPool * (1 - pPool) * (1 / n1 + 1 / n2));\n  if (!se) return null;\n  const z = (p1 - p2) / se;\n  return { z, pValue: 2 * (1 - normalCdf(Math.abs(z))), share: p1, restShare: p2, diffPct: (p1 - p2) * 100 };\n}\n\n// WITHOUT THIS THE WHOLE THING IS THEATRE: ~150-300 simultaneous tests at raw\n// p<0.05 manufacture roughly 15 'findings' a month from noise.\nfunction benjaminiHochberg(tests, q) {\n  const sorted = [...tests].sort((a, b) => a.pValue - b.pValue);\n  const m = sorted.length;\n  let maxRank = 0;\n  sorted.forEach((t, i) => { if (t.pValue <= ((i + 1) / m) * q) maxRank = i + 1; });\n  const cutoff = maxRank > 0 ? sorted[maxRank - 1].pValue : -1;\n  for (const t of tests) t.significant = maxRank > 0 && t.pValue <= cutoff;\n  return { m, passed: maxRank, cutoff };\n}\n\nconst norm = (s) => String(s).toLowerCase().replace(/[^\\p{L}\\p{N}\\s]/gu, '').replace(/\\s+/g, ' ').trim();\nconst NPS_BAND = (n) => { const s = Number(n); if (s <= 6) return 'detractors'; if (s <= 8) return 'passives'; return 'promoters'; };\nconst validEvidence = (ev) => ev && ev !== 'UNMATCHED_BY_CLASSIFIER' && !String(ev).startsWith('ENUM_VIOLATION');\nconst pctOf = (k, n) => (n ? Math.round(1000 * k / n) / 10 : 0);\n\nfunction collapseWithNps(list, cap) {\n  const m = new Map();\n  for (const it of list) {\n    const k = norm(it.text);\n    if (!k) continue;\n    if (!m.has(k)) m.set(k, { text: it.text, count: 0, npsSum: 0, negativeCount: 0 });\n    const e = m.get(k);\n    e.count++;\n    e.npsSum += Number(it.nps) || 0;\n    if (it.negative) e.negativeCount++;\n  }\n  return [...m.values()]\n    .map((e) => ({ text: e.text, count: e.count, avg_nps: Math.round(e.npsSum / e.count * 10) / 10, negativeCount: e.negativeCount }))\n    .sort((a, b) => b.count - a.count)\n    .slice(0, cap);\n}\n\nfunction sentimentSplit(counts) {\n  const pos = counts.positive || 0, neg = counts.negative || 0, neu = counts.neutral || 0;\n  const t = pos + neg + neu;\n  return { total: t, positive_pct: pctOf(pos, t), negative_pct: pctOf(neg, t), neutral_pct: pctOf(neu, t) };\n}\n\n// ===================================================================\n// GLOBAL ANALYSIS: topics, requests, complaints, strategic bets\n// ===================================================================\nfunction buildOverallReport(rows) {\n  const n = rows.length;\n  const catStats = {};\n  const ensure = (name) => {\n    if (!catStats[name]) catStats[name] = {\n      category: name, primary: 0, secondary: 0, detractors: 0, passives: 0, promoters: 0,\n      sentimentCounts: { positive: 0, negative: 0, neutral: 0 }, _requests: [], _problems: [],\n    };\n    return catStats[name];\n  };\n\n  let unmatched_rows = 0, enum_violation_rows = 0, other_rows = 0;\n  const allRequests = [], allProblems = [];\n\n  for (const r of rows) {\n    const cat = r.category || 'Other';\n    const c = ensure(cat);\n    c.primary++;\n    c[NPS_BAND(r.nps)]++;\n    if (r.sentiment && c.sentimentCounts[r.sentiment] !== undefined) c.sentimentCounts[r.sentiment]++;\n    if (r.category_secondary) ensure(r.category_secondary).secondary++;\n\n    const ev = String(r.evidence || '').trim();\n    if (ev === 'UNMATCHED_BY_CLASSIFIER') unmatched_rows++;\n    if (ev.startsWith('ENUM_VIOLATION')) enum_violation_rows++;\n    if (cat === 'Other') other_rows++;\n\n    if (validEvidence(ev)) {\n      const entry = { text: ev, nps: r.nps, negative: r.sentiment === 'negative' };\n      if (r.is_request === true) { c._requests.push(entry); allRequests.push(entry); }\n      else { c._problems.push(entry); allProblems.push(entry); }\n    }\n  }\n\n  const categories = Object.values(catStats)\n    .sort((a, b) => (b.primary + b.secondary) - (a.primary + a.secondary))\n    .map((c) => {\n      delete c._requests; delete c._problems;\n      return {\n        ...c, mentions: c.primary + c.secondary, share_pct: pctOf(c.primary, n),\n        sentiment: sentimentSplit(c.sentimentCounts),\n        interpretable: (c.primary + c.secondary) >= MIN_SEGMENT_ROWS,\n      };\n    });\n\n  // Requests and complaints are DIFFERENT things for a product team: what people\n  // asked for versus what they struggled with. Complaints are the negative\n  // subset of problems, derived with a flag rather than a duplicated array.\n  const topRequests = collapseWithNps(allRequests, 15);\n  const topComplaints = collapseWithNps(allProblems.filter((x) => x.negative), 15);\n\n  const mkPillar = (p) => ({ pillar: p, mentions: 0, sentimentCounts: { positive: 0, negative: 0, neutral: 0 } });\n  const pillarStats = {};\n  for (const p of ALL_PILLARS) pillarStats[p] = mkPillar(p);\n  const byDep = { cloud: {}, self_hosted: {} };\n  for (const dep of Object.keys(byDep)) for (const p of ALL_PILLARS) byDep[dep][p] = mkPillar(p);\n\n  let pillar_none_count = 0;\n  const depTotals = { cloud: 0, self_hosted: 0 };\n  const depNone = { cloud: 0, self_hosted: 0 };\n\n  for (const r of rows) {\n    const dep = r.deployment === 'cloud' || r.deployment === 'self_hosted' ? r.deployment : null;\n    if (dep) depTotals[dep]++;\n    const p = r.strategy_pillar;\n    if (!p || p === 'None' || !pillarStats[p]) {\n      pillar_none_count++;\n      if (dep) depNone[dep]++;\n      continue;\n    }\n    pillarStats[p].mentions++;\n    if (r.sentiment && pillarStats[p].sentimentCounts[r.sentiment] !== undefined) pillarStats[p].sentimentCounts[r.sentiment]++;\n    if (dep) {\n      byDep[dep][p].mentions++;\n      if (r.sentiment && byDep[dep][p].sentimentCounts[r.sentiment] !== undefined) byDep[dep][p].sentimentCounts[r.sentiment]++;\n    }\n  }\n\n  const dress = (x, total) => ({\n    ...x, share_pct: pctOf(x.mentions, total), sentiment: sentimentSplit(x.sentimentCounts),\n    interpretable: x.mentions >= MIN_SEGMENT_ROWS, configure_once: CONFIGURE_ONCE_PILLARS.includes(x.pillar),\n  });\n  const pillars = Object.values(pillarStats).sort((a, b) => b.mentions - a.mentions).map((x) => dress(x, n));\n\n  // Pillar x deployment, TESTED rather than merely displayed: is this bet\n  // discussed more by one deployment group than the other?\n  const pillarContrasts = [];\n  for (const p of ALL_PILLARS) {\n    const t = twoProportionTest(byDep.cloud[p].mentions, depTotals.cloud, byDep.self_hosted[p].mentions, depTotals.self_hosted);\n    if (!t) continue;\n    pillarContrasts.push({\n      pillar: p,\n      cloud_pct: Math.round(t.share * 1000) / 10, cloud_count: byDep.cloud[p].mentions,\n      self_hosted_pct: Math.round(t.restShare * 1000) / 10, self_hosted_count: byDep.self_hosted[p].mentions,\n      diffPct: Math.round(t.diffPct * 10) / 10, pValue: t.pValue, significant: false,\n    });\n  }\n  benjaminiHochberg(pillarContrasts, FDR_Q);\n\n  return {\n    driver_responses: n, categories, topRequests, topComplaints, pillars,\n    pillarContrasts: pillarContrasts.filter((c) => c.significant),\n    pillar_none_count, pillar_none_share_pct: pctOf(pillar_none_count, n),\n    // How much of each group's feedback lands outside everything we bet on.\n    pillar_none_by_deployment: { cloud: pctOf(depNone.cloud, depTotals.cloud), self_hosted: pctOf(depNone.self_hosted, depTotals.self_hosted) },\n    quality: {\n      unmatched_rows, enum_violation_rows, other_rows,\n      strategy_versions: [...new Set(rows.map((r) => r.strategy_version).filter(Boolean))].sort(),\n      approx_timestamp_rows: rows.filter((r) => r.backfilled === null || r.backfilled === undefined).length,\n    },\n  };\n}\n\n// ===================================================================\n// SEGMENTED ANALYSIS\n// ===================================================================\nconst STRATIFIER = 'deployment';\nconst chiSqP1df = (x2) => (x2 <= 0 ? 1 : 2 * (1 - normalCdf(Math.sqrt(x2))));\n\nfunction mantelHaenszel(strata) {\n  let sumA = 0, sumE = 0, sumV = 0, used = 0;\n  for (const s of strata) {\n    const N = s.n1 + s.n2;\n    if (N < 2) continue;\n    const m1 = s.a + s.b, m2 = N - m1;\n    if (m1 === 0 || m2 === 0) continue;\n    if (s.n1 < MIN_SEGMENT_ROWS || s.n2 < MIN_SEGMENT_ROWS) continue;\n    sumA += s.a;\n    sumE += (s.n1 * m1) / N;\n    sumV += (s.n1 * s.n2 * m1 * m2) / (N * N * (N - 1));\n    used++;\n  }\n  if (!used || sumV <= 0) return { testable: false, strataUsed: used };\n  const x2 = Math.pow(Math.abs(sumA - sumE), 2) / sumV;\n  return { testable: true, strataUsed: used, pValue: chiSqP1df(x2), direction: sumA >= sumE ? 'more' : 'less' };\n}\n\n// A certified contrast says a segment talks about X more. It does NOT say the\n// segment is the cause: roles and company sizes skew hard by deployment, so a\n// role effect can be a deployment effect wearing a costume.\nfunction stratifyContrasts(usable, certified) {\n  const strataValues = [...new Set(usable.map((r) => r[STRATIFIER]).filter(Boolean))];\n  for (const c of certified) {\n    if (c.dimension === STRATIFIER) {\n      c.deployment_check = 'not_applicable';\n      c.deployment_check_note = 'This IS the deployment split, so there is nothing to hold constant.';\n      continue;\n    }\n    if (c.dimension === 'tech_skills_count') {\n      c.deployment_check = 'not_applicable';\n      c.deployment_check_note = 'Technical skills is a cloud-only question, so this effect is already inside one deployment group.';\n      continue;\n    }\n    const strata = strataValues.map((sv) => {\n      const inS = usable.filter((r) => r[STRATIFIER] === sv);\n      const inV = inS.filter((r) => String(r[c.dimension] ?? 'NA') === c.value);\n      const rest = inS.filter((r) => String(r[c.dimension] ?? 'NA') !== c.value);\n      return {\n        a: inV.filter((r) => (r.category || 'Other') === c.category).length, n1: inV.length,\n        b: rest.filter((r) => (r.category || 'Other') === c.category).length, n2: rest.length,\n      };\n    });\n    const mh = mantelHaenszel(strata);\n    // A verdict needs TWO strata. With one, the segment sits almost entirely\n    // inside a single deployment group and the two cannot be told apart.\n    if (!mh.testable || mh.strataUsed < 2) {\n      c.deployment_check = 'undetermined';\n      c.deployment_check_note = mh.strataUsed === 1\n        ? 'This segment sits almost entirely within one deployment group, so its effect cannot be separated from cloud vs self-hosted.'\n        : `Too few responses once split by deployment to tell whether this is a ${c.dimension} effect or a deployment effect.`;\n      continue;\n    }\n    if (mh.pValue < 0.05 && mh.direction === (c.diffPct > 0 ? 'more' : 'less')) {\n      c.deployment_check = 'independent';\n      c.deployment_check_note = 'Holds up within cloud and self-hosted separately, so it is not just a deployment difference.';\n    } else {\n      c.deployment_check = 'explained_by_deployment';\n      c.deployment_check_note = 'Disappears once deployment is held constant - most likely a cloud vs self-hosted effect, not a genuine one for this segment.';\n    }\n  }\n}\n\n// tech_skills_count='NA' is EXACTLY self_hosted, so testing both ran identical\n// arithmetic twice and printed it as two findings. Detected structurally, so\n// any future pair that collapses onto the same rows is caught too.\nfunction findAliases(usable, dims) {\n  const sig = new Map();\n  for (const dim of dims) {\n    const groups = new Map();\n    usable.forEach((r, i) => {\n      const v = r[dim] === null || r[dim] === undefined || r[dim] === '' ? 'NA' : String(r[dim]);\n      if (!groups.has(v)) groups.set(v, []);\n      groups.get(v).push(i);\n    });\n    for (const [v, idx] of groups.entries()) {\n      if (idx.length < 2) continue;\n      const k = idx.join(',');\n      if (!sig.has(k)) sig.set(k, []);\n      sig.get(k).push({ dimension: dim, value: v });\n    }\n  }\n  const aliasOf = new Map();\n  for (const members of sig.values()) {\n    if (members.length < 2) continue;\n    for (const m of members.slice(1)) aliasOf.set(`${m.dimension}||${m.value}`, members[0]);\n  }\n  return aliasOf;\n}\n\nfunction buildSegmentReport(rows, segmentScores) {\n  const usable = rows.filter((r) => r.deployment !== null && r.deployment !== undefined && r.deployment !== '');\n  const uncaptured = rows.length - usable.length;\n  const scoreIndex = {};\n  for (const s of segmentScores || []) scoreIndex[`${s.segment_dim}||${s.segment_value}`] = s;\n\n  const aliasOf = findAliases(usable, SEGMENT_DIMS);\n  const allTests = [];\n  const dimensions = [];\n\n  for (const dim of SEGMENT_DIMS) {\n    const byValue = new Map();\n    for (const r of usable) {\n      const v = r[dim] === null || r[dim] === undefined || r[dim] === '' ? 'NA' : String(r[dim]);\n      if (!byValue.has(v)) byValue.set(v, []);\n      byValue.get(v).push(r);\n    }\n    const overallCat = {};\n    for (const r of usable) overallCat[r.category || 'Other'] = (overallCat[r.category || 'Other'] || 0) + 1;\n    const overallN = usable.length;\n\n    const values = [];\n    for (const [value, vRows] of byValue.entries()) {\n      const n = vRows.length;\n      const catCounts = {};\n      const sentiment = { positive: 0, negative: 0, neutral: 0 };\n      const bands = { detractors: 0, passives: 0, promoters: 0 };\n      const reqs = [], probs = [], quotes = [];\n      for (const r of vRows) {\n        catCounts[r.category || 'Other'] = (catCounts[r.category || 'Other'] || 0) + 1;\n        if (sentiment[r.sentiment] !== undefined) sentiment[r.sentiment]++;\n        bands[NPS_BAND(r.nps)]++;\n        const ev = String(r.evidence || '').trim();\n        if (validEvidence(ev)) {\n          if (r.is_request === true) reqs.push({ text: ev, nps: r.nps });\n          else probs.push({ text: ev, nps: r.nps, negative: r.sentiment === 'negative' });\n          if (r.actionable === true) quotes.push({ text: r.feedback, evidence: ev, nps: Number(r.nps) });\n        }\n      }\n      const alias = aliasOf.get(`${dim}||${value}`) || null;\n      const testable = n >= MIN_SEGMENT_ROWS && !alias;\n      const contrasts = [];\n      if (testable) {\n        for (const [cat, k] of Object.entries(catCounts)) {\n          const t = twoProportionTest(k, n, (overallCat[cat] || 0) - k, overallN - n);\n          if (!t) continue;\n          const rec = {\n            dimension: dim, value, category: cat, count: k,\n            sharePct: Math.round(t.share * 1000) / 10,\n            restSharePct: Math.round(t.restShare * 1000) / 10,\n            diffPct: Math.round(t.diffPct * 10) / 10,\n            pValue: t.pValue, significant: false,\n          };\n          contrasts.push(rec);\n          allTests.push(rec);\n        }\n      }\n      const byBand = { detractors: [], passives: [], promoters: [] };\n      for (const q of quotes) byBand[NPS_BAND(q.nps)].push(q);\n      values.push({\n        value, rows: n, testable, alias_of: alias,\n        suppressed_reason: alias\n          ? `identical to ${alias.dimension} = ${alias.value} (exactly the same responses), so it is reported there rather than counted twice`\n          : (testable ? '' : `only ${n} classified responses, below the ${MIN_SEGMENT_ROWS} floor - counts shown, no claims made`),\n        score: scoreIndex[`${dim}||${value}`] || null,\n        categoryCounts: catCounts, sentimentCounts: sentiment, npsBands: bands,\n        requestPhrases: collapseWithNps(reqs, 10),\n        problemPhrases: collapseWithNps(probs, 10),\n        quoteCandidates: [...byBand.detractors.slice(0, 3), ...byBand.promoters.slice(0, 2)].slice(0, 4),\n        contrasts,\n      });\n    }\n    values.sort((a, b) => b.rows - a.rows);\n    dimensions.push({ dimension: dim, values });\n  }\n\n  const fdr = benjaminiHochberg(allTests, FDR_Q);\n  const certified = allTests.filter((t) => t.significant);\n  stratifyContrasts(usable, certified);\n\n  const byCategory = {};\n  for (const t of certified) {\n    if (!byCategory[t.category]) byCategory[t.category] = new Set();\n    byCategory[t.category].add(t.dimension);\n  }\n  for (const t of certified) t.alsoSignificantIn = [...(byCategory[t.category] || [])].filter((d) => d !== t.dimension);\n\n  return {\n    dimensions,\n    certified_contrasts: certified.sort((a, b) => {\n      const rank = (x) => {\n        if (x.deployment_check === 'independent') return 0;\n        if (x.deployment_check === 'not_applicable' && x.dimension === 'deployment') return 0;\n        if (x.deployment_check === 'not_applicable') return 1;\n        if (x.deployment_check === 'undetermined') return 2;\n        return 3;\n      };\n      return rank(a) - rank(b) || Math.abs(b.diffPct) - Math.abs(a.diffPct);\n    }),\n    stats: {\n      classified_rows: rows.length, segmented_rows: usable.length, uncaptured_rows: uncaptured,\n      coverage_pct: rows.length ? Math.round(1000 * usable.length / rows.length) / 10 : 0,\n      tests_run: fdr.m, tests_passed: fdr.passed, fdr_q: FDR_Q, min_segment_rows: MIN_SEGMENT_ROWS,\n      aliased_values: aliasOf.size,\n      independent_findings: certified.filter((c) => c.deployment_check === 'independent').length,\n      explained_by_deployment: certified.filter((c) => c.deployment_check === 'explained_by_deployment').length,\n      undetermined_findings: certified.filter((c) => c.deployment_check === 'undetermined').length,\n    },\n  };\n}\n\n// ---- entry point ----\nconst rows = $input.all().map((i) => i.json);\nconst bundle = $('Collect Segment Scores').first().json;\nif (!rows.length) throw new Error('No classified rows for ' + bundle.period_label + ' - has the backfill run for this period?');\n\nconst report = buildSegmentReport(rows, bundle.scores);\nreport.overall = buildOverallReport(rows);\nconst st = report.stats;\nconsole.log('[Analysis] ' + report.overall.driver_responses + ' comments, ' + report.overall.categories.length + ' topics, ' + report.overall.pillar_none_share_pct + '% touched no current bet');\nconsole.log('[Segments] ' + st.segmented_rows + '/' + st.classified_rows + ' segmented (' + st.coverage_pct + '%), ' + st.tests_passed + '/' + st.tests_run + ' contrasts certified, ' + st.independent_findings + ' independent of deployment');\n\nreturn [{ json: report }];"
+      },
+      "id": "8ce7fd04-df7c-487e-b540-6d70af3319fd",
+      "name": "Segment Contrast Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2240,
+        640
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per segment dimension, so the loop below makes one LLM call per\n// dimension rather than one per segment VALUE (~35 calls, far more variance\n// between runs and no extra insight).\n//\n// Reads the engine BY NAME rather than from $json: the theme clustering step\n// now sits between the engine and this node, so $json here is the theme\n// assignments, not the segment report.\nconst report = $('Segment Contrast Engine').first().json;\nconst scoreBundle = $('Collect Segment Scores').first().json;\n\nreturn report.dimensions.map((d) => ({ json: {\n  dimension: d.dimension,\n  period_label: scoreBundle.period_label,\n  values: d.values,\n  certified: report.certified_contrasts.filter((c) => c.dimension === d.dimension),\n  stats: report.stats,\n} }));"
+      },
+      "id": "6579557b-70b3-4620-863b-04f0aeac12e5",
+      "name": "Split Dimension Payloads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1104,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Renders Slack and the full report from ONE payload, so the short and long\n// versions cannot drift apart. Global analysis first, then segmented.\n\nconst NOTION_MAIN_PAGE_URL = '';\nconst NOTION_MONTHLY_DB_URL = '';\n\nconst narrations = $input.all().map((i) => i.json);\nconst report = $('Segment Contrast Engine').first().json;\nconst bundle = $('Collect Segment Scores').first().json;\nconst themes = $('Parse Theme Assignments').first().json;\nconst period = bundle.period_label;\nconst st = report.stats;\nconst ov = report.overall;\n\n// BigQuery returns numerics as STRINGS in n8n (\"45406\", \"62.1\"), so this must\n// COERCE rather than type-check.\nconst n = (v) => { const x = typeof v === 'string' ? Number(v) : v; return (typeof x === 'number' && isFinite(x)) ? x : 0; };\nconst s = (v) => (typeof v === 'string' ? v : '');\nconst num = (v) => n(v).toLocaleString('en-US');\nconst stars = (p) => (p < 0.001 ? '***' : p < 0.01 ? '**' : '*');\nconst byDim = {};\nfor (const x of narrations) byDim[x.dimension] = x;\n\nconst DIM_LABEL = {\n  deployment: 'Cloud vs self-hosted',\n  enterprise_tier: 'Enterprise tier',\n  role: 'Role',\n  company_size: 'Company size',\n  tech_skills_count: 'Technical skills (cloud only)',\n};\nconst failed = narrations.filter((x) => !x.parse_ok).map((x) => x.dimension);\nconst overallScore = bundle.scores.find((x) => x.segment_dim === 'overall');\nconst reliable = bundle.scores.filter((x) => x.score_reliable);\n\nconst mdTable = (cols, rows) => {\n  if (!rows.length) return '_Nothing to show._';\n  return [`| ${cols.map((c) => c.label).join(' | ')} |`, `| ${cols.map(() => '---').join(' | ')} |`,\n    ...rows.map((r) => `| ${cols.map((c) => String(r[c.key] ?? '')).join(' | ')} |`)].join('\\n');\n};\nconst esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst htmlTable = (cols, rows) => {\n  if (!rows.length) return '<p><em>Nothing to show.</em></p>';\n  const th = cols.map((c) => `<th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #333;\">${esc(c.label)}</th>`).join('');\n  const tr = rows.map((r, i) => `<tr${i % 2 ? ' style=\"background:#fafafa;\"' : ''}>${cols.map((c) => `<td style=\"padding:6px 10px;border-bottom:1px solid #eee;\">${esc(r[c.key])}</td>`).join('')}</tr>`).join('');\n  return `<table cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;width:100%;\"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;\n};\n\n// ================= THEME TABLES =================\n// Rows are curated themes, not raw phrases. A phrase can belong to more than\n// one theme, so shares do NOT sum to 100% - each is the share of comments\n// MENTIONING that theme, not a slice of a pie.\nconst themeRows = (list, unassigned) => {\n  const rows = (list || []).map((t) => ({\n    theme: s(t.label),\n    mentions: num(t.mentions),\n    share: `${t.share_pct}%`,\n    phrases: num(t.distinct_phrases),\n    avg: String(t.avg_nps),\n    examples: (t.samples || []).slice(0, 2).map((x) => s(x)).join(' | '),\n  }));\n  if (unassigned && unassigned.mentions > 0) {\n    rows.push({\n      theme: 'Unassigned - fits no current theme',\n      mentions: num(unassigned.mentions),\n      share: `${unassigned.pct}%`,\n      phrases: '', avg: '',\n      examples: 'Review these: they may need a new theme in the codebook',\n    });\n  }\n  return rows;\n};\nconst THEME_COLS = [\n  { key: 'theme', label: 'Theme' }, { key: 'mentions', label: 'Mentions' }, { key: 'share', label: 'Share' },\n  { key: 'phrases', label: 'Distinct phrasings' }, { key: 'avg', label: 'Avg NPS' }, { key: 'examples', label: 'Examples' },\n];\nconst requestRows = themeRows(themes.request_themes, themes.unassigned && themes.unassigned.request);\nconst complaintRows = themeRows(themes.complaint_themes, themes.unassigned && themes.unassigned.complaint);\nconst THEME_FOOTNOTE = 'Themes come from a fixed codebook, so they mean the same thing month to month. A comment can mention more than one theme, so shares do not add up to 100% - each is the share of comments mentioning that theme.';\n\n// The alert: users are talking about something the codebook does not cover.\nconst alertLines = [];\nif (themes.alert) {\n  const u = themes.unassigned || {};\n  const parts = [];\n  if (u.request && u.request.pct > themes.alert_threshold_pct) parts.push(`${u.request.pct}% of requests`);\n  if (u.complaint && u.complaint.pct > themes.alert_threshold_pct) parts.push(`${u.complaint.pct}% of complaints`);\n  alertLines.push(`${parts.join(' and ')} did not fit any theme in the codebook (threshold ${themes.alert_threshold_pct}%). Review the unassigned rows before treating this month as final - they may need a new theme.`);\n}\nif (!themes.ok) alertLines.push('Theme clustering failed this run, so the request and complaint tables are empty. Everything else is unaffected.');\n\n// ================= GLOBAL TABLES =================\nconst topicRows = (ov.categories || []).map((c) => ({\n  topic: s(c.category), mentions: num(c.mentions), share: `${c.share_pct}%`,\n  sentiment: c.sentiment.total ? `${c.sentiment.positive_pct}% pos / ${c.sentiment.negative_pct}% neg` : '-',\n  bands: `${num(c.detractors)} / ${num(c.passives)} / ${num(c.promoters)}`,\n  note: c.interpretable ? '' : 'too few to interpret',\n}));\nconst TOPIC_COLS = [\n  { key: 'topic', label: 'Topic' }, { key: 'mentions', label: 'Mentions' }, { key: 'share', label: 'Share' },\n  { key: 'sentiment', label: 'Sentiment' }, { key: 'bands', label: 'Detr / Pass / Prom' }, { key: 'note', label: 'Notes' },\n];\n\nconst contrastByPillar = {};\nfor (const c of (ov.pillarContrasts || [])) contrastByPillar[c.pillar] = c;\nlet anyConfigureOnce = false;\nconst pillarRows = (ov.pillars || []).map((p) => {\n  const c = contrastByPillar[p.pillar];\n  if (p.configure_once) anyConfigureOnce = true;\n  return {\n    bet: `${s(p.pillar)}${p.configure_once ? ' \\u2020' : ''}`,\n    mentions: num(p.mentions), share: `${p.share_pct}%`,\n    sentiment: p.sentiment.total ? `${p.sentiment.positive_pct}% pos / ${p.sentiment.negative_pct}% neg` : '-',\n    split: c ? `cloud ${c.cloud_pct}% vs self-hosted ${c.self_hosted_pct}%${stars(c.pValue)}` : '',\n    note: p.interpretable ? '' : 'too few to interpret',\n  };\n});\nconst PILLAR_COLS = [\n  { key: 'bet', label: 'Strategic bet' }, { key: 'mentions', label: 'Mentions' }, { key: 'share', label: 'Share' },\n  { key: 'sentiment', label: 'Sentiment' }, { key: 'split', label: 'Differs by deployment' }, { key: 'note', label: 'Notes' },\n];\nconst CONFIGURE_ONCE_FOOTNOTE = '\\u2020 Configure-once surface: users touch it rarely, so it generates almost no unprompted comment however important it is. A zero here is expected and is not a health signal - source these from sales, support and CS instead.';\n\n// ================= SEGMENT TABLES =================\nconst VERDICT_MARK = { independent: 'YES', explained_by_deployment: 'NO - deployment', undetermined: 'CANNOT TELL', not_applicable: 'n/a' };\nconst commentCounts = {};\nfor (const d of report.dimensions) for (const v of d.values) commentCounts[`${d.dimension}||${v.value}`] = v;\n\nconst SEGMENT_ORDER = {\n  company_size: ['solo', '<20', '20-99', '100-499', '500-999', '1000+', 'not_for_work', 'NA'],\n  tech_skills_count: 'numeric',\n};\nfunction orderRows(dim, rows) {\n  const spec = SEGMENT_ORDER[dim];\n  if (!spec) return rows;\n  if (spec === 'numeric') {\n    return [...rows].sort((a, b) => {\n      const av = Number(a.segment_value), bv = Number(b.segment_value);\n      const aN = isFinite(av), bN = isFinite(bv);\n      if (aN && bN) return av - bv;\n      if (aN) return -1;\n      if (bN) return 1;\n      return String(a.segment_value).localeCompare(String(b.segment_value));\n    });\n  }\n  return [...rows].sort((a, b) => {\n    const ai = spec.indexOf(String(a.segment_value)), bi = spec.indexOf(String(b.segment_value));\n    return (ai === -1 ? spec.length : ai) - (bi === -1 ? spec.length : bi) || n(b.responses) - n(a.responses);\n  });\n}\n\nconst scoreRows = [];\nconst suppressedAliases = [];\nfor (const dim of Object.keys(DIM_LABEL)) {\n  for (const x of orderRows(dim, bundle.scores.filter((y) => y.segment_dim === dim))) {\n    const gap = overallScore ? Math.round((n(x.nps) - n(overallScore.nps)) * 10) / 10 : null;\n    let change = '-';\n    if (!x.score_reliable) change = 'too few responses';\n    else if (x.nps_delta === null || x.nps_delta === undefined) change = 'no prior month';\n    else change = `${n(x.nps_delta) > 0 ? '+' : ''}${n(x.nps_delta)}${x.delta_moved ? stars(n(x.delta_p)) : ''}`;\n    const cv = commentCounts[`${dim}||${s(x.segment_value)}`];\n    if (cv && cv.alias_of) {\n      const canon = bundle.scores.find((y) => y.segment_dim === cv.alias_of.dimension && y.segment_value === cv.alias_of.value);\n      if (canon && n(canon.responses) === n(x.responses)) { suppressedAliases.push(`${DIM_LABEL[dim]} = ${s(x.segment_value)} (identical to ${cv.alias_of.value})`); continue; }\n    }\n    let comments = cv ? num(cv.rows) : '0';\n    if (cv && !cv.testable && !cv.alias_of) comments = `${num(cv.rows)} (too few to test)`;\n    scoreRows.push({\n      dimension: DIM_LABEL[dim], group: s(x.segment_value), responses: num(x.responses),\n      nps: x.score_reliable ? String(n(x.nps)) : '-',\n      vs_average: x.score_reliable && gap !== null ? `${gap > 0 ? '+' : ''}${gap}` : '-',\n      change, comments, wrote_text: x.score_reliable ? `${n(x.pct_with_text)}%` : '-',\n    });\n  }\n}\nconst SCORE_COLS = [\n  { key: 'dimension', label: 'Segment' }, { key: 'group', label: 'Group' }, { key: 'responses', label: 'Responses' },\n  { key: 'nps', label: 'NPS' }, { key: 'vs_average', label: 'vs average' }, { key: 'change', label: 'Change since last month' },\n  { key: 'wrote_text', label: 'Wrote text' }, { key: 'comments', label: 'Comments analysed' },\n];\n\nconst findingRows = report.certified_contrasts.map((c) => ({\n  dimension: DIM_LABEL[c.dimension] || c.dimension, group: s(c.value), topic: s(c.category),\n  direction: c.diffPct > 0 ? 'more' : 'less',\n  this_group: `${c.sharePct}%`, everyone_else: `${c.restSharePct}%`,\n  responses: String(c.count), sig: stars(c.pValue), real_effect: VERDICT_MARK[c.deployment_check] || '',\n}));\nconst FINDING_COLS = [\n  { key: 'dimension', label: 'Segment' }, { key: 'group', label: 'Group' }, { key: 'topic', label: 'Topic' },\n  { key: 'direction', label: 'More/less' }, { key: 'this_group', label: 'This group' }, { key: 'everyone_else', label: 'Everyone else' },\n  { key: 'responses', label: 'n' }, { key: 'sig', label: 'Sig.' }, { key: 'real_effect', label: 'Survives deployment check' },\n];\n\nconst results = { period, topics: topicRows, requests: requestRows, complaints: complaintRows, bets: pillarRows, scores: scoreRows, findings: findingRows, themes, stats: st };\n\n// ================= SLACK =================\nconst L = [];\nL.push(`*NPS monthly* \\u00b7 ${period}`);\nL.push('');\nfor (const a of alertLines) { L.push(`:warning: ${a}`); L.push(''); }\nif (overallScore) {\n  L.push(`*NPS ${n(overallScore.nps)}* \\u00b7 ${num(overallScore.responses)} answered \\u00b7 ${n(overallScore.pct_with_text)}% wrote text`);\n  if (overallScore.delta_moved === true) L.push(`${n(overallScore.nps_delta) > 0 ? 'Up' : 'Down'} ${Math.abs(n(overallScore.nps_delta))} points since last month.`);\n  else if (overallScore.delta_moved === false) L.push('Essentially unchanged since last month.');\n  L.push('');\n}\nif ((themes.complaint_themes || []).length) {\n  L.push('*What they struggle with*');\n  for (const t of themes.complaint_themes.slice(0, 3)) L.push(`\\u2022 ${s(t.label)} \\u2014 ${num(t.mentions)} mentions (${t.share_pct}%)`);\n  L.push('');\n}\nif ((themes.request_themes || []).length) {\n  L.push('*What they asked for*');\n  for (const t of themes.request_themes.slice(0, 3)) L.push(`\\u2022 ${s(t.label)} \\u2014 ${num(t.mentions)} mentions (${t.share_pct}%)`);\n  L.push('');\n}\nL.push(`*${ov.pillar_none_share_pct}% of what they said touched no current strategic bet* (cloud ${ov.pillar_none_by_deployment.cloud}%, self-hosted ${ov.pillar_none_by_deployment.self_hosted}%)`);\nL.push('');\nconst gaps = reliable\n  .filter((x) => x.segment_dim !== 'overall' && s(x.segment_value) !== 'NA' && n(x.responses) >= 300 && overallScore)\n  .map((x) => ({ x, gap: n(x.nps) - n(overallScore.nps) }))\n  .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));\nif (gaps.length) {\n  L.push('*Standing gaps between groups* _(long-running differences, not changes)_');\n  for (const g of gaps.slice(0, 3)) {\n    L.push(`\\u2022 ${DIM_LABEL[g.x.segment_dim]}: ${s(g.x.segment_value)} \\u2014 NPS ${n(g.x.nps)}, ${Math.abs(Math.round(g.gap * 10) / 10)} points ${g.gap > 0 ? 'above' : 'below'} the ${n(overallScore.nps)} average`);\n  }\n  L.push('');\n}\nconst independent = report.certified_contrasts.filter((c) => c.deployment_check === 'independent');\nif (independent.length) {\n  L.push(`*What differs by segment* \\u2014 ${st.independent_findings} of ${st.tests_passed} survive holding deployment constant`);\n  const seen = new Set();\n  for (const c of independent) {\n    if (seen.has(c.category)) continue;\n    seen.add(c.category);\n    if (seen.size > 3) break;\n    L.push(`\\u2022 *${DIM_LABEL[c.dimension]}: ${s(c.value)}* \\u2014 ${s(c.category)} ${c.diffPct > 0 ? 'more' : 'less'} than everyone else, ${c.sharePct}% vs ${c.restSharePct}%`);\n  }\n} else {\n  L.push('*What differs by segment*');\n  L.push('Nothing survived the deployment check this month. Segments talked about broadly the same things.');\n}\nif (failed.length) { L.push(''); L.push(`:rotating_light: *Pipeline issue* \\u2014 no narrative returned for: ${failed.join(', ')}`); }\nL.push('');\nL.push(NOTION_MONTHLY_DB_URL ? `<${NOTION_MONTHLY_DB_URL}|Full report>` : '_Full report by email._');\nconst slack_text = L.join('\\n');\n\n// ================= MARKDOWN =================\nconst M = [];\nM.push(`# NPS monthly report - ${period}`);\nM.push('');\nfor (const a of alertLines) { M.push(`> **Heads up.** ${a}`); M.push(''); }\nif (overallScore) {\n  M.push(`**NPS ${n(overallScore.nps)}** from ${num(overallScore.responses)} responses. ${num(overallScore.promoters)} promoters, ${num(overallScore.passives)} passives, ${num(overallScore.detractors)} detractors. ${n(overallScore.pct_with_text)}% wrote open text.`);\n  M.push('');\n}\nM.push('# Part 1 - Everyone');\nM.push('');\nM.push('## What they talked about');\nM.push('');\nM.push(`_From the ${num(ov.driver_responses)} comments with substantive text._`);\nM.push('');\nM.push(mdTable(TOPIC_COLS, topicRows));\nM.push('');\nM.push('## What they asked for');\nM.push('');\nM.push(mdTable(THEME_COLS, requestRows));\nM.push('');\nM.push(`_${THEME_FOOTNOTE}_`);\nM.push('');\nM.push('## What they struggle with');\nM.push('');\nM.push('_Negative-sentiment evidence. Distinct from requests above: things people described as problems, not things they asked for._');\nM.push('');\nM.push(mdTable(THEME_COLS, complaintRows));\nM.push('');\nM.push('## Strategic bets');\nM.push('');\nM.push(`**${num(ov.pillar_none_count)} comments (${ov.pillar_none_share_pct}%) touched no current strategic bet** - cloud ${ov.pillar_none_by_deployment.cloud}%, self-hosted ${ov.pillar_none_by_deployment.self_hosted}%.`);\nM.push('');\nM.push(mdTable(PILLAR_COLS, pillarRows));\nM.push('');\nif (anyConfigureOnce) { M.push(`_${CONFIGURE_ONCE_FOOTNOTE}_`); M.push(''); }\nM.push('_\"Differs by deployment\" is shown only where the difference survived testing. `*` p<0.05, `**` p<0.01, `***` p<0.001._');\nM.push('');\nM.push('# Part 2 - By segment');\nM.push('');\nM.push('## Scores');\nM.push('');\nM.push('_Across ALL responses including the majority who wrote nothing, so unlike the topic tables these are not distorted by the open-text writer bias._');\nM.push('');\nM.push(mdTable(SCORE_COLS, scoreRows));\nM.push('');\nM.push('_Change since last month: `*` p<0.05, `**` p<0.01, `***` p<0.001. No stars means the change is within normal month-to-month variation for a group that size._');\nif (suppressedAliases.length) M.push(`_Rows omitted as exact duplicates of another group: ${suppressedAliases.join('; ')}._`);\nM.push('');\nM.push('## What each group talks about differently');\nM.push('');\nM.push('_Significance after Benjamini-Hochberg correction across all ' + st.tests_run + ' comparisons. \"Survives deployment check\" = still holds when cloud and self-hosted are looked at separately; NO means the difference is real but caused by deployment, not by this segment._');\nM.push('');\nM.push(mdTable(FINDING_COLS, findingRows));\nconst anyNarrative = Object.keys(DIM_LABEL).some((d) => byDim[d] && s(byDim[d].narrative));\nif (anyNarrative) {\n  M.push('');\n  M.push('## Notes per segment');\n  for (const dim of Object.keys(DIM_LABEL)) {\n    const nar = byDim[dim];\n    if (!nar || !s(nar.narrative)) continue;\n    M.push('');\n    M.push(`**${DIM_LABEL[dim]}** - ${s(nar.narrative)}`);\n  }\n}\nM.push('');\nM.push('## Method and caveats');\nM.push('');\nM.push(`Themes are assigned from a fixed codebook of ${n(themes.codebook_size)} curated themes; the model only assigns, it never counts and never invents a theme. Segment differences were selected by two-proportion tests in code: ${st.tests_run} comparisons run, ${st.tests_passed} survived Benjamini-Hochberg correction at FDR ${st.fdr_q}. Groups under ${st.min_segment_rows} classified responses are never tested.`);\nif (st.coverage_pct < 100) M.push(`\\n**Coverage ${st.coverage_pct}%.** ${num(st.uncaptured_rows)} of ${num(st.classified_rows)} comments predate segmentation capture and are excluded from Part 2.`);\nM.push('');\nM.push(`- **Part 1 covers only the ${overallScore ? n(overallScore.pct_with_text) : 0}% who wrote text**, and those people score ${overallScore ? n(overallScore.writer_bias) : 0} points higher than people who left the box empty. That does not just deflate counts, it tilts the ranking. The score tables are the unbiased part.`);\nM.push('- **Changes and gaps are different.** A change is movement since last month. \"vs average\" is where a group sits relative to everyone, usually long-standing.');\nM.push('- **NA means asked-and-unanswered**, not missing. Non-response is much higher among self-hosted users, so role and company-size rows lean cloud.');\nM.push('- **Technical skills is cloud-only.** Every self-hosted row is NA by construction, never \"zero skills\".');\nif (n(ov.quality.approx_timestamp_rows) > 0) M.push(`- **${num(ov.quality.approx_timestamp_rows)} rows carry an approximate response date** (within ~12 hours), from before the pipeline captured answer time.`);\nM.push('');\nM.push(`_Comments ${num(ov.driver_responses)} \\u00b7 unassigned requests ${themes.unassigned ? themes.unassigned.request.pct : 0}% \\u00b7 unassigned complaints ${themes.unassigned ? themes.unassigned.complaint.pct : 0}% \\u00b7 unmatched ${n(ov.quality.unmatched_rows)} \\u00b7 invalid categories ${n(ov.quality.enum_violation_rows)} \\u00b7 filed as Other ${n(ov.quality.other_rows)} \\u00b7 taxonomy ${ov.quality.strategy_versions.join(', ') || 'unknown'} \\u00b7 segmentation coverage ${st.coverage_pct}%_`);\nconst notion_markdown = M.join('\\n');\n\n// ================= HTML EMAIL =================\nconst H = [];\nH.push('<div style=\"font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;color:#111;max-width:900px;\">');\nH.push(`<h1 style=\"font-size:20px;\">NPS monthly report - ${esc(period)}</h1>`);\nfor (const a of alertLines) H.push(`<p style=\"background:#fff4e5;border-left:4px solid #e08600;padding:10px 14px;margin:12px 0;\"><strong>Heads up.</strong> ${esc(a)}</p>`);\nif (overallScore) H.push(`<p style=\"font-size:15px;\"><strong>NPS ${n(overallScore.nps)}</strong> from ${num(overallScore.responses)} responses \\u00b7 ${num(overallScore.promoters)} promoters, ${num(overallScore.passives)} passives, ${num(overallScore.detractors)} detractors \\u00b7 ${n(overallScore.pct_with_text)}% wrote open text.</p>`);\nH.push('<h1 style=\"font-size:18px;border-top:2px solid #333;padding-top:10px;\">Part 1 &mdash; Everyone</h1>');\nH.push('<h2 style=\"font-size:16px;\">What they talked about</h2>');\nH.push(`<p style=\"color:#555;\">From the ${num(ov.driver_responses)} comments with substantive text.</p>`);\nH.push(htmlTable(TOPIC_COLS, topicRows));\nH.push('<h2 style=\"font-size:16px;\">What they asked for</h2>');\nH.push(htmlTable(THEME_COLS, requestRows));\nH.push(`<p style=\"color:#555;font-size:12px;\">${esc(THEME_FOOTNOTE)}</p>`);\nH.push('<h2 style=\"font-size:16px;\">What they struggle with</h2>');\nH.push('<p style=\"color:#555;\">Negative-sentiment evidence. Distinct from requests above: things people described as problems, not things they asked for.</p>');\nH.push(htmlTable(THEME_COLS, complaintRows));\nH.push('<h2 style=\"font-size:16px;\">Strategic bets</h2>');\nH.push(`<p><strong>${num(ov.pillar_none_count)} comments (${ov.pillar_none_share_pct}%) touched no current strategic bet</strong> &mdash; cloud ${ov.pillar_none_by_deployment.cloud}%, self-hosted ${ov.pillar_none_by_deployment.self_hosted}%.</p>`);\nH.push(htmlTable(PILLAR_COLS, pillarRows));\nif (anyConfigureOnce) H.push(`<p style=\"color:#555;font-size:12px;\">${esc(CONFIGURE_ONCE_FOOTNOTE)}</p>`);\nH.push('<p style=\"color:#555;font-size:12px;\">\"Differs by deployment\" is shown only where the difference survived testing. * p&lt;0.05, ** p&lt;0.01, *** p&lt;0.001.</p>');\nH.push('<h1 style=\"font-size:18px;border-top:2px solid #333;padding-top:10px;\">Part 2 &mdash; By segment</h1>');\nH.push('<h2 style=\"font-size:16px;\">Scores</h2>');\nH.push('<p style=\"color:#555;\">Across ALL responses including the majority who wrote nothing, so unlike the topic tables these are not distorted by the open-text writer bias.</p>');\nH.push(htmlTable(SCORE_COLS, scoreRows));\nH.push('<p style=\"color:#555;font-size:12px;\">Change since last month: * p&lt;0.05, ** p&lt;0.01, *** p&lt;0.001. No stars means the change is within normal month-to-month variation for a group that size.</p>');\nif (suppressedAliases.length) H.push(`<p style=\"color:#555;font-size:12px;\">Rows omitted as exact duplicates of another group: ${esc(suppressedAliases.join('; '))}.</p>`);\nH.push('<h2 style=\"font-size:16px;\">What each group talks about differently</h2>');\nH.push(`<p style=\"color:#555;\">Significance after Benjamini-Hochberg correction across all ${st.tests_run} comparisons. \"Survives deployment check\" = still holds when cloud and self-hosted are looked at separately; NO means the difference is real but caused by deployment, not by this segment.</p>`);\nH.push(htmlTable(FINDING_COLS, findingRows));\nif (anyNarrative) {\n  H.push('<h2 style=\"font-size:16px;\">Notes per segment</h2><ul>');\n  for (const dim of Object.keys(DIM_LABEL)) {\n    const nar = byDim[dim];\n    if (!nar || !s(nar.narrative)) continue;\n    H.push(`<li><strong>${esc(DIM_LABEL[dim])}</strong> - ${esc(s(nar.narrative))}</li>`);\n  }\n  H.push('</ul>');\n}\nH.push('<h2 style=\"font-size:16px;\">Method and caveats</h2>');\nH.push(`<p>Themes are assigned from a fixed codebook of ${n(themes.codebook_size)} curated themes; the model only assigns, it never counts and never invents a theme. Segment differences were selected by two-proportion tests in code: ${st.tests_run} comparisons run, ${st.tests_passed} survived Benjamini-Hochberg correction at FDR ${st.fdr_q}.</p>`);\nif (st.coverage_pct < 100) H.push(`<p><strong>Coverage ${st.coverage_pct}%.</strong> ${num(st.uncaptured_rows)} of ${num(st.classified_rows)} comments predate segmentation capture and are excluded from Part 2.</p>`);\nH.push('<ul>');\nH.push(`<li><strong>Part 1 covers only the ${overallScore ? n(overallScore.pct_with_text) : 0}% who wrote text</strong>, who score ${overallScore ? n(overallScore.writer_bias) : 0} points higher than those who did not. That tilts the ranking, not just the counts.</li>`);\nH.push('<li><strong>NA means asked-and-unanswered.</strong> Non-response is much higher among self-hosted users, so role and company-size rows lean cloud.</li>');\nH.push('<li><strong>Technical skills is cloud-only.</strong> Every self-hosted row is NA by construction, never \"zero skills\".</li>');\nH.push('</ul>');\nH.push(`<p style=\"color:#777;font-size:12px;\">Comments ${num(ov.driver_responses)} &middot; unassigned requests ${themes.unassigned ? themes.unassigned.request.pct : 0}% &middot; unassigned complaints ${themes.unassigned ? themes.unassigned.complaint.pct : 0}% &middot; unmatched ${n(ov.quality.unmatched_rows)} &middot; invalid categories ${n(ov.quality.enum_violation_rows)} &middot; filed as Other ${n(ov.quality.other_rows)} &middot; taxonomy ${esc(ov.quality.strategy_versions.join(', ') || 'unknown')} &middot; segmentation coverage ${st.coverage_pct}%</p>`);\nH.push('</div>');\nconst email_html = H.join('\\n');\n\nreturn [{ json: {\n  title: `NPS monthly report - ${period}`,\n  period_label: period,\n  slack_text, notion_markdown, email_html, email_text: notion_markdown, results,\n  notion_main_page_url: NOTION_MAIN_PAGE_URL,\n  notion_monthly_db_url: NOTION_MONTHLY_DB_URL,\n  dimensions_failed: failed,\n} }];"
+      },
+      "id": "ba476e56-ca1b-4f1b-ae83-2dd1068bb54e",
+      "name": "Render Segmented Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        448
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds a COMPACT prompt. Only certified contrasts and the evidence needed to\n// describe them are sent - never the raw rows. Keeps the call small enough to\n// stay well inside the task-runner timeout that the monthly digest kept hitting.\nconst d = $json;\nconst MAX_QUOTES = 3;\n\nconst values = d.values.map((v) => ({\n  value: v.value,\n  rows: v.rows,\n  testable: v.testable,\n  suppressed_reason: v.suppressed_reason,\n  nps: v.score ? v.score.nps : null,\n  nps_responses: v.score ? v.score.responses : null,\n  score_reliable: v.score ? v.score.score_reliable : null,\n  sentimentCounts: v.sentimentCounts,\n  requestPhrases: v.requestPhrases.slice(0, 10),\n  problemPhrases: v.problemPhrases.slice(0, 10),\n  quoteCandidates: v.quoteCandidates.slice(0, MAX_QUOTES),\n}));\n\nconst payload = {\n  dimension: d.dimension,\n  period: d.period_label,\n  certified_contrasts: d.certified,\n  values,\n  coverage_pct: d.stats.coverage_pct,\n  tests_run: d.stats.tests_run,\n  tests_passed: d.stats.tests_passed,\n};\n\nreturn [{ json: { dimension: d.dimension, promptText: JSON.stringify(payload) } }];"
+      },
+      "id": "65a457f2-a37c-4120-ac7a-d6d6bf3d8064",
+      "name": "Build Dimension Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -624,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.promptText }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You write the prose for ONE segment dimension of n8n's monthly NPS segmented analysis. The audience is a senior product researcher plus product and design people who do not track NPS.\n\nWHAT YOU ARE GIVEN\nA JSON object with:\n- dimension: which segmentation this is (deployment, enterprise_tier, role, company_size, tech_skills_count).\n- certified_contrasts: differences that ALREADY PASSED a two-proportion test with Benjamini-Hochberg correction, computed in code. Each has value, category, count, sharePct, restSharePct, diffPct, pValue, alsoSignificantIn, and deployment_check.\n- values: every segment value, with rows (classified responses), testable, nps, sentimentCounts, requestPhrases, problemPhrases, quoteCandidates.\n- coverage_pct, tests_run, tests_passed.\n\nTHE ONE RULE THAT MATTERS\nYOU DO NOT DECIDE WHAT IS A FINDING. The code already did. Write about certified_contrasts and nothing else. If certified_contrasts is empty, say so plainly and stop - an empty list is a real and reportable result, not a failure to look hard enough.\n\nNEVER:\n- Compute, recompute, adjust, estimate or 'sanity check' any number. Every count and percentage is exact and final.\n- Claim a difference that is not in certified_contrasts, however visible it looks in the values block.\n- Interpret a value where testable is false. Those are below the sample floor. You may state the raw count, nothing more.\n- Say a segment is 'trending', 'rising', 'falling', 'emerging' or 'improving'. You are seeing one month with no prior segmented baseline.\n- Infer overall sentiment from quoteCandidates - they are deliberately weighted toward detractors. Use sentimentCounts for tone.\n\nTHE deployment_check FIELD - READ IT AND RESPECT IT\nEvery certified contrast has been re-tested within cloud and self-hosted separately:\n- 'independent': the effect holds inside both deployment groups. Write about it as a genuine effect for this segment.\n- 'explained_by_deployment': the effect disappears once deployment is held constant. The difference is REAL but the cause is cloud vs self-hosted, not this segment. Say so explicitly - describe it as a deployment effect showing through this segment, never as a property of the segment itself.\n- 'undetermined': it could not be separated. Say plainly that it cannot be told apart from deployment. Do not resolve it either way.\n- 'not_applicable': either this IS the deployment split, or it is the cloud-only technical-skills question. No confirmation was needed or possible.\nLead with independent findings. Never present an explained_by_deployment finding as if the segment caused it.\n\nWHAT TO WRITE\nnarrative: 2 to 4 plain sentences. What distinguishes the segments in this dimension, based only on certified contrasts, respecting deployment_check. If a contrast has a non-empty alsoSignificantIn, say the same pattern appears in those other dimensions and is probably one effect rather than several - do not present it as independent corroboration.\nfindings: one entry per certified contrast worth expanding, max 4. Each has segment (the value), reading (one sentence on what the users actually said, drawn from requestPhrases and problemPhrases for that segment), and quotes (up to 2 from that segment's quoteCandidates, 'text' field verbatim, never paraphrased, with a short English gloss for non-English text and '' for English).\n\nDIMENSION-SPECIFIC CAUTIONS\n- tech_skills_count is a CLOUD-ONLY onboarding question. Every self-hosted response is NA there by construction. Never read NA as 'zero technical skills'.\n- role and company_size have high non-response, and non-response is much higher among self-hosted users. Say so when it applies.\n- enterprise_tier values other than NA are small. Respect the testable flag strictly.\n- An 'NA' value means the user was asked and did not answer. It is a real group, but describe it as 'not recorded', never as a user type.\n\nOUTPUT FORMAT - CRITICAL\nRAW JSON ONLY. No prose before or after, no markdown fences, no backticks. First character { and last }.\n{\n  \"narrative\": \"\",\n  \"findings\": [ { \"segment\": \"\", \"reading\": \"\", \"quotes\": [ { \"text\": \"\", \"gloss\": \"\", \"nps\": 0 } ] } ]\n}\nUse \"\" or [] for absent values, never null."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "3d353354-1c5f-4109-8a81-a44a7246a5f4",
+      "name": "Narrate Segment Dimension",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -384,
+        800
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5"
+        },
+        "builtInTools": {},
+        "options": {
+          "reasoningEffort": "low"
+        }
+      },
+      "id": "5159255b-0b7f-461f-ad96-b9303744a796",
+      "name": "OpenAI Segment Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -384,
+        1008
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse defensively and NEVER throw. A single dimension failing to return JSON\n// must not lose the other four - the failure is recorded and rendered as a\n// visible gap in the report instead.\nconst raw = $json.output ?? $json.text ?? '';\nconst dimension = $('Build Dimension Prompt').first().json.dimension;\n\nlet parsed = null;\nlet parseError = '';\ntry {\n  const cleaned = String(raw).replace(/^\\s*```(?:json)?/i, '').replace(/```\\s*$/, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) { parseError = e.message; }\n\nif (!parsed || typeof parsed !== 'object') {\n  return [{ json: { dimension, parse_ok: false, parseError, narrative: '', findings: [] } }];\n}\n\nreturn [{ json: {\n  dimension,\n  parse_ok: true,\n  parseError: '',\n  narrative: typeof parsed.narrative === 'string' ? parsed.narrative : '',\n  findings: Array.isArray(parsed.findings) ? parsed.findings : [],\n} }];"
+      },
+      "id": "71ccb6a5-f853-462a-a86c-78203cd0c935",
+      "name": "Parse Dimension Narration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "affae624-b3c4-4ffe-9c41-783e2f2ab71a",
+      "name": "Batch Dimensions (1 per call)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -864,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "aniol.moner@n8n.io",
+        "subject": "={{ $json.title }}",
+        "message": "={{ $json.email_html }}",
+        "options": {}
+      },
+      "id": "8ae1a294-7833-44f1-bb1b-85e25eaa0708",
+      "name": "Email Segmented Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        560
+      ],
+      "webhookId": "370608c1-dda9-4391-a3b2-99324ba87397",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PkP6YANOmg5nWxdm",
+          "name": "Aniol's Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the clustering call. The codebook is FIXED: themes are curated in the\n// nps_theme_codebook data table and this workflow never writes to it. That is\n// what makes months comparable - the same phrase means the same theme in July\n// and in August, because the theme set did not move underneath it.\nconst codebook = $input.all().map((i) => i.json).filter((r) => r && r.theme_id);\nif (!codebook.length) throw new Error('The theme codebook is empty. Add active themes to nps_theme_codebook before running - this workflow assigns to existing themes and never invents its own.');\n\nconst rows = $('Fetch Period Insights (Segmented)').all().map((i) => i.json);\nconst norm = (s) => String(s).toLowerCase().replace(/[^\\p{L}\\p{N}\\s]/gu, '').replace(/\\s+/g, ' ').trim();\nconst valid = (ev) => ev && ev !== 'UNMATCHED_BY_CLASSIFIER' && !String(ev).startsWith('ENUM_VIOLATION');\n\n// Collapse identical phrasings first, so the model clusters a few hundred\n// distinct strings rather than every row. The count travels with each phrase\n// and is NEVER recomputed from the model's output.\nfunction collect(kind) {\n  const m = new Map();\n  for (const r of rows) {\n    const ev = String(r.evidence || '').trim();\n    if (!valid(ev)) continue;\n    const isReq = r.is_request === true;\n    if (kind === 'request' && !isReq) continue;\n    if (kind === 'complaint' && (isReq || r.sentiment !== 'negative')) continue;\n    const k = norm(ev);\n    if (!k) continue;\n    if (!m.has(k)) m.set(k, { text: ev, count: 0, npsSum: 0 });\n    const e = m.get(k);\n    e.count++;\n    e.npsSum += Number(r.nps) || 0;\n  }\n  return [...m.values()]\n    .map((e) => ({ text: e.text, count: e.count, avg_nps: Math.round(e.npsSum / e.count * 10) / 10 }))\n    .sort((a, b) => b.count - a.count);\n}\n\nconst requests = collect('request');\nconst complaints = collect('complaint');\n\n// Defensive cap. July had ~170 distinct requests, so this is headroom rather\n// than a real limit - but an unbounded list is what pushed an earlier\n// summariser past a 10 minute timeout.\nconst CAP = 400;\nconst phrases = [\n  ...requests.slice(0, CAP).map((p, i) => ({ id: `r${i}`, kind: 'request', ...p })),\n  ...complaints.slice(0, CAP).map((p, i) => ({ id: `c${i}`, kind: 'complaint', ...p })),\n];\nif (!phrases.length) throw new Error('No request or complaint phrases found for this period.');\n\nconst payload = {\n  codebook: codebook.map((t) => ({ theme_id: t.theme_id, label: t.label, kind: t.kind, description: t.description, examples: t.examples })),\n  phrases,\n};\n\nconsole.log('[Themes] ' + codebook.length + ' active themes, ' + requests.length + ' distinct requests, ' + complaints.length + ' distinct complaints');\n\nreturn [{ json: { codebook_size: codebook.length, phrase_count: phrases.length, promptText: JSON.stringify(payload) } }];"
+      },
+      "id": "6d3ddbf6-e66f-4ee4-aa94-61cb0a0ddb44",
+      "name": "Build Theme Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1808,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5"
+        },
+        "builtInTools": {},
+        "options": {
+          "reasoningEffort": "medium"
+        }
+      },
+      "id": "58c0134f-ffad-4863-a83c-896ae7b2d12b",
+      "name": "Theme Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1600,
+        848
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The model clusters. THIS CODE COUNTS. Every phrase id the model returns is\n// checked against the list we sent; anything invented is dropped. Counts come\n// from the phrase counts computed upstream, never from the model.\nconst raw = $json.output ?? $json.text ?? '';\nconst sent = JSON.parse($('Build Theme Prompt').first().json.promptText);\nconst byId = {};\nfor (const p of sent.phrases) byId[p.id] = p;\nconst known = new Map();\nfor (const t of sent.codebook) known.set(t.theme_id, t);\n\nlet parsed = null, parseError = '';\ntry {\n  parsed = JSON.parse(String(raw).replace(/^\\s*```(?:json)?/i, '').replace(/```\\s*$/, '').trim());\n} catch (e) { parseError = e.message; }\n\nconst totals = { request: 0, complaint: 0 };\nfor (const p of sent.phrases) totals[p.kind] += p.count;\n\n// Never throw: a failed clustering must not lose the rest of the report.\nif (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.assignments)) {\n  return [{ json: {\n    ok: false, parseError: parseError || 'no assignments array returned',\n    request_themes: [], complaint_themes: [],\n    unassigned: { request: { mentions: totals.request, total: totals.request, pct: 100 }, complaint: { mentions: totals.complaint, total: totals.complaint, pct: 100 } },\n    alert: false, alert_threshold_pct: 15, dropped_phrase_ids: 0, invented_themes: 0, codebook_size: sent.codebook.length,\n  } }];\n}\n\n// A phrase MAY belong to several themes ('cheaper key to unlock features while\n// self-hosting' is genuinely pricing AND self-hosting). Consequence: theme\n// shares do NOT sum to 100%, and the report says so rather than implying a\n// partition.\nconst tally = new Map();\nconst seenPhrase = new Set();\nconst assignedMentions = { request: 0, complaint: 0 };\nlet droppedIds = 0, inventedThemes = 0;\n\nfor (const a of parsed.assignments) {\n  const p = byId[a && a.phrase_id];\n  if (!p) { droppedIds++; continue; }\n  const ids = Array.isArray(a.theme_ids) ? a.theme_ids : [];\n  const realIds = [];\n  for (const id of ids) {\n    if (!id || id === 'unassigned') continue;\n    // The codebook is curated. A theme id we never sent is a hallucination and\n    // is discarded rather than silently entering the report.\n    if (!known.has(id)) { inventedThemes++; continue; }\n    // A request phrase can never belong to a complaint theme or the reverse.\n    if ((known.get(id).kind || 'request') !== p.kind) continue;\n    realIds.push(id);\n  }\n  if (!realIds.length) continue;\n  if (!seenPhrase.has(p.id)) { seenPhrase.add(p.id); assignedMentions[p.kind] += p.count; }\n  for (const id of realIds) {\n    if (!tally.has(id)) tally.set(id, { theme_id: id, mentions: 0, phrases: 0, npsSum: 0, samples: [] });\n    const t = tally.get(id);\n    t.mentions += p.count;\n    t.phrases += 1;\n    t.npsSum += (p.avg_nps || 0) * p.count;\n    if (t.samples.length < 3) t.samples.push(p.text);\n  }\n}\n\nconst dress = (kind) => [...tally.values()]\n  .map((t) => ({ ...t, meta: known.get(t.theme_id) }))\n  .filter((t) => t.meta && (t.meta.kind || 'request') === kind)\n  .map((t) => ({\n    theme_id: t.theme_id, label: t.meta.label, mentions: t.mentions, distinct_phrases: t.phrases,\n    share_pct: totals[kind] ? Math.round(1000 * t.mentions / totals[kind]) / 10 : 0,\n    avg_nps: t.mentions ? Math.round(t.npsSum / t.mentions * 10) / 10 : 0,\n    samples: t.samples,\n  }))\n  .sort((a, b) => b.mentions - a.mentions);\n\nconst mk = (kind) => ({\n  mentions: totals[kind] - assignedMentions[kind], total: totals[kind],\n  pct: totals[kind] ? Math.round(1000 * (totals[kind] - assignedMentions[kind]) / totals[kind]) / 10 : 0,\n});\nconst unassigned = { request: mk('request'), complaint: mk('complaint') };\n\n// The alert. Unassigned is not a failure - it is the signal that users have\n// started talking about something the curated codebook does not yet cover.\nconst ALERT_THRESHOLD_PCT = 15;\nconst alert = unassigned.request.pct > ALERT_THRESHOLD_PCT || unassigned.complaint.pct > ALERT_THRESHOLD_PCT;\n\nconsole.log('[Themes] ' + dress('request').length + ' request themes, ' + dress('complaint').length + ' complaint themes, unassigned ' + unassigned.request.pct + '% requests / ' + unassigned.complaint.pct + '% complaints' + (droppedIds ? ', ' + droppedIds + ' invented phrase ids dropped' : '') + (inventedThemes ? ', ' + inventedThemes + ' invented theme ids dropped' : ''));\nif (alert) console.warn('[Themes] ALERT: unassigned share above ' + ALERT_THRESHOLD_PCT + '% - the codebook may need a new theme');\n\nreturn [{ json: {\n  ok: true, parseError: '',\n  request_themes: dress('request'), complaint_themes: dress('complaint'),\n  unassigned, alert, alert_threshold_pct: ALERT_THRESHOLD_PCT,\n  dropped_phrase_ids: droppedIds, invented_themes: inventedThemes, codebook_size: sent.codebook.length,\n} }];"
+      },
+      "id": "a2be3838-c4e8-4bf5-832f-15e0deb93ac8",
+      "name": "Parse Theme Assignments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1296,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.promptText }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You assign short feedback phrases from n8n's NPS survey to a FIXED set of themes. You are the clustering step of a pipeline that is otherwise entirely deterministic.\n\nYOU DO NOT COUNT. Every phrase arrives with an exact count and the code sums those counts itself. Never output a number, a total, a percentage or a ranking.\n\nYOU DO NOT CHANGE THE CODEBOOK. The themes are curated by a researcher. Do not invent, rename, merge, split or improve them. A theme_id that was not given to you will be discarded by the validator. The whole point of a fixed codebook is that a phrase means the same thing this month as last month.\n\nINPUT\nA JSON object with:\n- codebook: [{ theme_id, label, kind, description, examples }] - kind is \"request\" or \"complaint\"\n- phrases: [{ id, kind, text, count, avg_nps }]\n\nRULES\n- Assign every phrase exactly once in the assignments array, with one or more theme_ids.\n- A phrase MAY belong to SEVERAL themes. \"cheaper key to unlock features while self-hosting\" is both pricing and self-hosting. Assign every theme that genuinely applies, not only the best one.\n- A phrase that fits no theme gets theme_ids: [\"unassigned\"]. This is EXPECTED and useful: the unassigned share is monitored and tells the researcher when a genuinely new topic has appeared and the codebook needs extending. Never force a poor fit to keep the number down.\n- Read each theme's description before assigning, especially where two themes are deliberately close. Cost and evaluation time are different blockers: \"too expensive\" is req_pricing_relief / cmp_price_value, \"the trial was too short\" is req_trial_evaluation / cmp_trial_too_short. Never merge those.\n- Requests and complaints have separate themes. Never assign a request phrase to a cmp_ theme or the reverse.\n- Use phrase ids EXACTLY as supplied.\n- Match on meaning, not wording. Phrases in other languages belong to the same themes as their English equivalents.\n\nOUTPUT FORMAT - CRITICAL\nRAW JSON ONLY. No prose, no markdown fences, no backticks. First character { and last }.\n{\n  \"assignments\": [ { \"phrase_id\": \"\", \"theme_ids\": [\"\"] } ]\n}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "bf7e00ea-1a61-4784-9e32-4c12c60bfb19",
+      "name": "Assign Themes",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1600,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Converts the structured results into Notion blocks.\n// Notion has no markdown endpoint, so this walks the SAME `results` object the\n// email renders from rather than parsing markdown - the data was built\n// storage-agnostic precisely so a new destination needs a renderer, not a\n// rewrite.\n//\n// The score headline and the caveat sentences are read from the engine and the\n// score bundle directly, because they are prose the email builds inline rather\n// than rows inside `results`. An earlier version omitted them and the Notion\n// page silently lost the NPS headline and the no-bet share.\nconst d = $json;\nconst r = d.results || {};\nconst engine = $('Segment Contrast Engine').first().json;\nconst bundle = $('Collect Segment Scores').first().json;\nconst ov = engine.overall || {};\nconst st = engine.stats || {};\nconst overallScore = (bundle.scores || []).find((x) => x.segment_dim === 'overall');\n\nconst n = (v) => { const x = typeof v === 'string' ? Number(v) : v; return (typeof x === 'number' && isFinite(x)) ? x : 0; };\nconst num = (v) => n(v).toLocaleString('en-US');\n\nconst txt = (content) => ({ type: 'text', text: { content: String(content ?? '').slice(0, 2000) } });\nconst para = (content, opts = {}) => ({ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ ...txt(content), annotations: opts }] } });\nconst heading = (content, level) => ({ object: 'block', type: `heading_${level}`, [`heading_${level}`]: { rich_text: [txt(content)] } });\nconst callout = (content) => ({ object: 'block', type: 'callout', callout: { rich_text: [txt(content)], icon: { type: 'emoji', emoji: '\\u26A0\\uFE0F' } } });\nconst bullet = (content) => ({ object: 'block', type: 'bulleted_list_item', bulleted_list_item: { rich_text: [txt(content)] } });\nconst divider = () => ({ object: 'block', type: 'divider', divider: {} });\n\n// Notion caps nested children per request, so a long table is split into\n// several table blocks rather than failing outright. The header row is\n// repeated on each chunk so a split table still reads correctly.\nconst MAX_ROWS = 90;\nfunction table(cols, rows) {\n  if (!rows || !rows.length) return [para('Nothing to show.', { italic: true })];\n  const row = (cells) => ({ object: 'block', type: 'table_row', table_row: { cells: cells.map((c) => [txt(c)]) } });\n  const header = cols.map((c) => c.label);\n  const out = [];\n  for (let i = 0; i < rows.length; i += MAX_ROWS) {\n    const slice = rows.slice(i, i + MAX_ROWS);\n    out.push({\n      object: 'block', type: 'table',\n      table: {\n        table_width: cols.length, has_column_header: true, has_row_header: false,\n        children: [row(header), ...slice.map((x) => row(cols.map((c) => x[c.key] ?? '')))],\n      },\n    });\n  }\n  return out;\n}\n\nconst TOPIC_COLS = [{ key: 'topic', label: 'Topic' }, { key: 'mentions', label: 'Mentions' }, { key: 'share', label: 'Share' }, { key: 'sentiment', label: 'Sentiment' }, { key: 'bands', label: 'Detr / Pass / Prom' }, { key: 'note', label: 'Notes' }];\nconst THEME_COLS = [{ key: 'theme', label: 'Theme' }, { key: 'mentions', label: 'Mentions' }, { key: 'share', label: 'Share' }, { key: 'phrases', label: 'Distinct phrasings' }, { key: 'avg', label: 'Avg NPS' }, { key: 'examples', label: 'Examples' }];\nconst PILLAR_COLS = [{ key: 'bet', label: 'Strategic bet' }, { key: 'mentions', label: 'Mentions' }, { key: 'share', label: 'Share' }, { key: 'sentiment', label: 'Sentiment' }, { key: 'split', label: 'Differs by deployment' }, { key: 'note', label: 'Notes' }];\nconst SCORE_COLS = [{ key: 'dimension', label: 'Segment' }, { key: 'group', label: 'Group' }, { key: 'responses', label: 'Responses' }, { key: 'nps', label: 'NPS' }, { key: 'vs_average', label: 'vs average' }, { key: 'change', label: 'Change' }, { key: 'wrote_text', label: 'Wrote text' }, { key: 'comments', label: 'Comments' }];\nconst FINDING_COLS = [{ key: 'dimension', label: 'Segment' }, { key: 'group', label: 'Group' }, { key: 'topic', label: 'Topic' }, { key: 'direction', label: 'More/less' }, { key: 'this_group', label: 'This group' }, { key: 'everyone_else', label: 'Everyone else' }, { key: 'responses', label: 'n' }, { key: 'sig', label: 'Sig.' }, { key: 'real_effect', label: 'Survives check' }];\n\nconst th = r.themes || {};\nconst un = th.unassigned || {};\nconst blocks = [];\n\n// Space reserved at the top for the summary, written by the summary workflow.\nblocks.push(heading('Summary', 2));\nblocks.push(para('To be written.', { italic: true }));\n\nif (th.alert) {\n  const parts = [];\n  if (un.request && un.request.pct > th.alert_threshold_pct) parts.push(`${un.request.pct}% of requests`);\n  if (un.complaint && un.complaint.pct > th.alert_threshold_pct) parts.push(`${un.complaint.pct}% of complaints`);\n  blocks.push(callout(`${parts.join(' and ')} did not fit any theme in the codebook (threshold ${th.alert_threshold_pct}%). Review the unassigned rows before treating this month as final - they may need a new theme.`));\n}\nif (th.ok === false) blocks.push(callout('Theme clustering failed this run, so the request and complaint tables are empty. Everything else is unaffected.'));\n\n// The score headline, which the Notion page was missing entirely.\nif (overallScore) {\n  blocks.push(para(`NPS ${n(overallScore.nps)} from ${num(overallScore.responses)} responses \\u00b7 ${num(overallScore.promoters)} promoters, ${num(overallScore.passives)} passives, ${num(overallScore.detractors)} detractors \\u00b7 ${n(overallScore.pct_with_text)}% wrote open text.`, { bold: true }));\n}\n\nblocks.push(divider());\nblocks.push(heading('Part 1 - Everyone', 1));\nblocks.push(heading('What they talked about', 2));\nblocks.push(para(`From the ${num(ov.driver_responses)} comments with substantive text.`, { italic: true }));\nblocks.push(...table(TOPIC_COLS, r.topics));\n\nblocks.push(heading('What they asked for', 2));\nblocks.push(...table(THEME_COLS, r.requests));\nblocks.push(para('Themes come from a fixed codebook, so they mean the same thing month to month. A comment can mention more than one theme, so shares do not add up to 100% - each is the share of comments mentioning that theme.', { italic: true }));\n\nblocks.push(heading('What they struggle with', 2));\nblocks.push(para('Negative-sentiment evidence. Distinct from requests above: things people described as problems, not things they asked for.', { italic: true }));\nblocks.push(...table(THEME_COLS, r.complaints));\n\nblocks.push(heading('Strategic bets', 2));\n// The no-bet share: how much of what users said touches nothing we are betting\n// on. This was missing from the Notion page and is one of the more loaded\n// numbers in the report.\nblocks.push(para(`${num(ov.pillar_none_count)} comments (${ov.pillar_none_share_pct}%) touched no current strategic bet - cloud ${ov.pillar_none_by_deployment ? ov.pillar_none_by_deployment.cloud : 0}%, self-hosted ${ov.pillar_none_by_deployment ? ov.pillar_none_by_deployment.self_hosted : 0}%.`, { bold: true }));\nblocks.push(...table(PILLAR_COLS, r.bets));\nif ((ov.pillars || []).some((p) => p.configure_once)) {\n  blocks.push(para('\\u2020 Configure-once surface: users touch it rarely, so it generates almost no unprompted comment however important it is. A zero here is expected and is not a health signal - source these from sales, support and CS instead.', { italic: true }));\n}\nblocks.push(para('\"Differs by deployment\" is shown only where the difference survived testing. * p<0.05, ** p<0.01, *** p<0.001.', { italic: true }));\n\nblocks.push(divider());\nblocks.push(heading('Part 2 - By segment', 1));\nblocks.push(heading('Scores', 2));\nblocks.push(para('Across ALL responses including the majority who wrote nothing, so unlike the topic tables these are not distorted by the open-text writer bias.', { italic: true }));\nblocks.push(...table(SCORE_COLS, r.scores));\nblocks.push(para('Change since last month: * p<0.05, ** p<0.01, *** p<0.001. No stars means the change is within normal month-to-month variation for a group that size.', { italic: true }));\n\nblocks.push(heading('What each group talks about differently', 2));\nblocks.push(para(`Significance after Benjamini-Hochberg correction across all ${st.tests_run} comparisons. \"Survives check\" = still holds when cloud and self-hosted are looked at separately; NO means the difference is real but caused by deployment, not by this segment.`, { italic: true }));\nblocks.push(...table(FINDING_COLS, r.findings));\n\nblocks.push(divider());\nblocks.push(heading('Method and caveats', 2));\nblocks.push(para(`Themes are assigned from a fixed codebook of ${n(th.codebook_size)} curated themes; the model only assigns, it never counts and never invents a theme. Segment differences were selected by two-proportion tests in code: ${st.tests_run} comparisons run, ${st.tests_passed} survived correction. Groups under ${st.min_segment_rows} classified responses are never tested.`));\nif (st.coverage_pct < 100) {\n  blocks.push(para(`Coverage ${st.coverage_pct}%. ${num(st.uncaptured_rows)} of ${num(st.classified_rows)} comments predate segmentation capture and are excluded from Part 2.`));\n}\nblocks.push(bullet(`Part 1 covers only the ${overallScore ? n(overallScore.pct_with_text) : 0}% who wrote open text, and those people score ${overallScore ? n(overallScore.writer_bias) : 0} points higher than people who left the box empty. That does not just deflate counts, it tilts the ranking. The score tables are the unbiased part.`));\nblocks.push(bullet('Changes and gaps are different. A change is movement since last month. \"vs average\" is where a group sits relative to everyone, usually long-standing.'));\nblocks.push(bullet('NA means asked-and-unanswered, not missing. Non-response is much higher among self-hosted users, so role and company-size rows lean cloud.'));\nblocks.push(bullet('Technical skills is a cloud-only question. Every self-hosted row is NA by construction, never \"zero skills\".'));\nif (n(ov.quality && ov.quality.approx_timestamp_rows) > 0) {\n  blocks.push(bullet(`${num(ov.quality.approx_timestamp_rows)} rows carry an approximate response date (within ~12 hours), from before the pipeline captured answer time.`));\n}\nblocks.push(para(`Comments ${num(ov.driver_responses)} \\u00b7 unassigned requests ${un.request ? un.request.pct : 0}% \\u00b7 unassigned complaints ${un.complaint ? un.complaint.pct : 0}% \\u00b7 unmatched ${n(ov.quality && ov.quality.unmatched_rows)} \\u00b7 filed as Other ${n(ov.quality && ov.quality.other_rows)} \\u00b7 segmentation coverage ${st.coverage_pct}%`, { italic: true }));\n\n// Notion accepts at most 100 blocks per request, so the page is created with\n// the first chunk and the rest are appended.\nconst CHUNK = 90;\nconst chunks = [];\nfor (let i = 0; i < blocks.length; i += CHUNK) chunks.push(blocks.slice(i, i + CHUNK));\n\nconsole.log('[Notion] ' + blocks.length + ' blocks in ' + chunks.length + ' chunk(s)');\n\nreturn [{ json: {\n  title: d.title,\n  first_chunk: chunks[0] || [],\n  rest: chunks.slice(1),\n  block_count: blocks.length,\n  chunk_count: chunks.length,\n} }];"
+      },
+      "id": "620277ec-b0d3-43a7-bc53-5014bdc8528d",
+      "name": "Build Notion Blocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: '3c35b6e0-c94f-800c-8cb2-c537303e88e0' }, properties: { Name: { title: [{ text: { content: $json.title } }] } }, children: $json.first_chunk }) }}",
+        "options": {}
+      },
+      "id": "660f8ae1-4fb6-4238-81f5-49834b1637a5",
+      "name": "Create Notion Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -192,
+        208
+      ],
+      "credentials": {
+        "notionOAuth2Api": {
+          "id": "LFF9Jbbm2v2Ao4l1",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per remaining chunk, each carrying the new page id. Emits nothing\n// when the report fitted in a single request, in which case the append node\n// simply does not run.\nconst page = $json;\nconst prep = $('Build Notion Blocks').first().json;\nconst pageId = page.id;\nif (!pageId) throw new Error('Notion did not return a page id: ' + JSON.stringify(page).slice(0, 300));\nconsole.log('[Notion] page created ' + (page.url || pageId) + ', appending ' + (prep.rest || []).length + ' further chunk(s)');\nreturn (prep.rest || []).map((chunk) => ({ json: { page_id: pageId, page_url: page.url || '', children: chunk } }));"
+      },
+      "id": "bdf41977-1960-4db7-b3ae-e587557bfc55",
+      "name": "Prepare Block Appends",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/blocks/{{ $json.page_id }}/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ children: $json.children }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          }
+        }
+      },
+      "id": "2e460318-35a2-443d-9b94-a20aaa849d27",
+      "name": "Append Notion Blocks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        208
+      ],
+      "credentials": {
+        "notionOAuth2Api": {
+          "id": "LFF9Jbbm2v2Ao4l1",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "O2Co5oWJSdKtonBm",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/O2Co5oWJSdKtonBm"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "page_id": "={{ $json.page_id }}",
+            "period_label": "={{ $json.period_label }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "period_label",
+              "displayName": "period_label",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "page_id",
+              "displayName": "page_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "c17d400f-eea5-4853-a9e1-60170f9e4491",
+      "name": "Write Notion Summary",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        272,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "nps_open_text_insights",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "response_timestamp",
+              "condition": "gte",
+              "keyValue": "={{ $json.period_start }}T00:00:00Z"
+            },
+            {
+              "keyName": "response_timestamp",
+              "condition": "lte",
+              "keyValue": "={{ $json.period_end }}T23:59:59.999Z"
+            }
+          ]
+        }
+      },
+      "id": "e79543a0-b110-46f4-a081-b87e0dbd5b77",
+      "name": "Fetch Period Insights (Segmented)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2480,
+        640
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "nps_theme_codebook",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "active",
+              "condition": "eq",
+              "keyValue": "={{ true }}"
+            }
+          ]
+        }
+      },
+      "id": "95af63c7-1dc5-482a-a52d-1574076e647b",
+      "name": "Fetch Theme Codebook",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2032,
+        640
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "nps_monthly_results",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "generated_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "page_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "page_url",
+              "fieldValue": "={{ $json.url }}"
+            },
+            {
+              "fieldId": "period_label",
+              "fieldValue": "={{ $('Render Segmented Report').first().json.period_label }}"
+            },
+            {
+              "fieldId": "results_json",
+              "fieldValue": "={{ JSON.stringify(Object.assign({}, $('Render Segmented Report').first().json.results, { overall_score: $('Collect Segment Scores').first().json.scores.find(s => s.segment_dim === 'overall') || null })) }}"
+            }
+          ]
+        }
+      },
+      "id": "8df09a0a-54ae-4f8a-8f89-6ba94f25ed40",
+      "name": "Store Monthly Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "5765d517-abfc-4c92-9903-2b36c630e10a",
+      "name": "Write NPS Report Resource Node",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        136,
+        160
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.resource (id, parent_id, path, kind, source_id, title, created_at)\nSELECT gen_random_uuid(), (SELECT id FROM public.resource WHERE path = 'nps.reports'::ltree), ('nps.reports.' || lower(regexp_replace($1, '\\s+', '_', 'g')))::ltree, 'nps_report', $1, $1, now()\nON CONFLICT (path) DO NOTHING;",
+        "options": {
+          "queryReplacement": "={{ $('Render Segmented Report').first().json.period_label }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Segmented Monthly Trigger": {
+      "main": [
+        [
+          {
+            "node": "First Working Day Only (Segmented)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First Working Day Only (Segmented)": {
+      "main": [
+        [
+          {
+            "node": "Compute Segmented NPS Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Segmented NPS Scores": {
+      "main": [
+        [
+          {
+            "node": "Collect Segment Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Dimension Payloads": {
+      "main": [
+        [
+          {
+            "node": "Batch Dimensions (1 per call)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Segmented Report": {
+      "main": [
+        [
+          {
+            "node": "Email Segmented Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Notion Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dimension Prompt": {
+      "main": [
+        [
+          {
+            "node": "Narrate Segment Dimension",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Narrate Segment Dimension": {
+      "main": [
+        [
+          {
+            "node": "Parse Dimension Narration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Segment Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Narrate Segment Dimension",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Dimension Narration": {
+      "main": [
+        [
+          {
+            "node": "Batch Dimensions (1 per call)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Dimensions (1 per call)": {
+      "main": [
+        [
+          {
+            "node": "Render Segmented Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Dimension Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Theme Prompt": {
+      "main": [
+        [
+          {
+            "node": "Assign Themes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Theme Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Assign Themes",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Theme Assignments": {
+      "main": [
+        [
+          {
+            "node": "Split Dimension Payloads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Themes": {
+      "main": [
+        [
+          {
+            "node": "Parse Theme Assignments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notion Blocks": {
+      "main": [
+        [
+          {
+            "node": "Create Notion Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Notion Page": {
+      "main": [
+        [
+          {
+            "node": "Prepare Block Appends",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Monthly Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Block Appends": {
+      "main": [
+        [
+          {
+            "node": "Append Notion Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Segment Scores": {
+      "main": [
+        [
+          {
+            "node": "Fetch Period Insights (Segmented)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Period Insights (Segmented)": {
+      "main": [
+        [
+          {
+            "node": "Segment Contrast Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Segment Contrast Engine": {
+      "main": [
+        [
+          {
+            "node": "Fetch Theme Codebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Theme Codebook": {
+      "main": [
+        [
+          {
+            "node": "Build Theme Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Monthly Results": {
+      "main": [
+        [
+          {
+            "node": "Write NPS Report Resource Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write NPS Report Resource Node": {
+      "main": [
+        [
+          {
+            "node": "Write Notion Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "0fe3778a-90b6-4bb7-b7a5-fc365ef77d3a",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "sSJsP2ZRjaFCHn95",
+  "isArchived": false,
+  "nodeGroups": []
+}
