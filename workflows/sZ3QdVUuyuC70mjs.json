@@ -1,6 +1,7 @@
 {
   "id": "sZ3QdVUuyuC70mjs",
   "name": "NPS - Segmented analysis",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -445,8 +446,8 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "page_id": "={{ $json.page_id }}",
-            "period_label": "={{ $json.period_label }}"
+            "page_id": "={{ $('Store Monthly Results').item.json.page_id }}",
+            "period_label": "={{ $('Store Monthly Results').item.json.period_label }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -482,7 +483,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        272,
+        528,
         0
       ]
     },
@@ -597,14 +598,6 @@
       }
     },
     {
-      "id": "5765d517-abfc-4c92-9903-2b36c630e10a",
-      "name": "Write NPS Report Resource Node",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "position": [
-        136,
-        160
-      ],
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO public.resource (id, parent_id, path, kind, source_id, title, created_at)\nSELECT gen_random_uuid(), (SELECT id FROM public.resource WHERE path = 'nps.reports'::ltree), ('nps.reports.' || lower(regexp_replace($1, '\\s+', '_', 'g')))::ltree, 'nps_report', $1, $1, now()\nON CONFLICT (path) DO NOTHING;",
@@ -612,6 +605,14 @@
           "queryReplacement": "={{ $('Render Segmented Report').first().json.period_label }}"
         }
       },
+      "id": "5765d517-abfc-4c92-9903-2b36c630e10a",
+      "name": "Write NPS Report Resource Node",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        256,
+        0
+      ],
       "credentials": {
         "postgres": {
           "id": "Av2ehn3RdLrlzohO",
@@ -898,7 +899,7 @@
     "availableInMCP": true
   },
   "triggerCount": 1,
-  "versionId": "0fe3778a-90b6-4bb7-b7a5-fc365ef77d3a",
+  "versionId": "5acb7464-4431-478e-b253-2eeddbaedaad",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

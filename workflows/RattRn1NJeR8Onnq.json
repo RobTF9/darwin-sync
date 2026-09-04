@@ -1,0 +1,204 @@
+{
+  "id": "RattRn1NJeR8Onnq",
+  "name": "Darwin Continuous Discovery Ingest (Calendly)",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "scope": "organization",
+        "events": [
+          "invitee.created",
+          "invitee.canceled"
+        ]
+      },
+      "id": "d0721387-f82c-45c5-929f-9fddf316902f",
+      "name": "Calendly Invitee Created",
+      "type": "n8n-nodes-base.calendlyTrigger",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        96
+      ],
+      "webhookId": "cb9a0cd6-f1b4-4553-81f2-e33a2de846b8",
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "83j8w58D3WbXc0Mv",
+          "name": "Calendly account - Aniol APP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.payload || $json.body?.payload || $json;\nconst se = body.scheduled_event || body.event || {};\nconst eventTypeName = se.name || '';\n\n// Heuristic: this is meant to catch bookings made through\n// https://calendly.com/d/dz6d-wr6-6bf/research-with-n8n\n// Verify against a real webhook payload and tighten if needed (e.g. match\n// on the event_type URI's UUID instead once known).\nconst isCdBooking = /research\\s*(with)?\\s*n8n/i.test(eventTypeName);\nif (!isCdBooking) {\n  return [];\n}\n\nconst memberships = se.event_memberships || [];\nconst host = memberships[0] || {};\n\nreturn [{\n  json: {\n    externalId: se.uri || body.uri || '',\n    organizerName: host.user_name || '',\n    organizerEmail: host.user_email || '',\n    title: eventTypeName,\n    description: (body.questions_and_answers || []).map(qa => (qa.question + ': ' + qa.answer)).join('\\n'),\n    startsAt: se.start_time || '',\n    endsAt: se.end_time || '',\n    rawPayload: JSON.stringify(body),\n  }\n}];"
+      },
+      "id": "de6af0b1-1aca-4ada-b1f7-da7d1f6f40a5",
+      "name": "Extract CD Booking (if research-with-n8n)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Heuristic name match on the Calendly event type name (\"Research with n8n\" round robin). Verify field paths against a real test payload once the Calendly credential is connected -- Calendly API v2 webhook shapes can vary slightly."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO calendar_research_sessions\n  (session_type, source, external_id, organizer_name, organizer_email, title, description, starts_at, ends_at, raw_payload, updated_at)\nVALUES\n  ('continuous_discovery', 'calendly_webhook', $1, $2, $3, $4, $5, $6, $7, $8::jsonb, now())\nON CONFLICT (session_type, external_id) DO UPDATE SET\n  organizer_name = EXCLUDED.organizer_name,\n  organizer_email = EXCLUDED.organizer_email,\n  title = EXCLUDED.title,\n  description = EXCLUDED.description,\n  starts_at = EXCLUDED.starts_at,\n  ends_at = EXCLUDED.ends_at,\n  raw_payload = EXCLUDED.raw_payload,\n  updated_at = now();",
+        "options": {
+          "queryReplacement": "={{ [$json.externalId, $json.organizerName, $json.organizerEmail, $json.title, $json.description, $json.startsAt, $json.endsAt, $json.rawPayload] }}"
+        }
+      },
+      "id": "8faf60fa-8114-474d-8970-36312a4b2a52",
+      "name": "Upsert CD Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "evt1",
+              "leftValue": "={{ $json.event }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "invitee.created"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8bd86cd0-e163-4e4b-a65e-1c2dea4e57ec",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.payload || $json.body?.payload || $json;\nconst se = body.scheduled_event || body.event || {};\nconst eventTypeName = se.name || '';\n\nconst isCdBooking = /research\\s*(with)?\\s*n8n/i.test(eventTypeName);\nif (!isCdBooking) {\n  return [];\n}\n\nreturn [{\n  json: {\n    externalId: se.uri || body.uri || '',\n  }\n}];"
+      },
+      "id": "f1c5e939-7ee0-4db7-b5f6-16e16f6731f7",
+      "name": "Extract CD Cancellation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET canceled_at = now()\nWHERE session_type = 'continuous_discovery' AND external_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [$json.externalId] }}"
+        }
+      },
+      "id": "03ebbbc6-343d-4045-8425-5405ff6fa422",
+      "name": "Mark CD Session Canceled",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        192
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Calendly Invitee Created": {
+      "main": [
+        [
+          {
+            "node": "Route by Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract CD Booking (if research-with-n8n)": {
+      "main": [
+        [
+          {
+            "node": "Upsert CD Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Event Type": {
+      "main": [
+        [
+          {
+            "node": "Extract CD Booking (if research-with-n8n)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract CD Cancellation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract CD Cancellation": {
+      "main": [
+        [
+          {
+            "node": "Mark CD Session Canceled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "17cbb106-9370-41b8-a1cb-e3f17dc6ee10",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "boYztb3YTl3q49Fk",
+  "isArchived": false,
+  "nodeGroups": []
+}

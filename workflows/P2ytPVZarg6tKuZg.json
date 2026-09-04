@@ -1,0 +1,398 @@
+{
+  "id": "P2ytPVZarg6tKuZg",
+  "name": "Darwin All Research Sessions Swipe - daily",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "c737b610-4dc2-4c50-ae5d-98cff98f32a8",
+      "name": "Daily 8am Trigger (Mon-Fri)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        2160,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.email }}"
+        },
+        "returnAll": true,
+        "timeMin": "={{ $today }}",
+        "timeMax": "={{ $today.plus({ days: 1 }) }}",
+        "options": {
+          "orderBy": "startTime"
+        }
+      },
+      "id": "e18b8d27-f6a8-401e-9cbe-752d63931777",
+      "name": "Get Tomorrow Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2832,
+        352
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "Nz6ihXnCupaynaoe",
+          "name": "Rob's Calendar"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "colleagueName",
+              "type": "string",
+              "value": "={{ $('Normalize Employee Info (Daily)').item.json.name }}"
+            },
+            {
+              "id": "f2",
+              "name": "colleagueEmail",
+              "type": "string",
+              "value": "={{ $('Normalize Employee Info (Daily)').item.json.email }}"
+            },
+            {
+              "id": "f3",
+              "name": "eventTitle",
+              "type": "string",
+              "value": "={{ $json.summary }}"
+            },
+            {
+              "id": "f4",
+              "name": "eventStart",
+              "type": "string",
+              "value": "={{ $json.start?.dateTime ?? $json.start?.date ?? \"\" }}"
+            },
+            {
+              "id": "f5",
+              "name": "eventDescription",
+              "type": "string",
+              "value": "={{ $json.description ?? \"\" }}"
+            },
+            {
+              "id": "f6",
+              "name": "eventICalUID",
+              "type": "string",
+              "value": "={{ $json.iCalUID ?? \"\" }}"
+            },
+            {
+              "id": "f7",
+              "name": "organizerEmail",
+              "type": "string",
+              "value": "={{ $json.organizer?.email ?? \"\" }}"
+            },
+            {
+              "id": "f8",
+              "name": "organizerName",
+              "type": "string",
+              "value": "={{ $json.organizer?.displayName ?? $json.organizer?.email ?? \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "af0761ed-a4a6-4c7f-a661-031866a4e14e",
+      "name": "Extract Event Info (Daily)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3056,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.eventDescription }}",
+              "operator": {
+                "operation": "contains",
+                "type": "string"
+              },
+              "rightValue": "research with n8n"
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.eventDescription }}",
+              "operator": {
+                "operation": "contains",
+                "type": "string"
+              },
+              "rightValue": "n8n research"
+            },
+            {
+              "id": "174c091f-e164-49df-8f3d-b3a492d96c0a",
+              "leftValue": "={{ $json.eventDescription }}",
+              "rightValue": "research session",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "5195fd2b-6eac-4492-aa54-476891ba4492",
+      "name": "Match Research Sessions (Daily)",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        3280,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json; const people = resp.people || []; const results = []; for (const p of people) { const orgs = p.organizations || []; if (orgs.length === 0) { continue; } const email = (p.emailAddresses && p.emailAddresses[0] && p.emailAddresses[0].value) || ''; const name = (p.names && p.names[0] && p.names[0].displayName) || ''; if (email) { results.push({ json: { name: name, email: email } }); } } return results;"
+      },
+      "id": "c3c52069-4b13-4a81-9372-8aa6861f5a01",
+      "name": "Normalize Employee Info (Daily)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2608,
+        352
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://people.googleapis.com/v1/people:listDirectoryPeople",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "readMask",
+              "value": "names,emailAddresses,organizations"
+            },
+            {
+              "name": "sources",
+              "value": "DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE"
+            },
+            {
+              "name": "pageSize",
+              "value": "1000"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8d58701c-09b8-42c9-99d7-834ad21b8ccb",
+      "name": "Get Active Employees (Daily)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2384,
+        352
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "9qOBTlGp0nmv5Nbn",
+          "name": "Aniol's n8n directory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst groups = {};\nfor (const item of items) {\n  const uid = item.json.eventICalUID || (item.json.eventTitle + '|' + item.json.eventStart);\n  const isOrganizer = !!item.json.colleagueEmail && !!item.json.organizerEmail &&\n    item.json.colleagueEmail.toLowerCase() === item.json.organizerEmail.toLowerCase();\n  const candidate = { ...item.json, externalId: uid, _isOrganizer: isOrganizer };\n  const existing = groups[uid];\n  if (!existing || (isOrganizer && !existing._isOrganizer)) {\n    groups[uid] = candidate;\n  }\n}\nreturn Object.values(groups).map(g => {\n  const { _isOrganizer, ...json } = g;\n  return { json };\n});"
+      },
+      "id": "2e9a8365-0f1d-4d72-9e21-3cc21269a263",
+      "name": "Dedupe by iCalUID (Organizer Only)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3728,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO calendar_research_sessions\n  (session_type, source, external_id, organizer_name, organizer_email, title, description, starts_at, updated_at)\nVALUES\n  ('research', 'calendar_scan', $1, $2, $3, $4, $5, $6, now())\nON CONFLICT (session_type, external_id) DO UPDATE SET\n  organizer_name = EXCLUDED.organizer_name,\n  organizer_email = EXCLUDED.organizer_email,\n  title = EXCLUDED.title,\n  description = EXCLUDED.description,\n  starts_at = EXCLUDED.starts_at,\n  updated_at = now();",
+        "options": {
+          "queryReplacement": "={{ [$json.externalId, $json.organizerName, $json.organizerEmail, $json.eventTitle, $json.eventDescription, $json.eventStart] }}"
+        }
+      },
+      "id": "53e2987d-177e-47cf-8073-39e73823f3ac",
+      "name": "Upsert Research Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3952,
+        352
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  $1::text AS \"colleagueName\",\n  $2::text AS \"colleagueEmail\",\n  $3::text AS \"eventTitle\",\n  $4::text AS \"eventStart\",\n  $5::text AS \"eventDescription\",\n  $6::text AS \"eventICalUID\",\n  $7::text AS \"organizerEmail\",\n  $8::text AS \"organizerName\"\nWHERE NOT EXISTS (\n  SELECT 1 FROM calendar_research_sessions\n  WHERE session_type = 'continuous_discovery'\n    AND canceled_at IS NULL\n    AND organizer_email = $7\n    AND starts_at BETWEEN $4::timestamptz - interval '2 minutes' AND $4::timestamptz + interval '2 minutes'\n);",
+        "options": {
+          "queryReplacement": "={{ [$json.colleagueName, $json.colleagueEmail, $json.eventTitle, $json.eventStart, $json.eventDescription, $json.eventICalUID, $json.organizerEmail, $json.organizerName] }}"
+        }
+      },
+      "id": "abe2508d-dd72-4f51-8cc6-711ff107b797",
+      "name": "Check Not Continuous Discovery",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3504,
+        352
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Excludes an event iff a matching continuous_discovery row already exists (same organizer_email + starts_at, from the Calendly webhook/backfill) -- replaces the old hardcoded-description-text exclusion. Echoes back the 8 original fields via SELECT AS so Dedupe/Upsert downstream don't need to change."
+    }
+  ],
+  "connections": {
+    "Daily 8am Trigger (Mon-Fri)": {
+      "main": [
+        [
+          {
+            "node": "Get Active Employees (Daily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tomorrow Events": {
+      "main": [
+        [
+          {
+            "node": "Extract Event Info (Daily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Event Info (Daily)": {
+      "main": [
+        [
+          {
+            "node": "Match Research Sessions (Daily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Research Sessions (Daily)": {
+      "main": [
+        [
+          {
+            "node": "Check Not Continuous Discovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Employee Info (Daily)": {
+      "main": [
+        [
+          {
+            "node": "Get Tomorrow Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Employees (Daily)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Employee Info (Daily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe by iCalUID (Organizer Only)": {
+      "main": [
+        [
+          {
+            "node": "Upsert Research Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Not Continuous Discovery": {
+      "main": [
+        [
+          {
+            "node": "Dedupe by iCalUID (Organizer Only)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "f16beec0-a13f-4342-bb38-921b61c61f65",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "boYztb3YTl3q49Fk",
+  "isArchived": false,
+  "nodeGroups": []
+}

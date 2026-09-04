@@ -1,8 +1,11 @@
 {
-  "id": "PkP6YANOmg5nWxdm",
-  "name": "Aniol's Gmail account",
-  "type": "gmailOAuth2",
-  "data": {},
+  "id": "83j8w58D3WbXc0Mv",
+  "name": "Calendly account - Aniol APP",
+  "type": "calendlyOAuth2Api",
+  "data": {
+    "clientId": "",
+    "clientSecret": ""
+  },
   "ownedBy": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

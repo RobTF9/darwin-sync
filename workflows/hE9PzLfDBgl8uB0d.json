@@ -1,0 +1,190 @@
+{
+  "id": "hE9PzLfDBgl8uB0d",
+  "name": "Darwin Continuous Discovery Oneshot Backfill",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "5d9ea5a5-90e6-4c9f-932b-0ac539d5563f",
+      "name": "Run Backfill",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.calendly.com/users/me",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyOAuth2Api",
+        "options": {}
+      },
+      "id": "4badf511-7e5a-4dda-90f7-9ea3fcbe5811",
+      "name": "Get Current User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "83j8w58D3WbXc0Mv",
+          "name": "Calendly account - Aniol APP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.calendly.com/scheduled_events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "organization",
+              "value": "={{ $json.resource.current_organization }}"
+            },
+            {
+              "name": "min_start_time",
+              "value": "={{ $now.startOf('day').toISO() }}"
+            },
+            {
+              "name": "max_start_time",
+              "value": "={{ $now.plus({ days: 10 }).endOf('day').toISO() }}"
+            },
+            {
+              "name": "status",
+              "value": "active"
+            },
+            {
+              "name": "count",
+              "value": "100"
+            },
+            {
+              "name": "sort",
+              "value": "start_time:asc"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "597311bd-ee0a-46ba-a565-1860ee798871",
+      "name": "List Scheduled Events (next 10 days)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "83j8w58D3WbXc0Mv",
+          "name": "Calendly account - Aniol APP"
+        }
+      },
+      "notes": "Calendly caps this at 100 results per page; pagination is not implemented since a 10-day window for one event type is expected to stay well under that. Re-run with a narrower window / check manually if this ever needs to scale up."
+    },
+    {
+      "parameters": {
+        "jsCode": "const events = $json.collection || [];\nconst results = [];\nfor (const se of events) {\n  const name = se.name || '';\n  if (!/research\\s*(with)?\\s*n8n/i.test(name)) continue;\n  const memberships = se.event_memberships || [];\n  const host = memberships[0] || {};\n  results.push({\n    json: {\n      externalId: se.uri || '',\n      organizerName: host.user_name || '',\n      organizerEmail: host.user_email || '',\n      title: name,\n      description: '',\n      startsAt: se.start_time || '',\n      endsAt: se.end_time || '',\n      rawPayload: JSON.stringify(se),\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "4fc9754c-85b2-4a19-ba77-efd9ac87ace4",
+      "name": "Extract CD Bookings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "notes": "Same name-match heuristic as the live Calendly ingest workflow (\"Darwin CD Ingest (Calendly)\") -- keep them in sync if the heuristic ever changes."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO calendar_research_sessions\n  (session_type, source, external_id, organizer_name, organizer_email, title, description, starts_at, ends_at, raw_payload, updated_at)\nVALUES\n  ('continuous_discovery', 'calendly_backfill', $1, $2, $3, $4, $5, $6, $7, $8::jsonb, now())\nON CONFLICT (session_type, external_id) DO UPDATE SET\n  organizer_name = EXCLUDED.organizer_name,\n  organizer_email = EXCLUDED.organizer_email,\n  title = EXCLUDED.title,\n  description = EXCLUDED.description,\n  starts_at = EXCLUDED.starts_at,\n  ends_at = EXCLUDED.ends_at,\n  raw_payload = EXCLUDED.raw_payload,\n  updated_at = now();",
+        "options": {
+          "queryReplacement": "={{ [$json.externalId, $json.organizerName, $json.organizerEmail, $json.title, $json.description, $json.startsAt, $json.endsAt, $json.rawPayload] }}"
+        }
+      },
+      "id": "89d18dc9-3b22-4f00-99ce-961e1032b16b",
+      "name": "Upsert Backfilled CD Sessions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "source='calendly_backfill' so these are distinguishable from live-webhook rows. On conflict, source is intentionally NOT overwritten -- if a live webhook already captured one of these (e.g. today's earlier test bookings), it keeps its original 'calendly_webhook' provenance."
+    }
+  ],
+  "connections": {
+    "Run Backfill": {
+      "main": [
+        [
+          {
+            "node": "Get Current User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current User": {
+      "main": [
+        [
+          {
+            "node": "List Scheduled Events (next 10 days)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Scheduled Events (next 10 days)": {
+      "main": [
+        [
+          {
+            "node": "Extract CD Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract CD Bookings": {
+      "main": [
+        [
+          {
+            "node": "Upsert Backfilled CD Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "a1382bba-41af-4893-92b0-e66cf8f792d1",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "boYztb3YTl3q49Fk",
+  "isArchived": true,
+  "nodeGroups": []
+}

@@ -1,0 +1,178 @@
+{
+  "id": "YHc5x75KDweK8UQD",
+  "name": "Darwin Continuous Discovery Daily Digest",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "45a80f4b-afe7-4ae7-97ac-e0bc3c05b83e",
+      "name": "Daily 8am Trigger (Mon-Fri)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, organizer_name, organizer_email, title, starts_at\nFROM calendar_research_sessions\nWHERE session_type = 'continuous_discovery'\n  AND starts_at::date = CURRENT_DATE\n  AND notified_at IS NULL\n  AND canceled_at IS NULL\nORDER BY starts_at ASC;",
+        "options": {}
+      },
+      "id": "f391871d-2647-4f92-ae87-f905e7bbb988",
+      "name": "Get Today's CD Sessions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (rows.length === 0) return [];\n\nconst todayLabel = $today.toFormat('dd LLL yyyy');\nlet message = `*Continuous discovery sessions today, ${todayLabel}*\\n`;\nfor (const r of rows) {\n  let startLabel = 'time TBD';\n  if (r.starts_at) {\n    const dt = DateTime.fromISO(r.starts_at, { setZone: true }).setZone('Europe/Madrid');\n    const offsetMinutes = dt.offset;\n    const zoneAbbr = offsetMinutes === 120 ? 'CEST' : (offsetMinutes === 60 ? 'CET' : dt.offsetNameShort);\n    startLabel = dt.toFormat('dd LLL yyyy, HH:mm') + ', ' + zoneAbbr;\n  }\n  message += `\\n- *${r.organizer_name || r.organizer_email || 'Unknown host'}* — ${r.title || 'Continuous discovery session'} (${startLabel})`;\n}\n\nreturn [{ json: { message, ids: rows.map(r => r.id) } }];"
+      },
+      "id": "9e61e698-3c07-489e-bf14-5e1e9f778db8",
+      "name": "Build CD Digest Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "mission-user-research",
+          "mode": "name"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      },
+      "id": "8a76c6e3-8055-42b6-93e7-b6601662011a",
+      "name": "Post CD Digest",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        672,
+        0
+      ],
+      "webhookId": "0e57f316-2afb-448a-9ae2-335fb946740f",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions SET notified_at = now() WHERE id = ANY($1::uuid[]);",
+        "options": {
+          "queryReplacement": "={{ $('Build CD Digest Message').item.json.ids }}"
+        }
+      },
+      "id": "9876a2c8-35fa-40cf-9eb5-14fa177af83d",
+      "name": "Mark Notified",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 8am Trigger (Mon-Fri)": {
+      "main": [
+        [
+          {
+            "node": "Get Today's CD Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Today's CD Sessions": {
+      "main": [
+        [
+          {
+            "node": "Build CD Digest Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build CD Digest Message": {
+      "main": [
+        [
+          {
+            "node": "Post CD Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post CD Digest": {
+      "main": [
+        [
+          {
+            "node": "Mark Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "593b8bae-2473-4a7c-98fc-ad8d71c5c7eb",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "boYztb3YTl3q49Fk",
+  "isArchived": false,
+  "nodeGroups": []
+}

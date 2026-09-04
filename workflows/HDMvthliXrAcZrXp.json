@@ -1,6 +1,7 @@
 {
   "id": "HDMvthliXrAcZrXp",
   "name": "Darwin",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -102,8 +103,8 @@
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
       "typeVersion": 1.4,
       "position": [
-        -1896,
-        -488
+        -1904,
+        -496
       ],
       "credentials": {
         "postgres": {
@@ -151,8 +152,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -616,
-        -488
+        -624,
+        -496
       ]
     },
     {
@@ -168,8 +169,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -1768,
-        -488
+        -1776,
+        -496
       ],
       "credentials": {
         "postgres": {
@@ -191,8 +192,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -1640,
-        -488
+        -1648,
+        -496
       ],
       "credentials": {
         "postgres": {
@@ -240,8 +241,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1512,
-        -488
+        -1520,
+        -496
       ]
     },
     {
@@ -303,8 +304,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1384,
-        -488
+        -1392,
+        -496
       ]
     },
     {
@@ -346,8 +347,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1256,
-        -488
+        -1264,
+        -496
       ]
     },
     {
@@ -380,8 +381,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -1128,
-        -488
+        -1136,
+        -496
       ],
       "id": "974aa759-d0e4-43f2-88d8-8d9effe07836",
       "name": "drop_builder",
@@ -486,8 +487,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1000,
-        -488
+        -1008,
+        -496
       ]
     },
     {
@@ -560,8 +561,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -872,
-        -488
+        -880,
+        -496
       ]
     },
     {
@@ -623,8 +624,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -744,
-        -488
+        -752,
+        -496
       ]
     },
     {
@@ -664,8 +665,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -488,
-        -488
+        -496,
+        -496
       ]
     },
     {
@@ -707,8 +708,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -360,
-        -488
+        -368,
+        -496
       ]
     },
     {
@@ -827,8 +828,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -232,
-        -488
+        -240,
+        -496
       ]
     },
     {
@@ -890,8 +891,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -104,
-        -488
+        -112,
+        -496
       ]
     },
     {
@@ -950,8 +951,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        24,
-        -488
+        32,
+        -496
       ]
     },
     {
@@ -1106,8 +1107,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        152,
-        -488
+        160,
+        -496
       ]
     },
     {
@@ -1202,8 +1203,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.5,
       "position": [
-        -2024,
-        -488
+        -2032,
+        -496
       ],
       "id": "6bfe6118-fefa-43b6-8506-81478753a5e1",
       "name": "Fallback",
@@ -1222,8 +1223,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
       "typeVersion": 1,
       "position": [
-        -2152,
-        -488
+        -2160,
+        -496
       ],
       "id": "55df5ffa-4f9d-445a-9ffe-4b35d5fea2bf",
       "name": "Main",
@@ -1231,6 +1232,29 @@
         "openRouterApi": {
           "id": "BXBT8cTCvefRDsgP",
           "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Look up scheduled research-with-users sessions: who's running them and when. Covers BOTH kinds -- 'research' (one-off UXR interviews scheduled on internal calendars) and 'continuous_discovery' (the recurring Calendly research-with-n8n round-robin). Use for scheduling/logistics/stats questions like 'who is running research sessions this week', 'what's scheduled today', or 'how many continuous discovery sessions did we run last month' -- query this directly, do NOT use `search` for this (search looks at recorded session content/transcripts, not the schedule).\n\nCanceled sessions are excluded by default.\n\nParameters:\n- session_type (string, optional): 'research' or 'continuous_discovery'. Omit/blank to get both.\n- start_date (string, optional): ISO date YYYY-MM-DD. Defaults to today if omitted.\n- end_date (string, optional): ISO date YYYY-MM-DD, inclusive. Defaults to start_date if omitted.\n- include_canceled (string, optional): pass 'true' to include canceled sessions too (e.g. for a cancellation-stats question). Omit/blank to exclude them.",
+        "operation": "executeQuery",
+        "query": "SELECT session_type, organizer_name, organizer_email, title, starts_at, canceled_at\nFROM calendar_research_sessions\nWHERE (\n    NULLIF('{{ $fromAI(\"session_type\", \"research or continuous_discovery; omit/blank for both\", \"string\") }}', '') IS NULL\n    OR session_type = '{{ $fromAI(\"session_type\", \"research or continuous_discovery; omit/blank for both\", \"string\") }}'\n  )\n  AND (\n    NULLIF('{{ $fromAI(\"include_canceled\", \"pass true to include canceled sessions\", \"string\") }}', '') IS NOT NULL\n    OR canceled_at IS NULL\n  )\n  AND starts_at::date BETWEEN\n    COALESCE(NULLIF('{{ $fromAI(\"start_date\", \"ISO date YYYY-MM-DD, defaults to today\", \"string\") }}', '')::date, CURRENT_DATE)\n    AND\n    COALESCE(\n      NULLIF('{{ $fromAI(\"end_date\", \"ISO date YYYY-MM-DD inclusive, defaults to start_date\", \"string\") }}', '')::date,\n      COALESCE(NULLIF('{{ $fromAI(\"start_date\", \"ISO date YYYY-MM-DD, defaults to today\", \"string\") }}', '')::date, CURRENT_DATE)\n    )\nORDER BY starts_at ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.7,
+      "position": [
+        -2288,
+        -496
+      ],
+      "id": "3f308896-b4f0-437b-8ea0-baca66d3b87b",
+      "name": "get_scheduled_sessions",
+      "credentials": {
+        "postgres": {
+          "id": "eHgQKlVaUPTqb7s4",
+          "name": "Builder Supabase"
         }
       }
     }
@@ -1526,6 +1550,17 @@
           }
         ]
       ]
+    },
+    "get_scheduled_sessions": {
+      "ai_tool": [
+        [
+          {
+            "node": "darwin",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1538,7 +1573,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "38bac493-59e6-46ec-b111-b09d4267cab9",
+  "versionId": "745a24d8-dfe3-48f0-8121-85408dfdea5b",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
