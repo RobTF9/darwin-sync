@@ -1,0 +1,15 @@
+{
+  "id": "zZbEYqslfngdzziZ",
+  "name": "Notion account 3",
+  "type": "notionOAuth2Api",
+  "data": {},
+  "ownedBy": {
+    "type": "personal",
+    "projectId": "LmJG224lgqtgbrOT",
+    "projectName": "martina.perez@n8n.io Martina <martina.perez@n8n.io>",
+    "personalEmail": "martina.perez@n8n.io"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

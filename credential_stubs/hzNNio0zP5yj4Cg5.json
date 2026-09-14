@@ -1,10 +1,9 @@
 {
-  "id": "83j8w58D3WbXc0Mv",
-  "name": "Calendly account - Aniol APP",
-  "type": "calendlyOAuth2Api",
+  "id": "hzNNio0zP5yj4Cg5",
+  "name": "Qontext account",
+  "type": "qontextApi",
   "data": {
-    "clientId": "",
-    "clientSecret": ""
+    "xApiKey": ""
   },
   "ownedBy": {
     "type": "team",
