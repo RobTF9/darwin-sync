@@ -1,0 +1,16 @@
+{
+  "id": "U1kaLTDCWCWDzkTN",
+  "name": "Feedback",
+  "icon": {
+    "type": "icon",
+    "value": "globe"
+  },
+  "description": "",
+  "type": "team",
+  "owner": {
+    "type": "team",
+    "teamId": "U1kaLTDCWCWDzkTN",
+    "teamName": "Feedback"
+  },
+  "variableStubs": []
+}

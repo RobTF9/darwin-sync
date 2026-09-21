@@ -1,0 +1,207 @@
+{
+  "id": "MafaUe2kiJTFBDSK",
+  "name": "Daily Agent Insights from Darwin",
+  "description": "Daily schedule that asks the Darwin sub-workflow for new Agents-feature insights (from user research, #mission-user-research, Gong, Plain, forum) and posts the summary to #test-agent-feedback. Replaces the standalone Slack-scan-and-classify approach with ",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "e0f81193-cc51-459d-9f14-f6b5f451b36f",
+      "name": "Daily 09:00 Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "HDMvthliXrAcZrXp",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/HDMvthliXrAcZrXp",
+          "cachedResultName": "Darwin — Darwin"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chatInput": "Search recent user research sessions, Slack discussions in #mission-user-research, sales calls, support tickets, and forum posts from the past day for anything related to n8n's Agents feature (the built-in AI Agent product). Summarize the key new insights, findings, or feedback. If nothing new was found, say so briefly.",
+            "sessionId": "={{ $now.toISO() }}",
+            "channel": "C0BRV586LQZ",
+            "env": "schedule",
+            "user": "scheduled-digest"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "baseline",
+              "displayName": "baseline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "env",
+              "displayName": "env",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "user",
+              "displayName": "user",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "fan_out_row_id",
+              "displayName": "fan_out_row_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "079a98cc-b4bc-4496-bc31-b513529f173c",
+      "name": "Ask Darwin for Agent Insights",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "pageId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "3cc5b6e0c94f80adbe93d0aacb7d0e35",
+          "cachedResultName": "Agents Darwin Summary"
+        },
+        "title": "={{ $now.toFormat(\"EEEE, MMMM d, yyyy\") }}",
+        "contentType": "markdown",
+        "markdown": "={{ $json.output }}",
+        "options": {
+          "icon": "📓"
+        }
+      },
+      "id": "87074c42-9182-43e9-a120-eb45859a50de",
+      "name": "Save Summary to Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        448,
+        208
+      ],
+      "credentials": {
+        "notionOAuth2Api": {
+          "id": "zZbEYqslfngdzziZ",
+          "name": "Notion account 3"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 09:00 Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ask Darwin for Agent Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Darwin for Agent Insights": {
+      "main": [
+        [
+          {
+            "node": "Save Summary to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "feecdb79-bfa4-4a4b-80d1-17511d83b758",
+  "owner": {
+    "type": "personal",
+    "projectId": "LmJG224lgqtgbrOT",
+    "projectName": "martina.perez@n8n.io Martina <martina.perez@n8n.io>",
+    "personalEmail": "martina.perez@n8n.io"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}
