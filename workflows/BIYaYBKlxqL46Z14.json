@@ -1,0 +1,126 @@
+{
+  "id": "BIYaYBKlxqL46Z14",
+  "name": "Feedback MCP Smoke Test",
+  "description": "Throwaway smoke test: verify Slack and Drive credentials before publishing the feedback MCP server.",
+  "nodes": [
+    {
+      "id": "f72831c8-a61d-4385-b955-ac04793cd932",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "d4ae8eaf-15c6-48bc-bac1-c66766f09403",
+      "name": "Slack Search Test",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/assistant.search.context",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\": \"design feedback\", \"content_types\": [\"messages\"], \"channel_types\": [\"public_channel\", \"private_channel\"], \"limit\": 5}"
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      }
+    },
+    {
+      "id": "24326ae1-5088-485a-8a6a-3ef0386f8a84",
+      "name": "Drive Search Test",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "pageSize",
+              "value": "3"
+            },
+            {
+              "name": "q",
+              "value": "name contains \"feedback\""
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Slack Search Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Search Test": {
+      "main": [
+        [
+          {
+            "node": "Drive Search Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "922e7b44-c4d1-46b5-aed3-fc3ddb2786b1",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fxhuxPGdNIHdYUsf",
+  "isArchived": true,
+  "nodeGroups": []
+}

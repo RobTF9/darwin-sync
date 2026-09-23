@@ -1,6 +1,6 @@
 {
   "id": "WiCU0xKx5UzjGWkS",
-  "name": "uxr_sessions",
+  "name": "UXR Recruiting - Campaigns",
   "columns": [
     {
       "id": "efhFZvkVeJ1zE0jS",
@@ -27,64 +27,88 @@
       "index": 3
     },
     {
+      "id": "Tq5f60jeFQUI62KG",
+      "name": "slack_user_email",
+      "type": "string",
+      "index": 4
+    },
+    {
       "id": "Au41iMVtFFpyVP9B",
       "name": "state",
       "type": "string",
-      "index": 4
+      "index": 5
     },
     {
       "id": "5GUfLdHRiAqVEcH3",
       "name": "audience",
       "type": "string",
-      "index": 5
+      "index": 6
     },
     {
       "id": "Hprv5UkULnaXCVGs",
       "name": "filters_json",
       "type": "string",
-      "index": 6
+      "index": 7
     },
     {
       "id": "VFfF2XSfYUuk3cea",
       "name": "requested_count",
       "type": "number",
-      "index": 7
+      "index": 8
     },
     {
       "id": "fD37G47G2eTXLxB3",
       "name": "batch_id",
       "type": "string",
-      "index": 8
+      "index": 9
     },
     {
       "id": "cTxjO4T6yX3SOvvg",
       "name": "email_subject",
       "type": "string",
-      "index": 9
+      "index": 10
     },
     {
       "id": "hVFTZcQw4L1s0DZr",
       "name": "email_body",
       "type": "string",
-      "index": 10
+      "index": 11
     },
     {
       "id": "PcL4Kw0tg9wYUNL4",
       "name": "calendly_link",
       "type": "string",
-      "index": 11
+      "index": 12
     },
     {
       "id": "Jl4w0rQPcSylPJ6I",
       "name": "last_step_ts",
       "type": "string",
-      "index": 12
+      "index": 13
     },
     {
       "id": "c8vPXAyDyQHBjRUf",
       "name": "updated_at",
       "type": "string",
-      "index": 13
+      "index": 14
+    },
+    {
+      "id": "3Q2KeHDKlitKs00M",
+      "name": "calendly_options_json",
+      "type": "string",
+      "index": 15
+    },
+    {
+      "id": "aCourzkic17Rw7HK",
+      "name": "booked_count",
+      "type": "number",
+      "index": 16
+    },
+    {
+      "id": "r2SOrJ0BKaKnusfU",
+      "name": "csv_emails_json",
+      "type": "string",
+      "index": 17
     }
   ],
   "ownedBy": {
@@ -93,5 +117,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-08-07T16:56:45.637Z",
-  "updatedAt": "2026-08-07T18:17:16.842Z"
+  "updatedAt": "2026-09-23T06:47:14.767Z"
 }

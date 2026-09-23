@@ -1,0 +1,17 @@
+{
+  "id": "Ey3CHozjcBadn8Dr",
+  "name": "Giulio - Customer.io - n8n-dev - ✅ Ok to use",
+  "type": "httpHeaderAuth",
+  "data": {
+    "name": "",
+    "value": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

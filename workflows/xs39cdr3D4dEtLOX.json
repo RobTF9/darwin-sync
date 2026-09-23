@@ -1,6 +1,7 @@
 {
   "id": "xs39cdr3D4dEtLOX",
   "name": "IntegrationRun",
+  "description": "Integration suite manager: fires IntegrationDispatch in waves of 6 (Supabase pool caps at 15 clients), polls integration_results until all land (20s x 20 max), returns run summary. Call synchronously.",
   "nodes": [
     {
       "parameters": {

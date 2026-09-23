@@ -1,6 +1,7 @@
 {
   "id": "fZ6oxWLAC7XR0Rb6",
   "name": "RetrievalSlackDispatch",
+  "description": "Retrieval eval worker (Slack transport): runs ONE case through the REAL Slack path — posts each turn as Rob @mentioning the Darwin bot (threaded), polls reactions for the ✅ completion signal, then captures the bot's thread reply plus tool calls/observatio",
   "nodes": [
     {
       "parameters": {
@@ -27,7 +28,7 @@
       "typeVersion": 1.2,
       "position": [
         -640,
-        304
+        64
       ]
     },
     {
@@ -52,7 +53,7 @@
       "typeVersion": 1,
       "position": [
         -416,
-        304
+        64
       ],
       "credentials": {
         "supabaseApi": {
@@ -71,7 +72,7 @@
       "typeVersion": 2,
       "position": [
         -192,
-        304
+        64
       ]
     },
     {
@@ -92,8 +93,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        32,
-        608
+        480,
+        -224
       ],
       "webhookId": "8c078900-0d96-4238-8aa5-c02a02ede278",
       "credentials": {
@@ -105,27 +106,27 @@
     },
     {
       "parameters": {
+        "operation": "getAll",
+        "tableId": "agent_trace",
+        "returnAll": true,
+        "matchType": "allFilters",
         "filters": {
           "conditions": [
             {
-              "condition": "eq",
               "keyName": "session_id",
+              "condition": "eq",
               "keyValue": "={{ $('Final Ts').first().json.thread_ts }}"
             }
           ]
-        },
-        "matchType": "allFilters",
-        "operation": "getAll",
-        "returnAll": true,
-        "tableId": "agent_trace"
+        }
       },
       "id": "61edcc84-2801-4e5f-87ed-2c6ca0930b20",
       "name": "Fetch Trace",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        256,
-        608
+        928,
+        -224
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -144,8 +145,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        480,
-        608
+        1152,
+        -224
       ]
     },
     {
@@ -157,8 +158,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        704,
-        608
+        1376,
+        -224
       ]
     },
     {
@@ -222,8 +223,8 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        928,
-        608
+        1600,
+        -224
       ],
       "credentials": {
         "supabaseApi": {
@@ -262,7 +263,7 @@
       "typeVersion": 2.3,
       "position": [
         256,
-        304
+        64
       ]
     },
     {
@@ -284,7 +285,7 @@
       "typeVersion": 2.3,
       "position": [
         480,
-        208
+        -32
       ],
       "webhookId": "289229fb-81d4-4e50-8720-96629bdbd1a1",
       "credentials": {
@@ -320,7 +321,7 @@
       "typeVersion": 3.5,
       "position": [
         704,
-        304
+        64
       ]
     },
     {
@@ -347,7 +348,7 @@
       "typeVersion": 2.3,
       "position": [
         480,
-        400
+        160
       ],
       "webhookId": "07231d3a-a629-4def-a22e-51f7158c879f",
       "credentials": {
@@ -367,7 +368,7 @@
       "typeVersion": 3,
       "position": [
         32,
-        304
+        64
       ]
     },
     {
@@ -380,7 +381,7 @@
       "typeVersion": 1.1,
       "position": [
         928,
-        304
+        64
       ],
       "webhookId": "4f1dd732-a333-4553-9c12-e35fcd9aed9d"
     },
@@ -397,7 +398,7 @@
       "typeVersion": 4.5,
       "position": [
         1152,
-        304
+        -32
       ],
       "credentials": {
         "slackApi": {
@@ -416,7 +417,7 @@
       "typeVersion": 2,
       "position": [
         1376,
-        304
+        -32
       ]
     },
     {
@@ -458,7 +459,7 @@
       "typeVersion": 2.3,
       "position": [
         1600,
-        304
+        192
       ]
     },
     {
@@ -470,8 +471,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -192,
-        608
+        256,
+        -224
       ]
     },
     {
@@ -486,8 +487,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        480,
-        720
+        704,
+        -224
       ],
       "credentials": {
         "slackApi": {
@@ -724,7 +725,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "dd51cc97-0462-4db3-8795-ea6a45717f92",
+  "versionId": "bf762ad1-425c-454d-ae8e-e621110540a8",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

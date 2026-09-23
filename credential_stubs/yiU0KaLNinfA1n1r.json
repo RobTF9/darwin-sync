@@ -1,0 +1,16 @@
+{
+  "id": "yiU0KaLNinfA1n1r",
+  "name": "Giulio - Calendly - UXR Recruiting",
+  "type": "calendlyApi",
+  "data": {
+    "apiKey": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

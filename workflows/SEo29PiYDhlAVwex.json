@@ -1,0 +1,187 @@
+{
+  "id": "SEo29PiYDhlAVwex",
+  "name": "Test Suites MCP",
+  "description": "MCP server that exposes the Darwin test suites as tools: run_integration_suite (IntegrationRun) and run_retrieval_suite (RetrievalRun).",
+  "nodes": [
+    {
+      "id": "14538edc-c408-478c-8cd0-fb706b1f2a2b",
+      "name": "Test Suites MCP Server",
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        112
+      ],
+      "parameters": {
+        "path": "test-suites",
+        "instructions": "Test suite runners for the Darwin agent. run_integration_suite checks tool routing and tool results through the agent (integration_cases). run_retrieval_suite scores retrieval quality through the agent (retrieval_cases). Both run synchronously, write results to the shared testing Supabase project, and post reports to Slack. Prefer one run at a time.",
+        "authentication": "n8nOAuth2"
+      },
+      "webhookId": "5139af08-b39d-44b9-b831-30dda220b1f8"
+    },
+    {
+      "id": "37399d5a-a387-4b7f-afc7-91b042cd0b06",
+      "name": "run_integration_suite",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        16,
+        336
+      ],
+      "parameters": {
+        "description": "Runs the Darwin integration test suite (IntegrationRun). Executes every enabled case in integration_cases through the agent, evaluates assertions, writes integration_results, and posts a summary to Slack (#C09DRCJLQCE). Runs synchronously — a full run takes 2-5 minutes. Returns the Slack post result. Input: requested_by (who or what asked for the run).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "xs39cdr3D4dEtLOX"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requested_by": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('requested_by', 'Who or what requested this run, e.g. mcp or a user name.') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      }
+    },
+    {
+      "id": "322f010a-a740-415a-a766-5aaf5f991cf8",
+      "name": "run_retrieval_suite",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        144,
+        336
+      ],
+      "parameters": {
+        "description": "Runs the Darwin retrieval eval suite (RetrievalRun). Executes retrieval_cases through the agent, scores them, writes retrieval_results, and posts a report to Slack (#C09DRCJLQCE). Runs synchronously — a full run takes 5-10 minutes. Inputs (all optional): requested_by; category (multi-turn | source-specific | broad | time-bound | structure); slug (one case); transport (direct | slack, default direct); channel_id (Slack channel for slack-transport threads, default C0BQH5S6P1P); bot_id (Darwin bot user, env-aware default).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "9aoqb4qULHyuLs1K"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requested_by": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('requested_by', 'Who or what requested this run, e.g. mcp or a user name.') }}",
+            "category": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('category', 'Optional case category filter: multi-turn, source-specific, broad, time-bound, structure. Empty = all.') }}",
+            "slug": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('slug', 'Optional single case slug to run. Empty = all.') }}",
+            "transport": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('transport', 'direct (sub-workflow call) or slack (real Slack thread). Empty = direct.') }}",
+            "channel_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('channel_id', 'Slack channel ID for slack transport threads. Empty = default C0BQH5S6P1P.') }}",
+            "bot_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('bot_id', 'Darwin bot user ID to mention for slack transport. Empty = env default.') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "slug",
+              "displayName": "slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "transport",
+              "displayName": "transport",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "bot_id",
+              "displayName": "bot_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "run_integration_suite": {
+      "ai_tool": [
+        [
+          {
+            "node": "Test Suites MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "run_retrieval_suite": {
+      "ai_tool": [
+        [
+          {
+            "node": "Test Suites MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "fa3d6b5b-75f1-4933-9a05-39a24a0dc1a7",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fxhuxPGdNIHdYUsf",
+  "isArchived": false,
+  "nodeGroups": []
+}

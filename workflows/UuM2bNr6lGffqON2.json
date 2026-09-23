@@ -1,6 +1,7 @@
 {
   "id": "UuM2bNr6lGffqON2",
   "name": "IntegrationDispatch",
+  "description": "Integration suite worker: runs ONE case from Supabase integration_cases (calls Darwin or Builder per case.agent), evaluates deterministic assertions, inserts into integration_results. Inputs: run_id, case_id.",
   "nodes": [
     {
       "parameters": {

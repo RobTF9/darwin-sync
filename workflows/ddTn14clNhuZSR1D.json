@@ -1,6 +1,7 @@
 {
   "id": "ddTn14clNhuZSR1D",
   "name": "IntegrationNotifier",
+  "description": "Polls Darwin Integration Results until all cases for a run complete (or 15 polls), then posts the suite summary to the Slack thread. Mirrors EvalNotifier.",
   "nodes": [
     {
       "id": "e8952666-6d5d-44f7-8bd7-ed11e4517df9",

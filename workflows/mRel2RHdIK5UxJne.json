@@ -1,6 +1,7 @@
 {
   "id": "mRel2RHdIK5UxJne",
   "name": "CaseUpdate",
+  "description": "Updates description/inputs/assertions of a test case in either suite. Inputs: suite (integration|unit), case_id, description, inputs, assertions.",
   "nodes": [
     {
       "id": "4ce84630-b238-43ec-8c29-336308c34b7c",

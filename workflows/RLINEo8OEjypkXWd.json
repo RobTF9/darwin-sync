@@ -1,6 +1,7 @@
 {
   "id": "RLINEo8OEjypkXWd",
   "name": "IntegrationRead",
+  "description": "Reads Integration suite cases or results. Inputs: table (cases|results), optional case_id and run_id filters.",
   "nodes": [
     {
       "id": "db120c1d-92ba-433d-9180-f14477e9ef00",

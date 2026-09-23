@@ -1,0 +1,18 @@
+{
+  "id": "b66BIk4uP8j5TIqI",
+  "name": "Giulio - Customer.io - n8n-dev - ✅ Ok to use",
+  "type": "customerIoApi",
+  "data": {
+    "trackingApiKey": "",
+    "trackingSiteId": "",
+    "appApiKey": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

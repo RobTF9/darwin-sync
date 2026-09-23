@@ -1,6 +1,7 @@
 {
   "id": "URjTWV9UaE5sbON1",
   "name": "RetrievalDispatch",
+  "description": "Retrieval eval worker: runs ONE case from Supabase retrieval_cases through the Darwin agent (replaying context_messages into the same session for multi-turn cases), captures raw output + tool calls + intermediateSteps, inserts into retrieval_results with ",
   "nodes": [
     {
       "parameters": {

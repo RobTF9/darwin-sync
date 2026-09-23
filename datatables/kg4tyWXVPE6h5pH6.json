@@ -1,6 +1,6 @@
 {
   "id": "kg4tyWXVPE6h5pH6",
-  "name": "uxr_candidates",
+  "name": "UXR Recruiting - Candidates",
   "columns": [
     {
       "id": "pLqNynistKJTSsHQ",
@@ -43,6 +43,18 @@
       "name": "sent_at",
       "type": "string",
       "index": 6
+    },
+    {
+      "id": "kNMhgBDNfZQmjduM",
+      "name": "booked_at",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "lpjsrsquAZ8mxNhk",
+      "name": "researcher_email",
+      "type": "string",
+      "index": 8
     }
   ],
   "ownedBy": {
@@ -51,5 +63,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-08-07T16:56:48.226Z",
-  "updatedAt": "2026-08-07T18:17:17.242Z"
+  "updatedAt": "2026-09-23T07:30:34.992Z"
 }

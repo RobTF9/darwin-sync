@@ -1,6 +1,7 @@
 {
   "id": "9aoqb4qULHyuLs1K",
   "name": "RetrievalRun",
+  "description": "Retrieval eval manager: fires RetrievalDispatch in waves of 6 (Supabase pool caps at 15 clients), polls retrieval_results until all land (20s x 20 max), returns run summary. Optional inputs: category, slug to filter cases. Call synchronously.",
   "nodes": [
     {
       "parameters": {
@@ -553,7 +554,7 @@
     "availableInMCP": true,
     "binaryMode": "separate",
     "callerPolicy": "workflowsFromAList",
-    "callerIds": "StNrgWTWe5ck6piK"
+    "callerIds": "SEo29PiYDhlAVwex"
   },
   "triggerCount": 0,
   "versionId": "19387ee5-5c0c-4180-ad9e-ade8db793df7",

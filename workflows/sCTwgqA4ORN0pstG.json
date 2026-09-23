@@ -1,6 +1,7 @@
 {
   "id": "sCTwgqA4ORN0pstG",
   "name": "CaseDelete",
+  "description": "Deletes a test case from the Supabase testing project (kwhfkeyvgyjahzyvdanw) test_cases table by case_id. Input: case_id (string). Returns { deleted: true, case_id }.",
   "nodes": [
     {
       "id": "8b65dc7a-ca15-4354-9eb9-619434895252",

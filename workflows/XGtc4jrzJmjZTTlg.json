@@ -1,6 +1,7 @@
 {
   "id": "XGtc4jrzJmjZTTlg",
   "name": "ResultsDigest",
+  "description": "Unified orchestrator: runs Unit, Eval, Integration, then Chaos sequentially. Uses default output connections (output 0) for ExecuteWorkflow nodes.",
   "nodes": [
     {
       "parameters": {

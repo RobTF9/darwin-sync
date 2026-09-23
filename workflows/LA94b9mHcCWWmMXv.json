@@ -1,6 +1,7 @@
 {
   "id": "LA94b9mHcCWWmMXv",
   "name": "IntegrationCreate",
+  "description": "Adds a case to the Darwin Integration Cases table. Inputs: case_id, target_type (workflow|sql), target, agent, description, inputs (JSON string), assertions (JSON string).",
   "nodes": [
     {
       "id": "14c1b992-e77d-4b41-a465-76da390e36ab",

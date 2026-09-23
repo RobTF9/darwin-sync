@@ -1,0 +1,18 @@
+{
+  "id": "4xgehQnKp4Y5flIf",
+  "name": "SMTP Mailgun n8n official (use it with \"info.n8n.io\")",
+  "type": "smtp",
+  "data": {
+    "user": "",
+    "password": "",
+    "host": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}
