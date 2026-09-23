@@ -1,6 +1,7 @@
 {
   "id": "eOzrb3rELoBFXFwJ",
   "name": "PlainSearch",
+  "description": "Darwin agent sub-workflow. Embeds a query (OpenAI text-embedding-3-large, 3072 dims), searches the Supabase `plain` vector store via match_plain (top 5), enriches each result with company name (Plain API, company-only, no PII) and a Plain thread deep-link",
   "nodes": [],
   "connections": {},
   "settings": {

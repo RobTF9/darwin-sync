@@ -1,6 +1,7 @@
 {
   "id": "Wh2HLGiO0gVJ1mO2",
   "name": "SessionEmails",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -8,7 +9,7 @@
           "values": [
             {
               "name": "session_ids",
-              "type": "array"
+              "type": "string"
             }
           ]
         }
@@ -253,10 +254,11 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "956b5590-aaf5-495a-a0f7-ef79384c0e17",
+  "versionId": "eb65fa8e-eef8-44b0-b509-b5cf875beb0b",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

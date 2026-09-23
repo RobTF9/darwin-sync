@@ -1,6 +1,7 @@
 {
   "id": "ZMyr5DWlrfXlhhKs",
   "name": "Builder",
+  "description": "Builder agent (SonOfDarwin on staging): builds, modifies, tests, and diagnoses n8n workflows via the n8n MCP tools. Called by Darwin Core's manage_system tool and by Slack Entry's builder-channel route.",
   "nodes": [
     {
       "parameters": {
@@ -162,31 +163,6 @@
         "firecrawlApi": {
           "id": "esiKcQ7aTvw37IJj",
           "name": "New firecrawl"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "value": "claude-opus-4-8",
-          "mode": "list",
-          "cachedResultName": "Claude Opus 4.8"
-        },
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.5,
-      "position": [
-        848,
-        224
-      ],
-      "id": "255e942a-f796-4722-8d29-9c0bdb735fcf",
-      "name": "Opus 4.8",
-      "credentials": {
-        "anthropicApi": {
-          "id": "KjwErAoYcKCgdksp",
-          "name": "Anthropic"
         }
       }
     },
@@ -373,6 +349,26 @@
         1600,
         -16
       ]
+    },
+    {
+      "parameters": {
+        "model": "z-ai/glm-5.2",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        432
+      ],
+      "id": "6b17bff6-a376-4b77-81dd-a2cd4cff1810",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "BXBT8cTCvefRDsgP",
+          "name": "OpenRouter account"
+        }
+      }
     }
   ],
   "connections": {
@@ -426,17 +422,6 @@
           {
             "node": "Builder Agent",
             "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Opus 4.8": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Builder Agent",
-            "type": "ai_languageModel",
             "index": 0
           }
         ]
@@ -518,6 +503,17 @@
           }
         ]
       ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Builder Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -530,13 +526,13 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "097ac256-20c2-4c38-a4be-1e9ade0d3c52",
+  "versionId": "f605e792-51ae-4b7c-80f2-24fbc612cc28",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
   "parentFolderId": "DTre4lbkGJubF43l",
-  "isArchived": false,
+  "isArchived": true,
   "nodeGroups": []
 }

@@ -1,6 +1,7 @@
 {
   "id": "dLWwo63SMOZqfYfJ",
   "name": "Browse",
+  "description": "Sub-workflow tool for the Darwin agent: `ls` over the resource tree. Chunk leaves are excluded by default (units carry child_chunks counts) — pass include_chunks: true to list them. Rows capped at 200; check total_matching for truncation.",
   "nodes": [
     {
       "id": "b93516dc-d6ab-4243-9e9a-b960ef81c30d",

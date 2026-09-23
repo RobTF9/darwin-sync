@@ -1,6 +1,7 @@
 {
   "id": "MS14Oksst5sZnjiK",
   "name": "ProjectUpdate",
+  "description": "Agent tool sub-workflow that updates an existing project row in Supabase. Validates a required projectId and any provided fields (script, name, type — type checked against the 8-value whitelist), sends only the provided fields via a Supabase update filter",
   "nodes": [
     {
       "parameters": {
@@ -154,7 +155,8 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
   "versionId": "65dc2a92-2bb7-4bf7-9474-009b722122f3",

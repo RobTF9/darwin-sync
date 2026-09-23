@@ -1,6 +1,7 @@
 {
   "id": "cLfiqVMDnmNppMaG",
   "name": "SessionQuestionWorker",
+  "description": "Sub-workflow tool that answers a single research question against one session's transcript+profile using gpt-4.1-mini (JSON: answer/reasoning/relevant), then updates the session_question row to 'complete' — or 'error' with the error message if the LLM fai",
   "nodes": [
     {
       "id": "119c87f5-bc8d-4c2f-bf04-d3384d2f855f",

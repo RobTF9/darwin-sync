@@ -1,6 +1,7 @@
 {
   "id": "6lVlut82xPoebENQ",
   "name": "FanOut",
+  "description": "Generic fan-out orchestrator: takes an items array + instruction, dispatches one Darwin sub-agent run per item in parallel waves, polls until complete, returns aggregated results. Replaces ask_all_sessions/SessionQuestion.",
   "nodes": [
     {
       "parameters": {

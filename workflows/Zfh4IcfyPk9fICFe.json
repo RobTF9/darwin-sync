@@ -1,6 +1,7 @@
 {
   "id": "Zfh4IcfyPk9fICFe",
   "name": "GetResourceContext",
+  "description": "Sub-workflow tool for the Darwin agent: bounded drill-in for any search hit, addressed by its resource-tree path. Transcript windows for sessions, sibling chunks for gong calls, full threads for plain/slack, clips+linked sessions for jobs/opportunities, p",
   "nodes": [
     {
       "id": "cfa967f6-36ff-4409-98cf-b7a8f9c2c4de",

@@ -1,6 +1,7 @@
 {
   "id": "TvvDElh9iRoPoU7B",
   "name": "GongCallDetail",
+  "description": "Sub-workflow tool for the Darwin agent. Fetches a single Gong call by call_id from BigQuery (n8n-telemetry.gong.gong_calls) and returns a PII-filtered payload: parties reduced to speakerId+affiliation only, no names/emails/phones, no meetingUrl.",
   "nodes": [
     {
       "parameters": {

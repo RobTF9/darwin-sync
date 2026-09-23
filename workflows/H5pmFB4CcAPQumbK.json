@@ -1,6 +1,7 @@
 {
   "id": "H5pmFB4CcAPQumbK",
   "name": "SessionQuestion",
+  "description": "Parent orchestrator: takes a question, fetches approved sessions from Supabase, creates session_question tracking rows, fan-out dispatches each session to SessionQuestionWorker (fire-and-forget), polls until all rows complete, then returns aggregated resu",
   "nodes": [
     {
       "parameters": {

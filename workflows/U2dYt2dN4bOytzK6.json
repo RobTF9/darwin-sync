@@ -1,6 +1,7 @@
 {
   "id": "U2dYt2dN4bOytzK6",
   "name": "ProjectCreate",
+  "description": "Agent tool sub-workflow that creates a new research project: validates inputs, generates a UX research script (Claude Sonnet 4.6), creates a Google Drive folder, inserts a Supabase project row, and returns project links.",
   "nodes": [
     {
       "parameters": {
