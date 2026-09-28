@@ -1,0 +1,201 @@
+{
+  "id": "wL0G1b92guL0b7Iw",
+  "name": "UXR Calendly Probe [scratch]",
+  "description": null,
+  "nodes": [
+    {
+      "id": "197cb635-31c8-4bad-8d2f-a340bf4292c8",
+      "name": "Probe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "uxr-calendly-probe",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "d35530b8-b2c2-44ea-9c82-1d3d7c2754de"
+    },
+    {
+      "id": "9f33b33d-d25b-4f15-b895-6df4c47e33e9",
+      "name": "Calendly Me",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.calendly.com/users/me",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "ijutlu3XwjDml6uu",
+          "name": "Calendly account"
+        },
+        "calendlyApi": {
+          "id": "yiU0KaLNinfA1n1r",
+          "name": "Giulio - Calendly - UXR Recruiting"
+        }
+      }
+    },
+    {
+      "id": "ef71755c-0ccc-4e57-9806-d96a0ad6da41",
+      "name": "Org Membership By Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ \"https://api.calendly.com/organization_memberships?organization=\" + encodeURIComponent($json.body.resource.current_organization) + \"&email=\" + encodeURIComponent($('Probe Webhook').first().json.body.email || $json.body.resource.email) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "ijutlu3XwjDml6uu",
+          "name": "Calendly account"
+        },
+        "calendlyApi": {
+          "id": "yiU0KaLNinfA1n1r",
+          "name": "Giulio - Calendly - UXR Recruiting"
+        }
+      }
+    },
+    {
+      "id": "0bcc21d7-57f6-4b8c-8fff-bdd7f8dfddd2",
+      "name": "Event Types For User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ \"https://api.calendly.com/event_types?active=true&user=\" + encodeURIComponent((($json.body.collection || [])[0] || {}).user && (($json.body.collection || [])[0] || {}).user.uri || $('Calendly Me').first().json.body.resource.uri) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "ijutlu3XwjDml6uu",
+          "name": "Calendly account"
+        },
+        "calendlyApi": {
+          "id": "yiU0KaLNinfA1n1r",
+          "name": "Giulio - Calendly - UXR Recruiting"
+        }
+      }
+    },
+    {
+      "id": "644b68fd-ca3f-46da-bb85-5be728ae616f",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "respondWith": "allIncomingItems"
+      }
+    }
+  ],
+  "connections": {
+    "Probe Webhook": {
+      "main": [
+        [
+          {
+            "node": "Calendly Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendly Me": {
+      "main": [
+        [
+          {
+            "node": "Org Membership By Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Org Membership By Email": {
+      "main": [
+        [
+          {
+            "node": "Event Types For User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Types For User": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "d64f1dfb-58de-4d67-a305-d4eaff9bd93d",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "FfjFJ1a0edUECSdp",
+  "isArchived": false,
+  "nodeGroups": []
+}

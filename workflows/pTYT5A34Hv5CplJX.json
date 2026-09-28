@@ -1,34 +1,23 @@
 {
   "id": "pTYT5A34Hv5CplJX",
   "name": "UXR Send & Stamp",
+  "description": "Workflow C: sends invite emails to staged uxr_candidates by batch_id (SMTP, plain text) and stamps last_user_research_invite_date on Customer.io (Track API, _update true). test_mode overrides recipients and skips stamping. Credentials pending.",
   "nodes": [
     {
-      "id": "8cf1582e-c31e-4fe4-9a3e-14fbf6cbe308",
-      "name": "When Called",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ],
       "parameters": {
         "workflowInputs": {
           "values": [
             {
-              "name": "batch_id",
-              "type": "string"
+              "name": "batch_id"
             },
             {
-              "name": "email_subject",
-              "type": "string"
+              "name": "email_subject"
             },
             {
-              "name": "email_body",
-              "type": "string"
+              "name": "email_body"
             },
             {
-              "name": "calendly_url",
-              "type": "string"
+              "name": "calendly_url"
             },
             {
               "name": "test_mode",
@@ -36,38 +25,37 @@
             }
           ]
         }
-      }
+      },
+      "id": "8cf1582e-c31e-4fe4-9a3e-14fbf6cbe308",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        96
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const j = $('When Called').first().json || {};\nconst cfg = $('Load Config').first().json || {};\n\n// SAFETY SWITCH: only liveMode === true (boolean) in UXR Config allows real sends. False, missing, a string, anything else = test mode.\nconst liveMode = cfg.liveMode === true;\nconst forcedTest = !liveMode;\nconst testMode = forcedTest || j.test_mode === true || j.test_mode === 'true';\nconst testRecipient = String(cfg.testRecipient || 'g.andreini@gmail.com');\nconst testMax = Number(cfg.testMaxRecipients) || 3;\n\nconst batchId = (j.batch_id || '').toString().trim();\nconst body = (j.email_body || cfg.emailBody || '').toString();\nconst subject = (j.email_subject || cfg.emailSubject || 'Invitation: Help us improve n8n').toString();\nconst calendly = (j.calendly_url || '').toString().trim();\n\nlet error = null;\nif (!batchId) error = 'Missing batch_id.';\nelse if (!body) error = 'Missing email_body.';\nelse if (body.indexOf('{{calendly_link}}') !== -1 && !calendly) error = 'The email body contains {{calendly_link}} but no calendly_url was provided. Refusing to send.';\nelse if (testMode && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(testRecipient)) error = 'Test mode is on but testRecipient in UXR Config is not a valid email. Refusing to send.';\n\nreturn [{ json: {\n  valid: !error, error,\n  batch_id: batchId, email_subject: subject, email_body: body, calendly_url: calendly,\n  test_mode: testMode, forced_test: forcedTest, live_mode: liveMode,\n  test_recipient: testRecipient, test_max: testMax,\n  from_email: String(cfg.fromEmail || 'n8n Research <noreply@info.n8n.io>'),\n  reply_to: String(cfg.replyTo || 'design@n8n.io'),\n  cooldown_field: String(cfg.cooldownField || 'last_user_research_invite_date'),\n  cooldown_days: Number(cfg.cooldownDays) || 60\n} }];"
+      },
       "id": "de68744d-06eb-4c0a-935a-25700bb2bf3d",
       "name": "Validate Send",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
-        0
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const j = $input.first().json;\nconst batchId = (j.batch_id || '').toString().trim();\nconst body = (j.email_body || '').toString();\nconst calendly = (j.calendly_url || '').toString().trim();\nconst testMode = j.test_mode === true || j.test_mode === 'true';\nlet error = null;\nif (!batchId) error = 'Missing batch_id.';\nelse if (!body) error = 'Missing email_body.';\nelse if (body.indexOf('{{calendly_link}}') !== -1 && !calendly) error = 'The email body contains {{calendly_link}} but no calendly_url was provided. Refusing to send.';\nreturn [{ json: { valid: !error, error: error, batch_id: batchId, email_subject: (j.email_subject || 'Invitation: Help us improve n8n').toString(), email_body: body, calendly_url: calendly, test_mode: testMode } }];"
-      }
+        448,
+        96
+      ]
     },
     {
-      "id": "ab1ab7c4-aa1b-4510-aee1-d2f51d482c5d",
-      "name": "Input Valid?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        448,
-        0
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "loose",
+            "version": 1
           },
           "conditions": [
             {
@@ -80,76 +68,74 @@
             }
           ],
           "combinator": "and"
-        }
-      }
-    },
-    {
-      "id": "73e09aa2-105f-4f8e-afac-5af64609f1bf",
-      "name": "Get Staged Candidates",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
+        },
+        "options": {}
+      },
+      "id": "ab1ab7c4-aa1b-4510-aee1-d2f51d482c5d",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
         672,
-        -100
-      ],
+        96
+      ]
+    },
+    {
       "parameters": {
-        "resource": "row",
         "operation": "get",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
+          "mode": "list",
           "value": "kg4tyWXVPE6h5pH6",
-          "cachedResultName": "uxr_candidates"
+          "cachedResultName": "UXR Recruiting - Candidates",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/kg4tyWXVPE6h5pH6"
         },
         "matchType": "allConditions",
         "filters": {
           "conditions": [
             {
               "keyName": "batch_id",
-              "condition": "eq",
               "keyValue": "={{ $('Validate Send').first().json.batch_id }}"
             },
             {
               "keyName": "status",
-              "condition": "eq",
               "keyValue": "staged"
             }
           ]
         },
         "returnAll": true
       },
+      "id": "73e09aa2-105f-4f8e-afac-5af64609f1bf",
+      "name": "Get Staged Candidates",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
       "alwaysOutputData": true
     },
     {
+      "parameters": {
+        "jsCode": "const v = $('Validate Send').first().json;\nconst staged = $('Get Staged Candidates').all().map(i => i.json).filter(r => r && r.email);\n// Cooldown evidence: rows sent (status sent) plus rows booked. Two reads, one per status (the Data Table node cannot OR reliably).\nconst recentRows = $('Get Recently Sent').all().map(i => i.json).concat($input.all().map(i => i.json)).filter(r => r && r.email && (r.status === 'sent' || r.status === 'booked'));\n\n// DUPLICATE GUARD 1: emails already invited within the cooldown window, from the Candidates table.\n// Covers the gap before the Customer.io cooldown segment refreshes and rows that were sent but not stamped.\n// A booked row without sent_at (booked through a shared/test link) counts from booked_at; a row with no usable date is ignored, not blocked forever.\nconst cutoff = Date.now() - (Number(v.cooldown_days) || 60) * 24 * 60 * 60 * 1000;\nconst recentlySent = new Set();\nfor (const r of recentRows) {\n  const t = r.sent_at ? Date.parse(r.sent_at) : (r.booked_at ? Date.parse(r.booked_at) : NaN);\n  if (Number.isFinite(t) && t >= cutoff) recentlySent.add(String(r.email).trim().toLowerCase());\n}\n\n// DUPLICATE GUARD 2: the same email twice inside this batch (two Customer.io profiles sharing an address).\nconst seen = new Set();\nconst items = [];\nfor (const r of staged) {\n  const key = String(r.email).trim().toLowerCase();\n  let attrs = {};\n  try { attrs = JSON.parse(r.attributes_json || '{}'); } catch (e) { attrs = {}; }\n  if (!attrs || typeof attrs !== 'object') attrs = {};\n  const cioId = attrs.cio_id || attrs.id || '';\n  const base = { row_id: r.id, email: r.email, cio_id: cioId, test_mode: v.test_mode === true, from_email: v.from_email, reply_to: v.reply_to, cooldown_field: v.cooldown_field };\n  // Exactly one mailbox per row: 'a@x.com,b@y.com' would reach SMTP as two recipients\n  if (!/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(key)) { items.push({ ...base, skip: true, skip_reason: 'invalid email address' }); continue; }\n  if (recentlySent.has(key)) { items.push({ ...base, skip: true, skip_reason: 'already invited within the last ' + v.cooldown_days + ' days (Candidates table)' }); continue; }\n  if (seen.has(key)) { items.push({ ...base, skip: true, skip_reason: 'same email appears twice in this batch' }); continue; }\n  seen.add(key);\n  items.push({ ...base, skip: false });\n}\n\n// Test mode: cap the real sends, but keep skipped rows so they get marked\nlet toSend = items.filter(i => !i.skip);\nconst skipped = items.filter(i => i.skip);\nif (v.test_mode === true) toSend = toSend.slice(0, v.test_max);\nif (toSend.length === 0 && skipped.length === 0) return [{ json: { __none: true, batch_id: v.batch_id } }];\n\nconst out = toSend.map(i => {\n  const r = staged.find(s => s.id === i.row_id) || {};\n  let body = v.email_body || '';\n  body = body.split('{{first_name}}').join(r.first_name || 'there');\n  body = body.split('{{calendly_link}}').join(v.calendly_url || '');\n  let subject = v.email_subject;\n  let recipient = i.email;\n  if (v.test_mode === true) {\n    // TEST MODE: the real person never receives anything; the test inbox gets it with a header saying who it was for\n    recipient = v.test_recipient;\n    subject = '[TEST for ' + i.email + '] ' + subject;\n    body = 'TEST MODE (UXR Recruiting). This invite would have gone to: ' + i.email + '\\nBatch: ' + v.batch_id + '\\nNo Customer.io stamp was written.\\n-----\\n\\n' + body;\n  }\n  return { json: { ...i, recipient, subject, body } };\n});\nreturn out.concat(skipped.map(i => ({ json: i })));"
+      },
       "id": "3c57736a-6e90-419c-b5d9-c806d24ea72d",
       "name": "Prepare Recipients",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
-        -100
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const v = $('Validate Send').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.email);\nlet list = rows;\nif (v.test_mode === true) list = rows.slice(0, 2);\nif (list.length === 0) return [{ json: { __none: true, batch_id: v.batch_id } }];\nreturn list.map(r => {\n  let body = v.email_body || '';\n  body = body.split('{{first_name}}').join(r.first_name || 'there');\n  body = body.split('{{calendly_link}}').join(v.calendly_url || '');\n  const recipient = v.test_mode === true ? 'design@n8n.io, g.andreini@gmail.com' : r.email;\n  return { json: { row_id: r.id, email: r.email, recipient: recipient, subject: v.email_subject, body: body, test_mode: v.test_mode === true } };\n});"
-      }
+        1344,
+        0
+      ]
     },
     {
-      "id": "e4ceeb16-bb74-40a7-894a-7dc21255e612",
-      "name": "No Candidates?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        1120,
-        -100
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "loose",
+            "version": 1
           },
           "conditions": [
             {
@@ -162,97 +148,98 @@
             }
           ],
           "combinator": "and"
-        }
-      }
+        },
+        "options": {}
+      },
+      "id": "e4ceeb16-bb74-40a7-894a-7dc21255e612",
+      "name": "No Candidates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        0
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nreturn [{ json: { success: false, sent: 0, failed: 0, message: 'No staged candidates found for batch ' + (j.batch_id || '(unknown)') + '.' } }];"
+      },
       "id": "0adfca7c-0b06-484a-8315-125d3fe41607",
       "name": "Return No Candidates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1344,
-        60
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const j = $input.first().json;\nreturn [{ json: { success: false, sent: 0, failed: 0, message: 'No staged candidates found for batch ' + (j.batch_id || '(unknown)') + '.' } }];"
-      }
+        1792,
+        80
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.email);\nconst sent = rows.filter(r => r.status === 'sent' || r.status === 'test_sent').length;\nconst failed = rows.filter(r => r.status === 'failed').length;\nconst skipped = rows.filter(r => r.status === 'skipped_duplicate').length;\nconst details = rows.map(r => ({ email: r.email, status: r.status }));\nconst v = $('Validate Send').first().json;\n// Stamp problems are collected from Record Result (the rows themselves only carry the status)\nlet stampFailed = 0;\ntry { stampFailed = $('Record Result').all().map(i => i.json).filter(r => r && r.stamp_failed === true).length; } catch (e) { stampFailed = 0; }\nconst testNote = v.test_mode ? ' TEST MODE: every email was redirected to ' + v.test_recipient + ' (max ' + v.test_max + '), no Customer.io stamping.' : '';\nconst dupNote = skipped ? ' ' + skipped + ' duplicate(s) skipped (already invited within ' + v.cooldown_days + ' days or repeated in the batch).' : '';\nconst stampNote = stampFailed ? ' ' + stampFailed + ' email(s) sent but not stamped on Customer.io (cooldown covered by the Candidates table only).' : '';\nreturn [{ json: { success: failed === 0, sent, failed, skipped_duplicate: skipped, stamp_failed: stampFailed, test_mode: v.test_mode === true, test_recipient: v.test_mode ? v.test_recipient : null, batch_id: v.batch_id, details, message: 'Sent ' + sent + ', failed ' + failed + '.' + dupNote + stampNote + testNote } }];"
+      },
       "id": "e779d721-358c-44c5-aef4-84d6496f6d56",
       "name": "Summarize",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1568,
-        -280
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.email);\nconst sent = rows.filter(r => r.status === 'sent').length;\nconst failed = rows.filter(r => r.status === 'failed').length;\nconst details = rows.map(r => ({ email: r.email, status: r.status }));\nconst v = $('Validate Send').first().json;\nreturn [{ json: { success: failed === 0, sent: sent, failed: failed, test_mode: v.test_mode === true, batch_id: v.batch_id, details: details, message: 'Sent ' + sent + ', failed ' + failed + (v.test_mode ? ' (TEST MODE: recipients overridden, no Customer.io stamping)' : '') + '.' } }];"
-      }
+        2016,
+        -288
+      ]
     },
     {
-      "id": "96b78239-5d5f-48ed-aa0d-e270891f70e7",
-      "name": "Send Email",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [
-        1568,
-        -60
-      ],
       "parameters": {
-        "operation": "send",
-        "fromEmail": "n8n Research <noreply@info.n8n.io>",
+        "fromEmail": "={{ $json.from_email }}",
         "toEmail": "={{ $json.recipient }}",
         "subject": "={{ $json.subject }}",
         "emailFormat": "text",
         "text": "={{ $json.body }}",
         "options": {
           "appendAttribution": false,
-          "replyTo": "design@n8n.io"
+          "replyTo": "={{ $json.reply_to }}"
         }
       },
-      "onError": "continueRegularOutput",
-      "webhookId": "c4156f6b-a00f-4f71-aa26-effdee5500f3"
+      "id": "96b78239-5d5f-48ed-aa0d-e270891f70e7",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2240,
+        -160
+      ],
+      "webhookId": "c4156f6b-a00f-4f71-aa26-effdee5500f3",
+      "credentials": {
+        "smtp": {
+          "id": "4xgehQnKp4Y5flIf",
+          "name": "SMTP Mailgun n8n official (use it with \"info.n8n.io\")"
+        }
+      },
+      "onError": "continueRegularOutput"
     },
     {
+      "parameters": {
+        "jsCode": "const sent = $input.first().json || {};\nconst item = $('Send Loop').first().json;\nconst ok = !sent.error;\nreturn [{ json: { ...item, send_ok: ok, stamp_skipped: !item.cio_id, error: sent.error ? (typeof sent.error === 'string' ? sent.error : (sent.error.message || JSON.stringify(sent.error).slice(0, 200))) : null } }];"
+      },
       "id": "49699a20-4eb5-4c0f-bb2f-7ed7b4cec8af",
       "name": "Check Send OK",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1792,
-        -60
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const sent = $input.first().json || {};\nconst item = $('Send Loop').first().json;\nconst ok = !sent.error;\nreturn [{ json: { ...item, send_ok: ok, error: sent.error ? (typeof sent.error === 'string' ? sent.error : (sent.error.message || JSON.stringify(sent.error).slice(0, 200))) : null } }];"
-      }
+        2464,
+        -160
+      ]
     },
     {
-      "id": "ee35eade-96c2-4e50-9149-4bcc4574e3a0",
-      "name": "Stamp?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        2016,
-        -60
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "loose",
+            "version": 1
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.send_ok === true && $json.test_mode !== true }}",
+              "leftValue": "={{ $json.send_ok === true && $json.test_mode !== true && !!$json.cio_id }}",
               "operator": {
                 "type": "boolean",
                 "operation": "true",
@@ -261,77 +248,80 @@
             }
           ],
           "combinator": "and"
-        }
-      }
+        },
+        "options": {}
+      },
+      "id": "ee35eade-96c2-4e50-9149-4bcc4574e3a0",
+      "name": "Stamp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2688,
+        -160
+      ]
     },
     {
-      "id": "f7de73b9-513c-4e66-a9ff-853433b56788",
-      "name": "Stamp Customer.io",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        2240,
-        -160
-      ],
       "parameters": {
         "method": "PUT",
-        "url": "={{ 'https://track.customer.io/api/v1/customers/' + encodeURIComponent($json.email) }}",
+        "url": "={{ 'https://track.customer.io/api/v1/customers/cio_' + $json.cio_id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "customerIoApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ _update: true, last_user_research_invite_date: $now.toUnixInteger() }) }}",
+        "jsonBody": "={{ JSON.stringify({ _update: true, [$json.cooldown_field || 'last_user_research_invite_date']: $now.toUnixInteger() }) }}",
         "options": {
           "response": {
             "response": {
-              "neverError": true,
               "fullResponse": true,
+              "neverError": true,
               "responseFormat": "json"
             }
           }
         }
       },
+      "id": "f7de73b9-513c-4e66-a9ff-853433b56788",
+      "name": "Stamp Customer.io",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2912,
+        -240
+      ],
+      "credentials": {
+        "customerIoApi": {
+          "id": "qecydLSpSosOfmJw",
+          "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
+      "parameters": {
+        "jsCode": "const item = $('Send Loop').first().json;\nconst inp = $input.first().json || {};\n\n// Duplicate path: no email was sent, mark the row so nobody retries it\nif (item.skip === true) {\n  return [{ json: { row_id: item.row_id, email: item.email, final_status: 'skipped_duplicate', error: item.skip_reason || 'duplicate', sent_at: '' } }];\n}\n\nconst chk = $('Check Send OK').first().json;\nconst emailOk = chk.send_ok === true;\nlet err = chk.error || null;\nlet stampFailed = false;\nconst stampRan = emailOk && chk.test_mode !== true && !chk.stamp_skipped;\n// The stamp ran (live mode, cio_id present): an HTTP >= 400 or a transport error (no statusCode, error set) both mean not stamped\nif (stampRan && inp.statusCode !== undefined && inp.statusCode >= 400) {\n  stampFailed = true;\n  err = 'Email sent but Customer.io stamp failed (HTTP ' + inp.statusCode + '): cooldown relies on the Candidates table for this person';\n} else if (stampRan && inp.error) {\n  stampFailed = true;\n  err = 'Email sent but Customer.io stamp failed (' + (typeof inp.error === 'string' ? inp.error : (inp.error.message || 'transport error')) + '): cooldown relies on the Candidates table for this person';\n}\nif (emailOk && chk.test_mode !== true && chk.stamp_skipped) {\n  stampFailed = true;\n  err = 'Email sent but NOT stamped: no cio_id on the candidate row';\n}\n// The truth of the row is whether the person received the email: a failed stamp must not reopen them to another batch\nconst finalStatus = emailOk ? (chk.test_mode === true ? 'test_sent' : 'sent') : 'failed';\nreturn [{ json: { row_id: chk.row_id, email: chk.email, final_status: finalStatus, stamp_failed: stampFailed, error: err, sent_at: emailOk ? new Date().toISOString() : '' } }];"
+      },
       "id": "0fe5eb65-f56f-46c7-b63e-490eac0e38d6",
       "name": "Record Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2464,
-        -60
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const chk = $('Check Send OK').first().json;\nconst inp = $input.first().json || {};\nlet ok = chk.send_ok === true;\nlet err = chk.error || null;\nif (ok && inp.statusCode !== undefined && inp.statusCode >= 400) {\n  ok = false;\n  err = 'Customer.io stamp failed (HTTP ' + inp.statusCode + ')';\n}\nreturn [{ json: { row_id: chk.row_id, email: chk.email, final_status: ok ? 'sent' : 'failed', error: err, sent_at: ok ? new Date().toISOString() : '' } }];"
-      }
+        3136,
+        -96
+      ]
     },
     {
-      "id": "2711280b-71ab-4029-be2b-af91b93c2632",
-      "name": "Update Candidate Row",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        2688,
-        -60
-      ],
       "parameters": {
-        "resource": "row",
         "operation": "update",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
+          "mode": "list",
           "value": "kg4tyWXVPE6h5pH6",
-          "cachedResultName": "uxr_candidates"
+          "cachedResultName": "UXR Recruiting - Candidates",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/kg4tyWXVPE6h5pH6"
         },
         "matchType": "allConditions",
         "filters": {
           "conditions": [
             {
-              "keyName": "id",
-              "condition": "eq",
               "keyValue": "={{ $('Record Result').first().json.row_id }}"
             }
           ]
@@ -365,82 +355,197 @@
               "canBeUsedToMatch": true
             }
           ]
-        }
+        },
+        "options": {}
       },
+      "id": "2711280b-71ab-4029-be2b-af91b93c2632",
+      "name": "Update Candidate Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3360,
+        -96
+      ],
       "alwaysOutputData": true
     },
     {
+      "parameters": {
+        "amount": 1
+      },
       "id": "a3ad435e-7f05-4bbf-b57b-9237e749d7f0",
       "name": "Throttle",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2912,
-        -60
+        3584,
+        -16
       ],
-      "parameters": {
-        "amount": 1,
-        "unit": "seconds"
-      },
       "webhookId": "f5dba3d2-f85b-48ca-9bee-d370bdab3fb9"
     },
     {
+      "parameters": {
+        "options": {}
+      },
       "id": "84555fb7-f1a1-43fc-9d4d-01ccd4e1746b",
       "name": "Send Loop",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        1344,
-        -140
-      ],
-      "parameters": {
-        "batchSize": 1
-      }
+        1792,
+        -112
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nreturn [{ json: { success: false, sent: 0, failed: 0, message: j.error || 'Invalid input.' } }];"
+      },
       "id": "0018840f-e7e9-4684-bfea-d2dc301e1784",
       "name": "Return Invalid Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
-        200
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const j = $input.first().json;\nreturn [{ json: { success: false, sent: 0, failed: 0, message: j.error || 'Invalid input.' } }];"
-      }
+        896,
+        192
+      ]
     },
     {
+      "parameters": {
+        "content": "## UXR Send & Stamp (Workflow C)\nInputs: batch_id, email_subject, email_body, calendly_url, test_mode.\n\n**SAFETY SWITCH:** *Load Config* reads `liveMode` (boolean) from UXR Config. Only `true` allows real sends; false, missing or any other value forces test mode: every recipient becomes `testRecipient`, the batch is capped at `testMaxRecipients`, the subject gets a `[TEST for <real email>]` prefix, the body a header, and NOTHING is written to Customer.io. Candidate rows end as `test_sent` (not `sent`) so the batch stays reusable.\n\n**DUPLICATE GUARD:** *Get Recently Sent* loads the Candidates table (no filter: the Data Table node dropped an OR filter silently); *Prepare Recipients* keeps rows with status `sent` or `booked` and skips (a) emails sent within `cooldownDays` (covers the lag before Customer.io segment 260 refreshes and sent-but-unstamped rows), (b) the same email twice in one batch, (c) malformed addresses. *Skip Duplicate?* routes those rows straight to *Record Result* as `skipped_duplicate`, no email.\n\n**Live mode** (liveMode = true): per candidate, plain-text email (from/reply-to from Config), then Track API `PUT /api/v1/customers/cio_<cio_id>` with `_update: true` stamping `last_user_research_invite_date` (the n8n-prod workspace identifies by id, so email-based stamps would silently do nothing; rows without cio_id are sent but flagged). Rows end as `sent` / `failed`. Returns {success, sent, failed, skipped_duplicate, stamp_failed, details, test_mode}.\n\nRefuses to run if the body still contains {{calendly_link}} and no calendly_url is given.",
+        "height": 360,
+        "width": 792,
+        "color": 4
+      },
       "id": "f692e417-7f2b-48cd-956f-f5d357fbe707",
       "name": "Sticky Note 51598141",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -50,
-        -50
+        -16,
+        -304
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "bwOgNKo1fCRR0BMv",
+          "cachedResultName": "UXR Config"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "schema": [],
+          "matchingColumns": []
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "65d250c9-8b77-45b1-bd75-c370ea1eb27b",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "kg4tyWXVPE6h5pH6",
+          "cachedResultName": "UXR Recruiting - Candidates",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/kg4tyWXVPE6h5pH6"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "sent"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "1e92a552-67dd-4713-a49f-07c184813abf",
+      "name": "Get Recently Sent",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip === true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5b872d79-de57-4283-879f-d56a258449a5",
+      "name": "Skip Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        -96
+      ]
+    },
+    {
+      "id": "2747a73e-3e43-4f08-8795-0ab675511b0e",
+      "name": "Get Recently Booked",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1232,
+        -120
       ],
       "parameters": {
-        "content": "## UXR Send & Stamp (Workflow C)\nInputs: batch_id, email_subject, email_body, calendly_url, test_mode.\n\nReads staged candidates from uxr_candidates by batch_id, sends the invite per candidate via SMTP (from noreply@info.n8n.io, reply-to design@n8n.io, plain text, no attribution), stamps last_user_research_invite_date on Customer.io via Track API (_update: true, never creates profiles), updates each candidate row to sent/failed, returns {success, sent, failed, details}.\n\n**test_mode: true** = recipients overridden to design@n8n.io + g.andreini@gmail.com, max 2 candidates, NO stamping. Refuses to run if the body still contains {{calendly_link}} and no calendly_url is given.\n\n**Credentials pending**: SMTP (Mailgun) and Customer.io Track API must be added by Rob before this can actually send.",
-        "color": 4,
-        "width": 524,
-        "height": 200
-      }
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "kg4tyWXVPE6h5pH6",
+          "cachedResultName": "UXR Recruiting - Candidates"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "booked"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "alwaysOutputData": true
     }
   ],
   "connections": {
-    "When Called": {
-      "main": [
-        [
-          {
-            "node": "Validate Send",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Validate Send": {
       "main": [
         [
@@ -464,17 +569,6 @@
         [
           {
             "node": "Return Invalid Input",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Staged Candidates": {
-      "main": [
-        [
-          {
-            "node": "Prepare Recipients",
             "type": "main",
             "index": 0
           }
@@ -605,7 +699,80 @@
         ],
         [
           {
+            "node": "Skip Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Validate Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Staged Candidates": {
+      "main": [
+        [
+          {
+            "node": "Get Recently Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Record Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recently Sent": {
+      "main": [
+        [
+          {
+            "node": "Get Recently Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recently Booked": {
+      "main": [
+        [
+          {
+            "node": "Prepare Recipients",
             "type": "main",
             "index": 0
           }
@@ -615,10 +782,12 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1",
+    "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "46466fac-4d7d-415c-b2c0-864c55eb5660",
+  "versionId": "c02b2bf4-701e-4827-8ea6-79e7ea7e5841",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

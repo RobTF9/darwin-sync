@@ -1,0 +1,232 @@
+{
+  "id": "c5PMDTtlptb5k1XY",
+  "name": "UXR Tests - Run All",
+  "description": "Manual integration runner: Search and Recruiting Start invalid-input suites. Appends both reports; fails after aggregation. No email sends.",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "49b337f7-c367-4c21-8672-d0a359edec92",
+      "name": "Run All Tests",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ZuygnsUjupGgPxfu",
+          "cachedResultName": "UXR Tests - Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "returnReportOnly": true
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "returnReportOnly",
+              "displayName": "returnReportOnly",
+              "type": "boolean",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "2021e47b-ffd7-4ac0-b9f9-529a238aa18a",
+      "name": "Run Search Suite",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw=$input.all().map(i=>i.json);\nconst suites=raw.map(r=>{\n const valid=Array.isArray(r.results)&&r.results.length>0&&r.results.every(s=>Array.isArray(s.checks)&&s.checks.length>0&&s.checks.every(c=>['PASS','FAIL'].includes(c.status)));\n if(!valid||r.error)return {suite:r.suite||'UXR Search',status:'ERROR',error:r.error||'Missing or malformed suite report',report:r};\n const assertions=r.results.flatMap(s=>s.checks);\n const failed=r.results.filter(s=>s.checks.some(c=>c.status==='FAIL')).length;\n return {suite:r.suite,status:failed?'FAIL':'PASS',scenarios:r.results.length,failedScenarios:failed,assertions:assertions.length,failedAssertions:assertions.filter(c=>c.status==='FAIL').length,report:r};\n});\nreturn [{json:{suite:'UXR Tests - Run All',runAt:new Date().toISOString(),status:suites.every(s=>s.status==='PASS')?'PASS':'FAIL',totalSuites:suites.length,passedSuites:suites.filter(s=>s.status==='PASS').length,failedSuites:suites.filter(s=>s.status!=='PASS').length,totalScenarios:suites.reduce((n,s)=>n+(s.scenarios||0),0),totalAssertions:suites.reduce((n,s)=>n+(s.assertions||0),0),suites}}];"
+      },
+      "id": "ee77170b-f495-466c-94a3-7e62a3deb17a",
+      "name": "All Tests Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r=$input.first().json;if(r.failedSuites>0)throw new Error(r.failedSuites+' test suites failed. Open All Tests Report for details.');return $input.all();"
+      },
+      "id": "fdc50739-67e0-4049-84b1-b2eb41e0f26e",
+      "name": "Fail If Any Suite Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## UXR test runner\nManual only. Calls Search (11 scenarios) and Recruiting Start (6 invalid-input scenarios), appends both reports, then fails if any assertion or suite fails.\n\nSearch reads real Customer.io data. Recruiting Start uses invalid Slack context only. No Send workflow is called.\n\nStart output assertions do not inspect internal traces automatically: inspect child executions to verify only the invalid-input branch ran. No valid-start or Slack UI coverage.",
+        "height": 256,
+        "width": 400,
+        "color": 5
+      },
+      "id": "17496157-33cf-4ddb-ba5b-dc998e39beb4",
+      "name": "Sticky Note 944de2e1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        208
+      ]
+    },
+    {
+      "id": "39c21889-5a44-44a0-9725-a930cc1d6200",
+      "name": "Run Recruiting Start Suite",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        240
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "3DAzktrBB5f3RIfH",
+          "cachedResultName": "UXR Tests - Recruiting Start"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "returnReportOnly": true
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "returnReportOnly",
+              "displayName": "returnReportOnly",
+              "type": "boolean",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "cb988b34-8a00-42fb-b5b6-af5108956320",
+      "name": "Collect Suite Reports",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "append"
+      }
+    }
+  ],
+  "connections": {
+    "Run All Tests": {
+      "main": [
+        [
+          {
+            "node": "Run Search Suite",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Run Recruiting Start Suite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All Tests Report": {
+      "main": [
+        [
+          {
+            "node": "Fail If Any Suite Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Search Suite": {
+      "main": [
+        [
+          {
+            "node": "Collect Suite Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Recruiting Start Suite": {
+      "main": [
+        [
+          {
+            "node": "Collect Suite Reports",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Collect Suite Reports": {
+      "main": [
+        [
+          {
+            "node": "All Tests Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "88ed147a-4431-40f2-8caa-e4f0f153e928",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "18LaAMBxIP1EjHef",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,23 +1,14 @@
 {
   "id": "6uEc2xCDjqeG0OJt",
   "name": "UXR Search",
+  "description": "UXR Recruiting search engine sub-workflow. Takes mode/filters/sampleSize/excludeRecentDays, loads UXR Config, builds a Customer.io segment filter (quality gates, cooldown, mode-specific base query + user filters), samples via random shards with up to 3 re",
   "nodes": [
     {
-      "id": "cea4a327-c4e7-4e18-8090-dce308e4cf73",
-      "name": "When Called",
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        0,
-        300
-      ],
       "parameters": {
-        "inputSource": "workflowInputs",
         "workflowInputs": {
           "values": [
             {
-              "name": "mode",
-              "type": "string"
+              "name": "mode"
             },
             {
               "name": "filters",
@@ -33,20 +24,18 @@
             }
           ]
         }
-      }
+      },
+      "id": "cea4a327-c4e7-4e18-8090-dce308e4cf73",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        48
+      ]
     },
     {
-      "id": "6427ff3e-2548-4e54-8db9-84da83780195",
-      "name": "Load Config",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        224,
-        128
-      ],
       "parameters": {
-        "mode": "once",
-        "source": "database",
         "workflowId": {
           "__rl": true,
           "mode": "id",
@@ -62,76 +51,71 @@
         "options": {
           "waitForSubWorkflow": true
         }
-      }
+      },
+      "id": "6427ff3e-2548-4e54-8db9-84da83780195",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        48
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const input = $('When Called').first().json || {};\nconst config = $('Load Config').first().json || {};\n\nlet mode = (input.mode || 'n8n_users').toString().trim();\nif (!['n8n_users', 'volunteers', 'non_users', 'csv'].includes(mode)) mode = 'n8n_users';\n\nlet filters = input.filters || {};\nif (typeof filters === 'string') { try { filters = JSON.parse(filters); } catch (e) { filters = {}; } }\nif (typeof filters !== 'object' || Array.isArray(filters) || filters === null) filters = {};\n\n// Cap: maxSampleSize for the wizard audiences, csvMaxInvites for CSV uploads (0 / empty = invite everyone found, up to the cap)\nconst maxSampleSize = mode === 'csv' ? (Number(config.csvMaxInvites) || 200) : (Number(config.maxSampleSize) || 20);\nlet sampleSize = Number(input.sampleSize);\nif (!Number.isFinite(sampleSize) || sampleSize <= 0) sampleSize = maxSampleSize;\nif (sampleSize > maxSampleSize) sampleSize = maxSampleSize;\nsampleSize = Math.floor(sampleSize);\n\n// Cooldown window: Config cooldownDays is the source of truth. The declared input arrives as null when the caller omits it\n// (Number(null) === 0 would silently disable the client-side check), so anything not a positive number falls back.\nconst rawWindow = input.excludeRecentDays;\nlet excludeRecentDays = (rawWindow === null || rawWindow === undefined || rawWindow === '' || typeof rawWindow === 'boolean') ? NaN : Number(rawWindow);\nif (!Number.isFinite(excludeRecentDays) || excludeRecentDays <= 0) excludeRecentDays = Number(config.cooldownDays) || 60;\nexcludeRecentDays = Math.floor(excludeRecentDays);\n\nreturn [{ json: { mode, filters, sampleSize, excludeRecentDays, config } }];"
+      },
       "id": "e9bb7847-cbf1-4fe0-96cd-997cc9188690",
       "name": "Normalize Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         448,
-        128
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const input = $('When Called').first().json || {};\nconst config = $('Load Config').first().json || {};\n\nlet mode = (input.mode || 'n8n_users').toString().trim();\nif (mode !== 'n8n_users' && mode !== 'non_users') mode = 'n8n_users';\n\nlet filters = input.filters || {};\nif (typeof filters === 'string') {\n  try { filters = JSON.parse(filters); } catch (e) { filters = {}; }\n}\nif (typeof filters !== 'object' || Array.isArray(filters) || filters === null) filters = {};\n\nlet sampleSize = Number(input.sampleSize);\nif (!Number.isFinite(sampleSize) || sampleSize <= 0) sampleSize = Number(config.maxSampleSize) || 10;\nconst maxSampleSize = Number(config.maxSampleSize) || 20;\nif (sampleSize > maxSampleSize) sampleSize = maxSampleSize;\nsampleSize = Math.floor(sampleSize);\n\nlet excludeRecentDays = Number(input.excludeRecentDays);\nif (!Number.isFinite(excludeRecentDays) || excludeRecentDays < 0) excludeRecentDays = Number(config.cooldownDays) || 60;\nexcludeRecentDays = Math.floor(excludeRecentDays);\n\nreturn [{ json: { mode, filters, sampleSize, excludeRecentDays, config } }];"
-      }
+        48
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst { filters, sampleSize, excludeRecentDays, config } = data;\nlet mode = data.mode;\n\nconst cooldownField = config.cooldownField || 'last_user_research_invite_date';\nconst shardField = config.shardField || 'uxr_shard';\nconst shardCount = Number(config.shardCount) || 4096;\nconst cooldownSegmentId = Number(config.cooldownSegmentId) || 0;\nconst cutoffTs = Math.floor((Date.now() - excludeRecentDays * 24 * 60 * 60 * 1000) / 1000);\n\n// CSV mode: the researcher supplied the emails. Verify them in Customer.io (chunks of 50 emails per query),\n// exclude the cooldown segment server-side; unsubscribed handling happens in Format Output (webform people are exempt).\nif (mode === 'csv') {\n  const raw = Array.isArray(filters.emails) ? filters.emails : [];\n  const emails = Array.from(new Set(raw.map(e => String(e || '').trim().toLowerCase()).filter(e => /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(e))));\n  const chunks = [];\n  for (let i = 0; i < emails.length; i += 50) chunks.push(emails.slice(i, i + 50));\n  if (!chunks.length) chunks.push(['nobody@invalid.invalid']); // matches nothing, keeps the loop shape\n  const base = [];\n  if (cooldownSegmentId > 0) base.push({ not: { segment: { id: cooldownSegmentId } } });\n  return [{ json: {\n    mode, filters: { csv: emails.length }, sampleSize, excludeRecentDays,\n    cooldownField, cooldownCutoffTs: cutoffTs, cooldownSegmentId, shardField, shardCount, noShards: false,\n    csvMode: true, csvEmails: emails, csvChunks: chunks,\n    baseAndClauses: base,\n    attempt: 0, maxAttempts: chunks.length, shardsUsed: [], collected: [], totalMatching: 0\n  } }];\n}\n\n// Audiences: n8n_users (Customer.io cloud accounts) and volunteers (research webform, includes non-users).\n// 'non_users' is kept as an alias: volunteers with n8n_usage restricted to aware + new.\nconst base = config.volunteerBaseQuery || config.nonUserBaseQuery || {};\nconst userFilters = Object.assign({}, filters || {});\nif (mode === 'non_users') {\n  mode = 'volunteers';\n  if (!Array.isArray(userFilters.n8n_usage) || userFilters.n8n_usage.length === 0) userFilters.n8n_usage = base.non_users_usage || ['aware', 'new'];\n}\nconst filterDefs = mode === 'n8n_users' ? (config.nUserFilters || []) : (config.volunteerFilters || config.nonUserFilters || []);\nconst defById = {};\nfor (const d of filterDefs) defById[d.id] = d;\n\nconst andClauses = [];\nif (mode === 'n8n_users') {\n  // Quality gates (unsubscribed always excluded for n8n users)\n  andClauses.push({ attribute: { field: 'email', operator: 'exists' } });\n  andClauses.push({ not: { attribute: { field: 'unsubscribed', operator: 'eq', value: 'true' } } });\n  andClauses.push({ attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } });\n  andClauses.push({ attribute: { field: 'confirmed', operator: 'eq', value: 'true' } });\n  // Default: everyone except deleted accounts, unless the researcher chose plan statuses explicitly\n  const chosenStatus = userFilters.cloud_plan_status;\n  if (!Array.isArray(chosenStatus) || chosenStatus.length === 0) {\n    andClauses.push({ not: { attribute: { field: 'cloud_plan_status', operator: 'eq', value: 'deleted' } } });\n  }\n} else {\n  // Volunteers: the research form is the consent. It sets unsubscribed = true on everyone (no marketing), so that flag is NOT a gate here.\n  andClauses.push({ attribute: { field: 'email', operator: 'exists' } });\n  andClauses.push({ attribute: { field: 'origin', operator: 'eq', value: base.origin || 'user_research_webform' } });\n}\n\n// Cooldown, server-side: not in the Customer.io cooldown segment (id from Config). Client-side date check stays in Format Output.\nif (cooldownSegmentId > 0) andClauses.push({ not: { segment: { id: cooldownSegmentId } } });\n\n// Researcher filters. Values are option values; a def may map them to several attribute values (matchValues),\n// to segments (via: 'segment'), and an option may add extra conditions (clauses), e.g. Trial + status trialing.\n// Options of one filter are OR-ed together; filters are AND-ed.\nconst applied = {};\nfor (const [key, raw] of Object.entries(userFilters)) {\n  const vals = (Array.isArray(raw) ? raw : [raw]).filter(v => v !== undefined && v !== null && v !== '');\n  if (vals.length === 0) continue;\n  const def = defById[key];\n  if (def && def.enabled === false) continue; // not live yet (needs Customer.io segments)\n  const field = (def && def.field) || key;\n  if (def && def.via === 'segment') {\n    const ids = vals.map(v => { const o = (def.options || []).find(x => x.value === v); return o && o.segmentId; }).filter(Boolean);\n    if (ids.length) andClauses.push({ or: ids.map(id => ({ segment: { id: Number(id) } })) });\n    applied[key] = vals;\n    continue;\n  }\n  const groups = [];\n  for (const v of vals) {\n    const o = def && (def.options || []).find(x => x.value === v);\n    const values = (o && Array.isArray(o.matchValues) && o.matchValues.length) ? o.matchValues : [String(v)];\n    const valueClause = values.length === 1 ? { attribute: { field, operator: 'eq', value: values[0] } } : { or: values.map(x => ({ attribute: { field, operator: 'eq', value: x } })) };\n    const extra = (o && Array.isArray(o.clauses)) ? o.clauses : [];\n    groups.push(extra.length ? { and: [valueClause].concat(extra) } : valueClause);\n  }\n  andClauses.push(groups.length === 1 ? groups[0] : { or: groups });\n  applied[key] = vals;\n}\n\n// Volunteers are ~1,000 people: one paginated query, no shards.\nconst noShards = mode === 'volunteers';\n\nreturn [{ json: {\n  mode, filters: applied, sampleSize, excludeRecentDays,\n  cooldownField, cooldownCutoffTs: cutoffTs, cooldownSegmentId, shardField, shardCount, noShards, csvMode: false,\n  baseAndClauses: andClauses,\n  attempt: 0, maxAttempts: 3, shardsUsed: [], collected: [], totalMatching: 0\n} }];"
+      },
       "id": "d25f835a-bc5a-47d0-a646-0c7d5db9bdcf",
       "name": "Build CIO Filter",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         672,
-        128
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const data = $input.first().json;\nconst { mode, filters, sampleSize, excludeRecentDays, config } = data;\n\nconst cooldownField = config.cooldownField || 'last_user_research_invite_date';\nconst shardField = config.shardField || 'uxr_shard';\nconst shardCount = Number(config.shardCount) || 4096;\n\nconst cutoff = new Date(Date.now() - excludeRecentDays * 24 * 60 * 60 * 1000);\nconst cutoffTs = Math.floor(cutoff.getTime() / 1000);\n\nconst filterDefs = mode === 'n8n_users' ? (config.nUserFilters || []) : (config.nonUserFilters || []);\nconst defById = {};\nfor (const d of filterDefs) defById[d.id] = d;\n\n// Cooldown clause: field doesn't exist OR older than cutoff\nconst cooldownClause = {\n  or: [\n    { attribute: { field: cooldownField, operator: 'not_exists' } },\n    { attribute: { field: cooldownField, operator: 'lt', value: String(cutoffTs) } }\n  ]\n};\n\nconst andClauses = [];\n\nif (mode === 'n8n_users') {\n  // Quality gates\n  andClauses.push({ attribute: { field: 'email', operator: 'exists' } });\n  andClauses.push({ not: { attribute: { field: 'unsubscribed', operator: 'eq', value: 'true' } } });\n  andClauses.push({ attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } });\n  andClauses.push({ attribute: { field: 'confirmed', operator: 'eq', value: 'true' } });\n  // Exclude non-user webform signups\n  andClauses.push({ not: { and: [\n    { attribute: { field: 'origin', operator: 'eq', value: 'user_research_webform' } },\n    { or: [\n      { attribute: { field: 'n8n_usage', operator: 'eq', value: 'aware' } },\n      { attribute: { field: 'n8n_usage', operator: 'eq', value: 'new' } }\n    ] },\n    { not: { attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } } }\n  ] } });\n} else {\n  // Non-users base query\n  const base = config.nonUserBaseQuery || {};\n  andClauses.push({ attribute: { field: 'email', operator: 'exists' } });\n  andClauses.push({ attribute: { field: 'origin', operator: 'eq', value: base.origin || 'user_research_webform' } });\n  andClauses.push({ not: { attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } } });\n  // n8n_usage in selected values (default aware+new)\n  let usageVals = filters.n8n_usage;\n  if (!Array.isArray(usageVals) || usageVals.length === 0) {\n    usageVals = (base.n8n_usage_default) || ['aware', 'new'];\n  }\n  andClauses.push({ or: usageVals.map(v => ({ attribute: { field: 'n8n_usage', operator: 'eq', value: String(v) } })) });\n}\n\n// Cooldown always applied\nandClauses.push(cooldownClause);\n\n// User-selected filters (skip n8n_usage in non_users, already handled)\nfor (const [key, val] of Object.entries(filters)) {\n  if (mode === 'non_users' && key === 'n8n_usage') continue;\n  if (val === undefined || val === null || val === '') continue;\n  const def = defById[key];\n  if (Array.isArray(val)) {\n    if (val.length === 0) continue;\n    andClauses.push({ or: val.map(v => ({ attribute: { field: key, operator: 'eq', value: String(v) } })) });\n  } else {\n    andClauses.push({ attribute: { field: key, operator: 'eq', value: String(val) } });\n  }\n}\n\nreturn [{ json: {\n  mode, filters, sampleSize, excludeRecentDays,\n  cooldownField, shardField, shardCount,\n  baseAndClauses: andClauses,\n  attempt: 0,\n  maxAttempts: 3,\n  shardsUsed: [],\n  collected: [],\n  totalMatching: 0\n} }];"
-      }
+        48
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const s = $input.first().json;\n\nif (s.csvMode) {\n  // CSV: each attempt verifies one chunk of emails (OR of email eq), no shards\n  const chunk = (s.csvChunks || [])[s.attempt || 0] || ['nobody@invalid.invalid'];\n  const emailClause = chunk.length === 1 ? { attribute: { field: 'email', operator: 'eq', value: chunk[0] } } : { or: chunk.map(e => ({ attribute: { field: 'email', operator: 'eq', value: e } })) };\n  return [{ json: { ...s, currentShards: [], shardsUsed: [], cioFilter: { filter: { and: s.baseAndClauses.concat([emailClause]) } } } }];\n}\n\nif (s.noShards) {\n  // Small pool: query everyone matching the base filter, no shard clause\n  return [{ json: { ...s, currentShards: [], shardsUsed: [], cioFilter: { filter: { and: s.baseAndClauses.slice() } } } }];\n}\n\n// Number of shards to query this attempt. Start with a spread proportional to sampleSize, widen on retries.\nconst shardsPerAttempt = Math.min(s.shardCount, Math.max(4, s.sampleSize) * (s.attempt + 1) * 2);\n\nconst used = new Set(s.shardsUsed || []);\nconst newShards = [];\nlet guard = 0;\nwhile (newShards.length < shardsPerAttempt && used.size < s.shardCount && guard < shardsPerAttempt * 20) {\n  guard++;\n  const shard = Math.floor(Math.random() * s.shardCount);\n  if (!used.has(shard)) { used.add(shard); newShards.push(shard); }\n}\n\n// Build the full CIO filter with a shard OR-clause for the newly picked shards\nconst shardClause = { or: newShards.map(sh => ({ attribute: { field: s.shardField, operator: 'eq', value: String(sh) } })) };\nconst andClauses = s.baseAndClauses.slice();\nif (newShards.length > 0) andClauses.push(shardClause);\n\nconst cioFilter = { filter: { and: andClauses } };\n\nreturn [{ json: { ...s, currentShards: newShards, shardsUsed: Array.from(used), cioFilter } }];"
+      },
       "id": "2e172b3d-653b-4da1-9d69-34e59dd8456a",
       "name": "Pick Shards",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         896,
-        128
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const s = $input.first().json;\n\n// Number of shards to query this attempt. Start with a spread proportional to sampleSize, widen on retries.\nconst shardsPerAttempt = Math.min(s.shardCount, Math.max(4, s.sampleSize) * (s.attempt + 1) * 2);\n\nconst used = new Set(s.shardsUsed || []);\nconst newShards = [];\nlet guard = 0;\nwhile (newShards.length < shardsPerAttempt && used.size < s.shardCount && guard < shardsPerAttempt * 20) {\n  guard++;\n  const shard = Math.floor(Math.random() * s.shardCount);\n  if (!used.has(shard)) { used.add(shard); newShards.push(shard); }\n}\n\n// Build the full CIO filter with a shard OR-clause for the newly picked shards\nconst shardClause = { or: newShards.map(sh => ({ attribute: { field: s.shardField, operator: 'eq', value: String(sh) } })) };\nconst andClauses = s.baseAndClauses.slice();\nif (newShards.length > 0) andClauses.push(shardClause);\n\nconst cioFilter = { filter: { and: andClauses } };\n\nreturn [{ json: { ...s, currentShards: newShards, shardsUsed: Array.from(used), cioFilter } }];"
-      }
+        48
+      ]
     },
     {
-      "id": "0b097d52-4ee4-4dbc-a805-5ef0cea8d9d5",
-      "name": "Query Customer.io",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        1120,
-        48
-      ],
       "parameters": {
         "method": "POST",
         "url": "https://api.customer.io/v1/customers",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "customerIoApi",
         "sendQuery": true,
-        "specifyQuery": "keypair",
         "queryParameters": {
           "parameters": [
             {
               "name": "limit",
-              "value": "={{ Math.min(100, ($json.sampleSize || 10) * 5) }}"
+              "value": "={{ ($json.noShards || $json.csvMode) ? 100 : Math.min(100, ($json.sampleSize || 10) * 5) }}"
             }
           ]
         },
         "sendHeaders": true,
-        "specifyHeaders": "keypair",
         "headerParameters": {
           "parameters": [
             {
@@ -141,24 +125,21 @@
           ]
         },
         "sendBody": true,
-        "contentType": "json",
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.cioFilter) }}",
         "options": {
           "response": {
             "response": {
-              "neverError": true,
               "fullResponse": true,
+              "neverError": true,
               "responseFormat": "json"
             }
           },
           "pagination": {
             "pagination": {
-              "paginationMode": "updateAParameterInEachRequest",
               "parameters": {
                 "parameters": [
                   {
-                    "type": "qs",
                     "name": "start",
                     "value": "={{ $response.body.next }}"
                   }
@@ -172,37 +153,43 @@
           }
         }
       },
+      "id": "0b097d52-4ee4-4dbc-a805-5ef0cea8d9d5",
+      "name": "Query Customer.io",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        -32
+      ],
+      "credentials": {
+        "customerIoApi": {
+          "id": "qecydLSpSosOfmJw",
+          "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
+      "parameters": {
+        "jsCode": "const s = $('Pick Shards').first().json;\nconst pages = $input.all().map(i => i.json);\n\nlet error = null;\nlet rows = [];\nfor (const p of pages) {\n  if (p.error) {\n    error = 'Customer.io request failed: ' + (typeof p.error === 'string' ? p.error : (p.error.message || JSON.stringify(p.error).slice(0, 200)));\n    continue;\n  }\n  const status = p.statusCode || 0;\n  const body = p.body || p;\n  if (status >= 400) {\n    error = 'Customer.io API error (HTTP ' + status + '): ' + JSON.stringify(body).slice(0, 300);\n    continue;\n  }\n  const ids = (body && (body.identifiers || body.results || body.customers)) || [];\n  if (Array.isArray(ids)) rows = rows.concat(ids);\n}\n\nconst prior = Array.isArray(s.collected) ? s.collected : [];\nconst byId = new Map();\nfor (const r of prior) { const k = r.cio_id || r.id || r.email; if (k) byId.set(k, r); }\nfor (const r of rows) { const k = r.cio_id || r.id || r.email; if (k && !byId.has(k)) byId.set(k, r); }\nconst collected = Array.from(byId.values());\n\nconst attempt = (s.attempt || 0) + 1;\nconst enough = collected.length >= s.sampleSize;\nconst exhausted = attempt >= (s.maxAttempts || 3);\n// noShards: one paginated pass over the whole pool is the full answer. csvMode: walk every chunk, never stop early.\nconst done = s.noShards || (s.csvMode ? (exhausted || !!error) : (enough || exhausted || !!error));\n\nreturn [{ json: { ...s, attempt, collected, collectedCount: collected.length, totalMatching: collected.length, error, done } }];"
+      },
       "id": "8158af58-0885-4390-b090-4496a2c0cd2a",
       "name": "Collect & Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         1344,
-        48
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const s = $('Pick Shards').first().json;\nconst pages = $input.all().map(i => i.json);\n\nlet error = null;\nlet rows = [];\nfor (const p of pages) {\n  const status = p.statusCode || 0;\n  const body = p.body || p;\n  if (status >= 400) {\n    error = 'Customer.io API error (HTTP ' + status + '): ' + JSON.stringify(body).slice(0, 300);\n    continue;\n  }\n  const ids = (body && (body.identifiers || body.results || body.customers)) || [];\n  if (Array.isArray(ids)) rows = rows.concat(ids);\n}\n\nconst prior = Array.isArray(s.collected) ? s.collected : [];\nconst byId = new Map();\nfor (const r of prior) { const k = r.cio_id || r.id || r.email; if (k) byId.set(k, r); }\nfor (const r of rows) { const k = r.cio_id || r.id || r.email; if (k && !byId.has(k)) byId.set(k, r); }\nconst collected = Array.from(byId.values());\n\nconst attempt = (s.attempt || 0) + 1;\nconst enough = collected.length >= s.sampleSize;\nconst exhausted = attempt >= (s.maxAttempts || 3);\nconst done = enough || exhausted || !!error;\n\nreturn [{ json: { ...s, attempt, collected, collectedCount: collected.length, totalMatching: collected.length, error, done } }];"
-      }
+        -32
+      ]
     },
     {
-      "id": "77a306d3-c0fa-4763-9120-f88eab796dda",
-      "name": "Enough Or Done?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        1568,
-        48
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "strict",
+            "version": 2
           },
           "conditions": [
             {
@@ -211,105 +198,106 @@
                 "type": "boolean",
                 "operation": "true",
                 "singleValue": true
-              }
+              },
+              "id": "764411f9-9816-4443-93e5-1d6370e992f6"
             }
           ],
           "combinator": "and"
-        }
-      }
+        },
+        "options": {}
+      },
+      "id": "77a306d3-c0fa-4763-9120-f88eab796dda",
+      "name": "Enough Or Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        -32
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const s = $('Collect & Check').first().json;\nconst samples = $('Sample Candidates').all().map(i => i.json).filter(x => x && !x.__empty);\nconst fetched = $input.all().map(i => i.json);\nconst cfg = $('Load Config').first().json || {};\nconst cioUrlTemplate = String(cfg.cioProfileUrlTemplate || '');\nfunction hasAttrs(resp) { return !!(resp && resp.customer && resp.customer.attributes && typeof resp.customer.attributes === 'object' && !Array.isArray(resp.customer.attributes)); }\nfunction attrsOf(resp) { return hasAttrs(resp) ? resp.customer.attributes : {}; }\nconst cooldownField = s.cooldownField || 'last_user_research_invite_date';\nconst cutoffTs = Number(s.cooldownCutoffTs) || 0;\nlet cooldownDropped = 0, fetchFailed = 0, duplicateEmailsDropped = 0, unsubscribedDropped = 0;\nconst all = samples.map((sm, idx) => {\n  const resp = fetched[idx] || {};\n  const a = attrsOf(resp);\n  if (!hasAttrs(resp)) fetchFailed++;\n  const usage_summary = [\n    a.successful_prod_exec_workflows !== undefined ? 'prod wfs: ' + a.successful_prod_exec_workflows : null,\n    a.services_count !== undefined ? 'services: ' + a.services_count : null,\n    a.ai_active_wfs !== undefined ? 'AI wfs: ' + a.ai_active_wfs : null\n  ].filter(Boolean).join(', ');\n  const lastInvite = Number(a[cooldownField]) || 0;\n  const cioId = sm.cio_id || null;\n  return {\n    email: a.email || sm.email || null,\n    id: sm.cio_id || sm.cust_id || null,\n    cio_id: cioId,\n    cio_url: (cioId && cioUrlTemplate.indexOf('{cio_id}') !== -1) ? cioUrlTemplate.replace('{cio_id}', cioId) : null,\n    first_name: a.first_name || null,\n    country: a.country || null,\n    cloud_plan: a.cloud_plan || null,\n    cloud_plan_status: a.cloud_plan_status || null,\n    role: a.job_role || a.utm_user_role || null,\n    company_size: a.company_size || null,\n    n8n_usage: a.n8n_usage || null,\n    tech_skills: a.tech_skills || null,\n    work_role: a.work_role || null,\n    linkedin: a.linkedin || null,\n    usage_summary,\n    attributes_fetched: hasAttrs(resp),\n    __recentlyInvited: lastInvite > 0 && lastInvite >= cutoffTs,\n    // CSV lists mix audiences: unsubscribed is respected, except for research-webform sign-ups (the form sets it on purpose)\n    __unsubscribed: !!s.csvMode && String(a.unsubscribed) === 'true' && a.origin !== 'user_research_webform'\n  };\n});\n// Reporting only: count distinct profiles per email before eligibility filtering.\nconst emailKey = value => String(value || '').trim().toLowerCase();\nconst profileIdsByEmail = new Map();\nfor (const r of (s.collected || [])) {\n  const key = emailKey(r.email);\n  const id = r.cio_id || r.id;\n  if (!key || !id) continue;\n  if (!profileIdsByEmail.has(key)) profileIdsByEmail.set(key, new Set());\n  profileIdsByEmail.get(key).add(String(id));\n}\nconst duplicateProfileEmails = Array.from(profileIdsByEmail, ([email, ids]) => ({ email, profileCount: ids.size })).filter(r => r.profileCount > 1);\nconst unsubscribeConflictEmails = Array.from(new Set(all.filter(c => c.__unsubscribed).map(c => emailKey(c.email)))).filter(key => all.some(c => emailKey(c.email) === key && c.attributes_fetched && !c.__unsubscribed));\n// Drop recently invited profiles (cooldown safety net), unsubscribed (CSV only) and duplicate emails\n// (the Customer.io base has distinct profiles sharing one address: one email = one invite).\nconst seenEmails = new Set();\nconst eligible = all.filter(c => {\n  if (c.__recentlyInvited) { cooldownDropped++; return false; }\n  if (c.__unsubscribed) { unsubscribedDropped++; return false; }\n  // CSV: no attributes = unsubscribed status unknown -> fail closed (counted in fetchFailed)\n  if (s.csvMode && !c.attributes_fetched) return false;\n  const key = c.email ? String(c.email).trim().toLowerCase() : null;\n  // Exactly one mailbox: a malformed 'a@x.com,b@y.com' value would reach SMTP as two recipients\n  if (!key || !/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(key)) return false;\n  if (seenEmails.has(key)) { duplicateEmailsDropped++; return false; }\n  seenEmails.add(key);\n  return true;\n});\nconst candidates = eligible.slice(0, s.sampleSize).map(c => { const { __recentlyInvited, __unsubscribed, ...rest } = c; return rest; });\nconst shardsWalked = Array.isArray(s.shardsUsed) ? s.shardsUsed.length : 0;\nconst exact = !!s.noShards || !!s.csvMode;\nconst poolEstimate = exact ? (s.collectedCount || 0) : (shardsWalked > 0 ? Math.round((s.collectedCount || 0) * (s.shardCount || 4096) / shardsWalked) : (s.collectedCount || 0));\n// CSV stats count distinct emails, not profiles (one address may have several Customer.io profiles)\nlet csvStats = null;\nif (s.csvMode) {\n  const total = (s.csvEmails || []).length;\n  const foundEmails = new Set((Array.isArray(s.collected) ? s.collected : []).map(r => String(r.email || '').trim().toLowerCase()).filter(Boolean));\n  csvStats = { total, found: foundEmails.size, notFoundOrCooldown: Math.max(0, total - foundEmails.size), unsubscribedDropped, fetchFailed, profilesMatched: s.collectedCount || 0, duplicateProfileEmails, unsubscribeConflictEmails, profilesChecked: samples.length, selected: candidates.length };\n}\nreturn [{ json: {\n  candidates, sampleSize: candidates.length, requestedSize: s.sampleSize,\n  collectedCount: s.collectedCount || 0, cooldownDropped, fetchFailed, duplicateEmailsDropped, unsubscribedDropped,\n  totalMatchingEstimate: exact && s.csvMode ? (csvStats ? csvStats.found : 0) : poolEstimate, poolIsExact: exact,\n  csvStats, csvEmails: s.csvMode ? (s.csvEmails || []) : undefined,\n  mode: s.mode, filtersApplied: s.filters, shardsUsed: s.shardsUsed || [], error: null\n} }];"
+      },
       "id": "73cb21b0-9cce-4018-a6ed-5b500be9c50c",
       "name": "Format Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1792,
-        0
+        2464,
+        16
       ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const s = $('Collect & Check').first().json;\nconst samples = $('Sample Candidates').all().map(i => i.json).filter(x => x && !x.__empty);\nconst fetched = $input.all().map(i => i.json);\n\nfunction attrsOf(resp) {\n  return (resp && resp.customer && resp.customer.attributes) || {};\n}\n\nconst candidates = samples.map((sm, idx) => {\n  const a = attrsOf(fetched[idx] || {});\n  const wf = a.wf_bucket;\n  const services = a.services_bucket;\n  const ai = a.ai_wfs_bucket;\n  const age = a.days_bucket;\n  const usage_summary = [\n    wf !== undefined ? 'wf: ' + wf : null,\n    services !== undefined ? 'services: ' + services : null,\n    ai !== undefined ? 'ai: ' + ai : null,\n    age !== undefined ? 'age: ' + age : null\n  ].filter(Boolean).join(', ');\n  return {\n    email: a.email || sm.email || null,\n    id: sm.cio_id || sm.cust_id || null,\n    country: a.country || null,\n    cloud_plan: a.cloud_plan || null,\n    cloud_plan_status: a.cloud_plan_status || null,\n    role: a.utm_user_role || null,\n    company_size: a.company_size || null,\n    first_name: a.first_name || null,\n    usage_summary\n  };\n});\n\nconst shardsWalked = Array.isArray(s.shardsUsed) ? s.shardsUsed.length : 0;\nconst poolEstimate = shardsWalked > 0 ? Math.round((s.collectedCount || 0) * (s.shardCount || 4096) / shardsWalked) : (s.collectedCount || 0);\n\nreturn [{ json: {\n  candidates,\n  sampleSize: candidates.length,\n  collectedCount: s.collectedCount || 0,\n  totalMatchingEstimate: poolEstimate,\n  mode: s.mode,\n  filtersApplied: s.filters,\n  shardsUsed: s.shardsUsed || [],\n  error: null\n} }];"
-      },
-      "executeOnce": true
+      "executeOnce": false
     },
     {
+      "parameters": {
+        "jsCode": "const s = $input.first().json;\n// Rebuild the state for another Pick Shards pass. baseAndClauses persists.\nreturn [{ json: {\n  mode: s.mode, filters: s.filters, sampleSize: s.sampleSize, excludeRecentDays: s.excludeRecentDays,\n  cooldownField: s.cooldownField, cooldownCutoffTs: s.cooldownCutoffTs, shardField: s.shardField, shardCount: s.shardCount,\n  noShards: s.noShards, csvMode: s.csvMode, csvEmails: s.csvEmails, csvChunks: s.csvChunks,\n  baseAndClauses: s.baseAndClauses, attempt: s.attempt, maxAttempts: s.maxAttempts,\n  shardsUsed: s.shardsUsed, collected: s.collected, totalMatching: s.totalMatching\n} }];"
+      },
       "id": "593cd3a4-5c8b-4251-853c-89677dcc0006",
       "name": "Prep Retry",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         1792,
-        224
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const s = $input.first().json;\n// Rebuild the state for another Pick Shards pass. baseAndClauses persists.\nreturn [{ json: {\n  mode: s.mode, filters: s.filters, sampleSize: s.sampleSize, excludeRecentDays: s.excludeRecentDays,\n  cooldownField: s.cooldownField, shardField: s.shardField, shardCount: s.shardCount,\n  baseAndClauses: s.baseAndClauses, attempt: s.attempt, maxAttempts: s.maxAttempts,\n  shardsUsed: s.shardsUsed, collected: s.collected, totalMatching: s.totalMatching\n} }];"
-      }
+        144
+      ]
     },
     {
+      "parameters": {
+        "content": "## UXR Search\nSub-workflow that queries Customer.io for matching candidate profiles.\n\n**Inputs:** mode (n8n_users | volunteers | csv; non_users = volunteers restricted to aware+new), filters (option values; for csv: { emails: [...] }), sampleSize (csv: 0 = everyone found, capped by csvMaxInvites), excludeRecentDays.\n\n1. Load Config: audiences, filter definitions (option values → attribute values, segment ids, extra clauses), cooldown segment, shard settings.\n2. Build CIO Filter: n8n users = email + not unsubscribed + created_n8n_account + confirmed + (not deleted unless Plan status chosen); volunteers = origin = user_research_webform only; csv = the uploaded emails in chunks of 50 (one query per chunk), unsubscribed dropped later unless origin = webform. All: not in cooldown segment 260. Only eq/exists/segment conditions are accepted by the search API.",
+        "height": 500,
+        "width": 300,
+        "color": 4
+      },
       "id": "e95bc919-6a4d-4f0c-84a5-8ba79949f254",
       "name": "Sticky Note fc486f84",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -80,
-        -120
-      ],
-      "parameters": {
-        "content": "## UXR Search\nSub-workflow that queries Customer.io for matching candidate profiles.\n\n**Inputs:** mode (n8n_users | non_users), filters (object), sampleSize, excludeRecentDays.\n\n1. Load Config — pulls filter defs, quality gates, cooldown & shard settings from UXR Config.\n2. Build CIO Filter — assembles the base Customer.io filter (quality gates, cooldown, mode-specific base query + user filters).",
-        "color": 4,
-        "width": 300,
-        "height": 500
-      }
+        -96,
+        -304
+      ]
     },
     {
+      "parameters": {
+        "content": "## Random Shard Sampling\nPick Shards -> Query Customer.io -> Collect & Check runs as a loop (up to maxAttempts=3).\n\nEach pass picks fresh random shard values (from shardCount=4096), appends a shard OR-clause to the filter, and queries. Dedupes results. If enough collected (>= sampleSize) or attempts exhausted, exits to Format Output; otherwise Prep Retry loops back with wider shard coverage.",
+        "height": 488,
+        "width": 300,
+        "color": 3
+      },
       "id": "7e73d2d4-5325-4f8a-84aa-76437afb04b7",
       "name": "Sticky Note 2119b34f",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        860,
-        -120
-      ],
-      "parameters": {
-        "content": "## Random Shard Sampling\nPick Shards -> Query Customer.io -> Collect & Check runs as a loop (up to maxAttempts=3).\n\nEach pass picks fresh random shard values (from shardCount=4096), appends a shard OR-clause to the filter, and queries. Dedupes results. If enough collected (>= sampleSize) or attempts exhausted, exits to Format Output; otherwise Prep Retry loops back with wider shard coverage.",
-        "color": 3,
-        "width": 300,
-        "height": 200
-      }
+        800,
+        -288
+      ]
     },
     {
+      "parameters": {
+        "content": "## Sample, fetch, format\n*Search Failed?* true → *Return Search Error* (error text for the wizard); false → *Sample Candidates* shuffles the collected ids and keeps 5× sampleSize, *Fetch Attributes* loads each profile, *Format Output* drops profiles invited within the cooldown window (last_user_research_invite_date ≥ cutoff), trims to sampleSize and maps to candidate objects (email, cio_id, plan, role, usage_summary…) plus metadata (totalMatchingEstimate, cooldownDropped, shardsUsed).\n\n**Credential:** \"Giulio - Customer.io - n8n-production\" (App API key for api.customer.io). Verified 200 on 2026-09-22.",
+        "height": 360,
+        "width": 300,
+        "color": 5
+      },
       "id": "04f1baab-a010-4f28-aa0b-81ccc8cc8650",
       "name": "Sticky Note 20fe626d",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1760,
-        -200
-      ],
-      "parameters": {
-        "content": "## Format Output\nRandomly subsamples collected profiles down to sampleSize, maps to candidate objects (email, id, plan, role, usage_summary, ...) and attaches metadata (totalMatching, mode, filtersApplied, shardsUsed).\n\n**Credentials:** Customer.io credential is a placeholder - Rob will add it. Until then Query Customer.io will fail auth.",
-        "color": 5,
-        "width": 300,
-        "height": 200
-      }
+        1888,
+        -496
+      ]
     },
     {
-      "id": "f0780c5f-4417-4534-a086-7ddc3309d498",
-      "name": "Search Failed?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        1792,
-        -80
-      ],
       "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "loose",
+            "version": 1
           },
           "conditions": [
             {
@@ -324,59 +312,74 @@
           "combinator": "and"
         },
         "options": {}
-      }
+      },
+      "id": "f0780c5f-4417-4534-a086-7ddc3309d498",
+      "name": "Search Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        -80
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const s = $input.first().json;\nreturn [{ json: { error: s.error, candidates: [], sampleSize: 0, collectedCount: 0, totalMatchingEstimate: 0, mode: s.mode, filtersApplied: s.filters, shardsUsed: s.shardsUsed || [], message: 'Search failed: ' + s.error } }];"
+      },
       "id": "f7a871e7-8622-4440-b18c-9c6dadd846e0",
       "name": "Return Search Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2016,
-        -180
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const s = $input.first().json;\nreturn [{ json: { error: s.error, candidates: [], sampleSize: 0, collectedCount: 0, totalMatchingEstimate: 0, mode: s.mode, filtersApplied: s.filters, shardsUsed: s.shardsUsed || [], message: 'Search failed: ' + s.error } }];"
-      }
+        -176
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "const s = $input.first().json;\nfunction shuffle(arr) {\n  const a = arr.slice();\n  for (let i = a.length - 1; i > 0; i--) {\n    const j = Math.floor(Math.random() * (i + 1));\n    [a[i], a[j]] = [a[j], a[i]];\n  }\n  return a;\n}\nconst collected = Array.isArray(s.collected) ? s.collected : [];\n// Oversample 5x: Format Output drops recently-invited profiles (cooldown) client-side and trims to sampleSize.\nconst want = Math.min(collected.length, Math.max(1, s.sampleSize * 5));\nconst sampled = shuffle(collected).slice(0, want);\nif (sampled.length === 0) return [{ json: { __empty: true } }];\nreturn sampled.map(r => ({ json: { cio_id: r.cio_id || null, cust_id: r.id || null, email: r.email || null } }));"
+      },
       "id": "3c18de53-f34d-4a51-a7c6-8a0e8b2cc3c5",
       "name": "Sample Candidates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         2016,
-        0
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const s = $input.first().json;\nfunction shuffle(arr) {\n  const a = arr.slice();\n  for (let i = a.length - 1; i > 0; i--) {\n    const j = Math.floor(Math.random() * (i + 1));\n    [a[i], a[j]] = [a[j], a[i]];\n  }\n  return a;\n}\nconst collected = Array.isArray(s.collected) ? s.collected : [];\nconst sampled = shuffle(collected).slice(0, s.sampleSize);\nif (sampled.length === 0) return [{ json: { __empty: true } }];\nreturn sampled.map(r => ({ json: { cio_id: r.cio_id || null, cust_id: r.id || null, email: r.email || null } }));"
-      }
+        16
+      ]
     },
     {
-      "id": "1b874406-a83c-4434-8a5f-7db626a3f132",
-      "name": "Fetch Attributes",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        2240,
-        0
-      ],
       "parameters": {
-        "method": "GET",
-        "url": "={{ $json.__empty ? 'https://api.customer.io/v1/customers/none/attributes' : ('https://api.customer.io/v1/customers/' + ($json.cio_id ? 'cio_' + $json.cio_id : encodeURIComponent($json.cust_id || $json.email || 'unknown')) + '/attributes') }}",
+        "url": "={{ $json.__empty ? 'https://api.customer.io/v1/customers/none/attributes' : ($json.cio_id ? ('https://api.customer.io/v1/customers/' + $json.cio_id + '/attributes?id_type=cio_id') : ('https://api.customer.io/v1/customers/' + encodeURIComponent($json.cust_id || $json.email || 'unknown') + '/attributes' + ($json.cust_id ? '?id_type=id' : '?id_type=email'))) }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "customerIoApi",
         "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 600
+            }
+          },
           "response": {
             "response": {
               "neverError": true,
               "responseFormat": "json"
             }
           }
+        }
+      },
+      "id": "1b874406-a83c-4434-8a5f-7db626a3f132",
+      "name": "Fetch Attributes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2240,
+        16
+      ],
+      "credentials": {
+        "customerIoApi": {
+          "id": "qecydLSpSosOfmJw",
+          "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
         }
       }
     }
@@ -495,7 +498,9 @@
             "node": "Return Search Error",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "Sample Candidates",
             "type": "main",
@@ -529,10 +534,12 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1",
+    "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "c90fd8e3-3acf-4b47-893d-2d9574129ff7",
+  "versionId": "3d5de0e9-579a-420b-af89-e53b3e8eed9f",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

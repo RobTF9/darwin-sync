@@ -1,6 +1,7 @@
 {
   "id": "8Ypvt6VuLiQCMZT7",
-  "name": "UXR Recruiting Start",
+  "name": "UXR Recruiting Start (Step 1)",
+  "description": "Darwin tool: starts the UXR recruiting wizard. Validates Slack context, upserts the session into the uxr_sessions data table (key channel_threadts), posts the audience-selection step in the thread, returns a confirmation for the agent.",
   "nodes": [
     {
       "parameters": {
@@ -24,7 +25,7 @@
       "typeVersion": 1.2,
       "position": [
         0,
-        0
+        32
       ]
     },
     {
@@ -37,35 +38,8 @@
       "typeVersion": 2,
       "position": [
         224,
-        0
+        32
       ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://slack.com/api/chat.postMessage",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "slackApi",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ channel: $('Validate Input').item.json.channel_id, thread_ts: $('Validate Input').item.json.thread_ts, text: \"Recruiting Wizard: who do you want to talk to? Options: n8n Users, Non-users, Cancel.\", blocks: [ { type: \"section\", text: { type: \"mrkdwn\", text: \":mag: *Recruiting Wizard*\\n\\nLet's find participants for your research. First, who do you want to talk to?\" } }, { type: \"actions\", elements: [ { type: \"button\", text: { type: \"plain_text\", text: \"n8n Users\", emoji: true }, style: \"primary\", action_id: \"uxr_audience_n8n_users\", value: \"n8n_users\" }, { type: \"button\", text: { type: \"plain_text\", text: \"Non-users\", emoji: true }, action_id: \"uxr_audience_non_users\", value: \"non_users\" }, { type: \"button\", text: { type: \"plain_text\", text: \"Cancel\", emoji: true }, style: \"danger\", action_id: \"uxr_cancel\", value: \"cancel\" } ] } ] }) }}",
-        "options": {}
-      },
-      "id": "9572df84-9927-4491-bf71-4e72bcafcb74",
-      "name": "Post Audience Selection",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        448,
-        0
-      ],
-      "credentials": {
-        "slackApi": {
-          "id": "BBkWcmrv3sWmNe1t",
-          "name": "Slack Bot"
-        }
-      },
-      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -80,7 +54,7 @@
             {
               "id": "message",
               "name": "message",
-              "value": "Recruiting wizard started. Check the thread for the interactive flow.",
+              "value": "The recruiting wizard is now posted in the thread as interactive buttons and will guide the user step by step. Do not add any message in the thread: reply with an empty response or a single acknowledgement emoji reaction only.",
               "type": "string"
             }
           ]
@@ -92,8 +66,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        896,
-        -80
+        2912,
+        -160
       ]
     },
     {
@@ -102,7 +76,7 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose",
+            "typeValidation": "strict",
             "version": 2
           },
           "conditions": [
@@ -126,8 +100,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        672,
-        0
+        2464,
+        -64
       ]
     },
     {
@@ -143,7 +117,7 @@
             {
               "id": "err-message",
               "name": "message",
-              "value": "={{ 'Failed to start the recruiting wizard: could not post the interactive message to Slack (' + ($json.error || 'unknown error') + '). Tell the user something went wrong and the wizard did not start.' }}",
+              "value": "={{ 'Failed to start the recruiting wizard: could not post the interactive message to Slack (' + (typeof $json.error === 'string' ? $json.error : ($json.error && $json.error.message) || 'unknown error') + '). Tell the user something went wrong and the wizard did not start.' }}",
               "type": "string"
             }
           ]
@@ -155,8 +129,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        896,
-        176
+        2688,
+        32
       ]
     },
     {
@@ -189,7 +163,7 @@
       "typeVersion": 2.2,
       "position": [
         448,
-        0
+        32
       ]
     },
     {
@@ -197,9 +171,10 @@
         "operation": "upsert",
         "dataTableId": {
           "__rl": true,
-          "mode": "id",
+          "mode": "list",
           "value": "WiCU0xKx5UzjGWkS",
-          "cachedResultName": "uxr_sessions"
+          "cachedResultName": "UXR Recruiting - Sessions",
+          "cachedResultUrl": "/projects/2uAQ2XYnaFVSte2z/datatables/WiCU0xKx5UzjGWkS"
         },
         "matchType": "allConditions",
         "filters": {
@@ -212,25 +187,20 @@
         },
         "columns": {
           "mappingMode": "defineBelow",
-          "matchingColumns": [
-            "session_key"
-          ],
           "value": {
             "session_key": "={{ $('Validate Input').item.json.session_key }}",
             "channel": "={{ $('Validate Input').item.json.channel_id }}",
             "thread_ts": "={{ $('Validate Input').item.json.thread_ts }}",
             "slack_user": "={{ $('Validate Input').item.json.user_id }}",
             "state": "audience_select",
-            "audience": "",
             "filters_json": "{}",
             "requested_count": 0,
-            "batch_id": "",
-            "email_subject": "",
-            "email_body": "",
-            "calendly_link": "",
-            "last_step_ts": "",
-            "updated_at": "={{ $('Validate Input').item.json.now }}"
+            "updated_at": "={{ $('Validate Input').item.json.now }}",
+            "slack_user_email": "={{ (($('Get Slack User').first().json || {}).profile || {}).email || '' }}"
           },
+          "matchingColumns": [
+            "session_key"
+          ],
           "schema": [
             {
               "id": "session_key",
@@ -239,7 +209,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "channel",
@@ -248,7 +219,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "thread_ts",
@@ -257,7 +229,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "slack_user",
@@ -266,7 +239,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "state",
@@ -275,7 +249,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "audience",
@@ -284,7 +259,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "filters_json",
@@ -293,7 +269,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "requested_count",
@@ -302,7 +279,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "number",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "batch_id",
@@ -311,7 +289,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "email_subject",
@@ -320,7 +299,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "email_body",
@@ -329,7 +309,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "calendly_link",
@@ -338,7 +319,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "last_step_ts",
@@ -347,7 +329,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             },
             {
               "id": "updated_at",
@@ -356,9 +339,12 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "readOnly": false,
+              "removed": false
             }
-          ]
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
@@ -367,7 +353,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        672,
+        2688,
         -160
       ]
     },
@@ -397,8 +383,281 @@
       "typeVersion": 3.5,
       "position": [
         672,
-        160
+        128
       ]
+    },
+    {
+      "parameters": {
+        "content": "## UXR Recruiting Start\n**Entry point of the recruiting wizard.** Darwin (the research Slack agent) calls this workflow as a tool when someone asks it to recruit research participants.\n\nIt does ONE thing: opens the wizard in the Slack thread by posting step 1 (\"who do you want to talk to?\"). Every later step (filters, sample size, candidates, email, send) is handled by **UXR Interaction Handler**, triggered by the button clicks.\n\n**Inputs from Darwin:** channel_id, thread_ts (the thread where the user asked), user_id.\n**Returns to Darwin:** { success, message } so the agent can confirm or apologise.",
+        "height": 352,
+        "width": 364,
+        "color": 4
+      },
+      "id": "2f84a908-d91b-4c54-85f3-eb4d87199254",
+      "name": "Sticky: What this is",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 1. Validate the Slack context\nchannel_id must exist and thread_ts must look like a Slack timestamp (digits.digits). Builds the session key `channel_threadts`: one wizard session (= one recruiting campaign) per thread.\n\nInvalid → *Return Invalid Input*: tells Darwin the wizard did not start.",
+        "height": 376,
+        "width": 296,
+        "color": 5
+      },
+      "id": "e6ecad15-9a72-45f5-a7fe-c85628b20531",
+      "name": "Sticky: Validate",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        128,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 2. One recruiting per thread (strict)\n*Get Existing Session* + *Thread Free?* + *Thread Blocked?*: if this thread has EVER had a campaign row (any state), the wizard does NOT start again here: *Return Blocked* tells Darwin to send the user to a new thread. Rule chosen 2026-09-23: a thread is a campaign, full stop; the old thread keeps tracking its bookings.\n\n*Get Slack User* (users.info on the user_id Darwin passes) gives the researcher's email; on error it continues with an empty email (needs the `users:read.email` scope on the bot).\n\nThe campaign row in **UXR Recruiting - Campaigns** (key `session_key` = channel_threadts) is written by *Upsert Session* only AFTER the step-1 card was posted successfully (see step 3), so a failed Slack post never burns the thread.",
+        "height": 504,
+        "width": 296,
+        "color": 5
+      },
+      "id": "33639e61-6004-4d11-ac41-dbe3c29667a0",
+      "name": "Sticky: Session",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        576,
+        -608
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 3. Post step 1 in the thread, then create the campaign row\n*Load Config* → *Build Step 1* renders one card per audience from UXR Config (`audiences`: label, description, pool) with a Choose button (`uxr_audience_<id>`) plus Cancel (`uxr_cancel`). The Handler routes on these action_ids: change an audience id here AND in the Handler, never one side only.\n\n*Check Post Succeeded*: true → *Upsert Session* writes the campaign row (slack_user + slack_user_email, state `audience_select`, empty filters, count 0, updated_at = now) → *Return Result*. On a Slack error the node continues with an `error` field instead of `ok: true`, so the row is NOT created and *Return Error* gives Darwin Slack's error text: the thread stays free for a retry.",
+        "height": 508,
+        "width": 288,
+        "color": 5
+      },
+      "id": "a0d1c1eb-d21d-460a-a125-95b8efbffc54",
+      "name": "Sticky: Post",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.channel_id }}"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ JSON.stringify({ blocks: JSON.parse($json.blocks) }) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $json.thread_ts }}"
+            }
+          }
+        }
+      },
+      "id": "4792651c-55a0-48e9-90e0-f5f72b47be54",
+      "name": "Post Audience Selection",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2240,
+        -64
+      ],
+      "webhookId": "b32e6d73-2701-4545-80ad-d889c9043891",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "bwOgNKo1fCRR0BMv",
+          "cachedResultName": "UXR Config"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "schema": [],
+          "matchingColumns": []
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "dad3b9ed-3750-4d37-acce-528f6b74eac5",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1792,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $('Validate Input').first().json;\nconst config = $input.first().json || {};\nconst audiences = Array.isArray(config.audiences) && config.audiences.length ? config.audiences : [\n  { id: 'n8n_users', label: 'n8n users', emoji: ':busts_in_silhouette:', description: 'People with an n8n cloud account from Customer.io.' },\n  { id: 'volunteers', label: 'Research volunteers', emoji: ':raising_hand:', description: 'People who signed up through the research webform. Includes non-users.' }\n];\nconst blocks = [\n  { type: 'section', text: { type: 'mrkdwn', text: \":mag: *Recruiting Wizard*\\n\\nWho do you want to talk to?\" } },\n  { type: 'divider' }\n];\nfor (const a of audiences) {\n  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: (a.emoji ? a.emoji + ' ' : '') + '*' + a.label + '*' + (a.pool ? '  ·  _' + a.pool + '_' : '') + '\\n' + (a.description || '') }, accessory: { type: 'button', text: { type: 'plain_text', text: 'Choose', emoji: true }, style: 'primary', action_id: 'uxr_audience_' + a.id, value: a.id } });\n}\nreturn [{ json: { channel_id: v.channel_id, thread_ts: v.thread_ts, blocks: JSON.stringify(blocks) } }];"
+      },
+      "id": "8a3e04d0-f364-476e-ac5c-d92ee426d9aa",
+      "name": "Build Step 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.user_id }}"
+        }
+      },
+      "id": "e714efc6-4a48-4f0f-b807-470333120fae",
+      "name": "Get Slack User",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1344,
+        -256
+      ],
+      "alwaysOutputData": true,
+      "webhookId": "715d7a4d-1d7e-4fe5-a723-bb588272f024",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f6f22bfe-ddf5-486d-ad9e-97eb33e01bbf",
+      "name": "Get Existing Session",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        32
+      ],
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "UXR Recruiting - Campaigns"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Input').first().json.session_key }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "cc20e7f1-cc7d-4276-ab96-2b88410dcf67",
+      "name": "Thread Free?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        32
+      ],
+      "parameters": {
+        "jsCode": "// One recruiting per Slack thread, strictly: if this thread ever started a recruiting (any state, any age), no new one starts here.\n// Simple rule for the user (\"new recruiting = new thread\") and no ambiguity about which campaign a thread belongs to.\nconst v = $('Validate Input').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.session_key);\nconst row = rows[0] || null;\nconst blocked = !!row;\nlet block_message = '';\nif (blocked) {\n  const state = String(row.state || 'unknown');\n  const invited = Number(row.requested_count) || 0;\n  const booked = Number(row.booked_count) || 0;\n  let label = 'in progress, step: ' + state;\n  if (state === 'complete') label = 'complete, ' + invited + ' invited, ' + booked + ' booked';\n  else if (state === 'sending') label = 'sending emails right now';\n  else if (state === 'cancelled') label = 'cancelled';\n  block_message = 'This thread already has a recruiting (' + label + '). The rule is one recruiting per Slack thread, so the wizard cannot start here again. Tell the user to start a new thread for a new recruiting' + (state === 'complete' || state === 'sending' || state === 'cancelled' ? '.' : ', or to continue this one with the cards above.') + ' Do not start the wizard here.';\n}\nreturn [{ json: { ...v, blocked, block_message } }];"
+      }
+    },
+    {
+      "id": "35d843a1-ae3a-4ebf-bd48-7d049b6a2960",
+      "name": "Return Blocked",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1344,
+        160
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "blk-success",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "blk-message",
+              "name": "message",
+              "value": "={{ $json.block_message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2ee6c074-c969-4762-b945-7516d4402b9b",
+      "name": "Thread Blocked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        32
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "tb-1",
+              "leftValue": "={{ $json.blocked }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -413,22 +672,11 @@
         ]
       ]
     },
-    "Post Audience Selection": {
-      "main": [
-        [
-          {
-            "node": "Check Post Succeeded",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Check Post Succeeded": {
       "main": [
         [
           {
-            "node": "Return Result",
+            "node": "Upsert Session",
             "type": "main",
             "index": 0
           }
@@ -457,7 +705,7 @@
       "main": [
         [
           {
-            "node": "Upsert Session",
+            "node": "Get Existing Session",
             "type": "main",
             "index": 0
           }
@@ -471,11 +719,95 @@
         ]
       ]
     },
-    "Upsert Session": {
+    "Post Audience Selection": {
+      "main": [
+        [
+          {
+            "node": "Check Post Succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Build Step 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Step 1": {
       "main": [
         [
           {
             "node": "Post Audience Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Session": {
+      "main": [
+        [
+          {
+            "node": "Thread Free?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Thread Free?": {
+      "main": [
+        [
+          {
+            "node": "Thread Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Thread Blocked?": {
+      "main": [
+        [
+          {
+            "node": "Return Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Slack User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Slack User": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Session": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
             "type": "main",
             "index": 0
           }
@@ -490,7 +822,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "894327aa-79dc-42a0-89bb-c24cd22bd08e",
+  "versionId": "f2119197-801e-4538-9615-1c1e4db4df1a",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

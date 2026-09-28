@@ -1,0 +1,150 @@
+{
+  "id": "tmUbMNzjhobEnQLj",
+  "name": "UXR Calendly Subscribe [scratch]",
+  "description": null,
+  "nodes": [
+    {
+      "id": "af67c83e-5494-4d80-92ae-ff70196767aa",
+      "name": "Subscribe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "uxr-calendly-subscribe",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "746cf9a3-f2fc-46ed-bd13-747776de2a1e"
+    },
+    {
+      "id": "18ed5870-8020-42ad-9c56-37ffef300810",
+      "name": "List Subscriptions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ \"https://api.calendly.com/webhook_subscriptions?scope=organization&organization=\" + encodeURIComponent($json.body.organization) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "calendlyApi": {
+          "id": "yiU0KaLNinfA1n1r",
+          "name": "Giulio - Calendly - UXR Recruiting"
+        }
+      }
+    },
+    {
+      "id": "bd184f9f-ab10-40a6-b87b-2dbd4c78ae41",
+      "name": "Create Subscription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.calendly.com/webhook_subscriptions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $('Subscribe Webhook').first().json.body.url, events: [\"invitee.created\"], organization: $('Subscribe Webhook').first().json.body.organization, scope: \"organization\" }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "calendlyApi": {
+          "id": "yiU0KaLNinfA1n1r",
+          "name": "Giulio - Calendly - UXR Recruiting"
+        }
+      }
+    },
+    {
+      "id": "1664806f-a70d-4ce6-86ca-547c17370697",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "respondWith": "allIncomingItems"
+      }
+    }
+  ],
+  "connections": {
+    "Subscribe Webhook": {
+      "main": [
+        [
+          {
+            "node": "List Subscriptions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Subscriptions": {
+      "main": [
+        [
+          {
+            "node": "Create Subscription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Subscription": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "d1dfcaaf-f4c5-4b7b-827e-1f0b61c0c09d",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "FfjFJ1a0edUECSdp",
+  "isArchived": false,
+  "nodeGroups": []
+}

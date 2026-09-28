@@ -1,0 +1,145 @@
+{
+  "id": "PlNsxfE21gVxinwL",
+  "name": "UXR Search Test [scratch]",
+  "description": "Temporary harness to run the UXR Search sub-workflow with chosen inputs (mode, filters, sampleSize). Safe to delete.",
+  "nodes": [
+    {
+      "id": "ec192b25-c143-466c-81bc-b39cff24cd5f",
+      "name": "Test Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "uxr-search-test",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "4d704c97-7e1e-4e59-8ed5-5943413cde5b"
+    },
+    {
+      "id": "98c3a87a-6caa-494e-9bde-c3a68a595887",
+      "name": "Call UXR Search",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "={{ $json.body.mode || \"n8n_users\" }}",
+            "filters": "={{ $json.body.filters || {} }}",
+            "sampleSize": "={{ Number($json.body.sampleSize) || 5 }}",
+            "excludeRecentDays": "={{ Number($json.body.excludeRecentDays) || 60 }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "63bbca1f-7b87-4fc8-9faa-bd6c83939e66",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "respondWith": "allIncomingItems"
+      }
+    }
+  ],
+  "connections": {
+    "Test Webhook": {
+      "main": [
+        [
+          {
+            "node": "Call UXR Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call UXR Search": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "b5c03e62-fadd-44db-9f43-32b1672f9f88",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "FfjFJ1a0edUECSdp",
+  "isArchived": false,
+  "nodeGroups": []
+}

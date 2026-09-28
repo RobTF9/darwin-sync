@@ -1,0 +1,1367 @@
+{
+  "id": "ZuygnsUjupGgPxfu",
+  "name": "UXR Tests - Search",
+  "description": "Manual integration suite: eleven scenarios call original UXR Search using real Customer.io reads. CSV normalization, mixed input, chunk traversal, configured 200 cap, everyone mode and non-user audience. No email or table writes. Live data varies.",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "f5d752f9-d808-4c15-b81b-5fba23234658",
+      "name": "Run Search Tests",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "csv",
+            "filters": {
+              "emails": []
+            },
+            "sampleSize": 3,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "e9e60727-1275-4574-992b-65d30e2002c3",
+      "name": "Call 1 - CSV empty",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        272,
+        128
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=$input.all(); const r=rows[0]?.json || {}; const checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error && Array.isArray(r.candidates),'candidates array and no error',r.error|| (Array.isArray(r.candidates)?'ok':'missing candidates'));\nconst candidates=Array.isArray(r.candidates)?r.candidates:[];\ncheck('Requested limit respected',candidates.length<=3,'<= 3',candidates.length);\ncheck('Count matches candidate array',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Requested size preserved',r.requestedSize===3,3,r.requestedSize??null);\ncheck('Audience preserved',r.mode===\"csv\",\"csv\",r.mode??null);\nconst emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('Unique email addresses',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Valid single mailboxes',emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)),true,emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)));\ncheck('Candidate identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\ncheck('No eligible matches',candidates.length===0,0,candidates.length);\n\ncheck('CSV input normalized',r.csvStats?.total===0,0,r.csvStats?.total??null);\ncheck('CSV accounting balances',Number.isInteger(r.csvStats?.found)&&Number.isInteger(r.csvStats?.notFoundOrCooldown)&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total,'found + notFoundOrCooldown = total',r.csvStats?{found:r.csvStats.found,notFoundOrCooldown:r.csvStats.notFoundOrCooldown,total:r.csvStats.total}:null);\ncheck('CSV counters use selected addresses',r.csvStats?.selected===candidates.length,candidates.length,r.csvStats?.selected??null);\n\nreturn [{json:{scenario:\"CSV empty\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      },
+      "id": "cdfa76da-9c63-4015-b16c-1e39a67b828a",
+      "name": "Check 1 - CSV empty",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "csv",
+            "filters": {
+              "emails": [
+                "not-an-email",
+                "missing@",
+                ""
+              ]
+            },
+            "sampleSize": 3,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "910b009e-43f7-49f6-a0d0-20f57d38167b",
+      "name": "Call 2 - CSV invalid addresses",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        848,
+        128
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=$input.all(); const r=rows[0]?.json || {}; const checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error && Array.isArray(r.candidates),'candidates array and no error',r.error|| (Array.isArray(r.candidates)?'ok':'missing candidates'));\nconst candidates=Array.isArray(r.candidates)?r.candidates:[];\ncheck('Requested limit respected',candidates.length<=3,'<= 3',candidates.length);\ncheck('Count matches candidate array',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Requested size preserved',r.requestedSize===3,3,r.requestedSize??null);\ncheck('Audience preserved',r.mode===\"csv\",\"csv\",r.mode??null);\nconst emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('Unique email addresses',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Valid single mailboxes',emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)),true,emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)));\ncheck('Candidate identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\ncheck('No eligible matches',candidates.length===0,0,candidates.length);\n\ncheck('CSV input normalized',r.csvStats?.total===0,0,r.csvStats?.total??null);\ncheck('CSV accounting balances',Number.isInteger(r.csvStats?.found)&&Number.isInteger(r.csvStats?.notFoundOrCooldown)&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total,'found + notFoundOrCooldown = total',r.csvStats?{found:r.csvStats.found,notFoundOrCooldown:r.csvStats.notFoundOrCooldown,total:r.csvStats.total}:null);\ncheck('CSV counters use selected addresses',r.csvStats?.selected===candidates.length,candidates.length,r.csvStats?.selected??null);\n\nreturn [{json:{scenario:\"CSV invalid addresses\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      },
+      "id": "16a4e6ff-63f4-4f80-9743-aa90e4db82a4",
+      "name": "Check 2 - CSV invalid addresses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "csv",
+            "filters": {
+              "emails": [
+                "uxr-test-no-profile-20260925@example.invalid"
+              ]
+            },
+            "sampleSize": 3,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "6a6e4a7d-af86-43d5-93e5-c338f6251a2c",
+      "name": "Call 3 - CSV unknown address",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1408,
+        128
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=$input.all(); const r=rows[0]?.json || {}; const checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error && Array.isArray(r.candidates),'candidates array and no error',r.error|| (Array.isArray(r.candidates)?'ok':'missing candidates'));\nconst candidates=Array.isArray(r.candidates)?r.candidates:[];\ncheck('Requested limit respected',candidates.length<=3,'<= 3',candidates.length);\ncheck('Count matches candidate array',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Requested size preserved',r.requestedSize===3,3,r.requestedSize??null);\ncheck('Audience preserved',r.mode===\"csv\",\"csv\",r.mode??null);\nconst emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('Unique email addresses',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Valid single mailboxes',emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)),true,emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)));\ncheck('Candidate identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\ncheck('No eligible matches',candidates.length===0,0,candidates.length);\n\ncheck('CSV input normalized',r.csvStats?.total===1,1,r.csvStats?.total??null);\ncheck('CSV accounting balances',Number.isInteger(r.csvStats?.found)&&Number.isInteger(r.csvStats?.notFoundOrCooldown)&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total,'found + notFoundOrCooldown = total',r.csvStats?{found:r.csvStats.found,notFoundOrCooldown:r.csvStats.notFoundOrCooldown,total:r.csvStats.total}:null);\ncheck('CSV counters use selected addresses',r.csvStats?.selected===candidates.length,candidates.length,r.csvStats?.selected??null);\n\nreturn [{json:{scenario:\"CSV unknown address\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      },
+      "id": "5b65a775-2527-47d8-ab93-4298bda91dfb",
+      "name": "Check 3 - CSV unknown address",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "volunteers",
+            "filters": {},
+            "sampleSize": 2,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "a31bb988-a647-4df1-b5ba-4242769008bf",
+      "name": "Call 4 - Volunteers smoke",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1968,
+        128
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=$input.all(); const r=rows[0]?.json || {}; const checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error && Array.isArray(r.candidates),'candidates array and no error',r.error|| (Array.isArray(r.candidates)?'ok':'missing candidates'));\nconst candidates=Array.isArray(r.candidates)?r.candidates:[];\ncheck('Requested limit respected',candidates.length<=2,'<= 2',candidates.length);\ncheck('Count matches candidate array',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Requested size preserved',r.requestedSize===2,2,r.requestedSize??null);\ncheck('Audience preserved',r.mode===\"volunteers\",\"volunteers\",r.mode??null);\nconst emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('Unique email addresses',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Valid single mailboxes',emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)),true,emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)));\ncheck('Candidate identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\n\ncheck('Live audience has candidates',candidates.length>0,'> 0',candidates.length);\n\n\nreturn [{json:{scenario:\"Volunteers smoke\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      },
+      "id": "1d884874-f943-42ce-9951-c5fe6017c04b",
+      "name": "Check 4 - Volunteers smoke",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2192,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "n8n_users",
+            "filters": {},
+            "sampleSize": 3,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "bc7e4f46-718a-4fd2-af81-8fc1019126b4",
+      "name": "Call 5 - Cloud users smoke",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2528,
+        128
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=$input.all(); const r=rows[0]?.json || {}; const checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error && Array.isArray(r.candidates),'candidates array and no error',r.error|| (Array.isArray(r.candidates)?'ok':'missing candidates'));\nconst candidates=Array.isArray(r.candidates)?r.candidates:[];\ncheck('Requested limit respected',candidates.length<=3,'<= 3',candidates.length);\ncheck('Count matches candidate array',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Requested size preserved',r.requestedSize===3,3,r.requestedSize??null);\ncheck('Audience preserved',r.mode===\"n8n_users\",\"n8n_users\",r.mode??null);\nconst emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('Unique email addresses',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Valid single mailboxes',emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)),true,emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)));\ncheck('Candidate identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\n\ncheck('Live audience has candidates',candidates.length>0,'> 0',candidates.length);\n\n\nreturn [{json:{scenario:\"Cloud users smoke\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      },
+      "id": "88c2a009-ef13-45d9-94da-62043aea8df3",
+      "name": "Check 5 - Cloud users smoke",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "csv",
+            "filters": "={{ { emails: [ $('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || 'missing-fixture@example.invalid', ('  ' + ($('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || 'missing-fixture@example.invalid').toUpperCase() + '  ') ] } }}",
+            "sampleSize": 1,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "385ba891-bfa6-4f54-bec5-463b2293c2e2",
+      "name": "Call 6 - CSV duplicate input",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3088,
+        128
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows=$input.all(); const r=rows[0]?.json || {}; const checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error && Array.isArray(r.candidates),'candidates array and no error',r.error|| (Array.isArray(r.candidates)?'ok':'missing candidates'));\nconst candidates=Array.isArray(r.candidates)?r.candidates:[];\ncheck('Requested limit respected',candidates.length<=1,'<= 1',candidates.length);\ncheck('Count matches candidate array',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Requested size preserved',r.requestedSize===1,1,r.requestedSize??null);\ncheck('Audience preserved',r.mode===\"csv\",\"csv\",r.mode??null);\nconst emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('Unique email addresses',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Valid single mailboxes',emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)),true,emails.every(e=>/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e)));\ncheck('Candidate identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\n\n\ncheck('CSV input normalized',r.csvStats?.total===1,1,r.csvStats?.total??null);\ncheck('CSV accounting balances',Number.isInteger(r.csvStats?.found)&&Number.isInteger(r.csvStats?.notFoundOrCooldown)&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total,'found + notFoundOrCooldown = total',r.csvStats?{found:r.csvStats.found,notFoundOrCooldown:r.csvStats.notFoundOrCooldown,total:r.csvStats.total}:null);\ncheck('CSV counters use selected addresses',r.csvStats?.selected===candidates.length,candidates.length,r.csvStats?.selected??null);\nconst fixture=$('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email;\ncheck('Live fixture available',!!fixture,true,!!fixture);\ncheck('Repeated address yields one candidate',candidates.length===1,1,candidates.length);\ncheck('Returned address matches input',!!fixture&&emails.every(e=>e===fixture.trim().toLowerCase()),true,!!fixture&&emails.every(e=>e===fixture.trim().toLowerCase()));\nreturn [{json:{scenario:\"CSV duplicate input\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      },
+      "id": "96e2300c-0a3e-497b-9b76-dc98874d13b0",
+      "name": "Check 6 - CSV duplicate input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3312,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results=[$('Check 1 - CSV empty').first().json,$('Check 2 - CSV invalid addresses').first().json,$('Check 3 - CSV unknown address').first().json,$('Check 4 - Volunteers smoke').first().json,$('Check 5 - Cloud users smoke').first().json,$('Check 6 - CSV duplicate input').first().json,$(\"Check 7 - CSV mixed input\").first().json,$(\"Check 8 - CSV second chunk\").first().json,$(\"Check 9 - CSV maximum cap\").first().json,$(\"Check 10 - CSV everyone mode\").first().json,$(\"Check 11 - Non-users audience\").first().json];\nconst checks=results.flatMap(r=>r.checks);return [{json:{suite:'UXR Search integration tests',testedWorkflowId:'6uEc2xCDjqeG0OJt',runAt:new Date().toISOString(),scenarios:results.length,passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,assertions:checks.length,assertionsFailed:checks.filter(c=>c.status==='FAIL').length,results,limitations:['Live data changes between runs; smoke failures may reflect data or service availability.','Does not prove cooldown or unsubscribe correctness across every associated profile.','Does not test SMTP, Slack UI, bookings or induced external-service failures.']}}];"
+      },
+      "id": "f4abf99e-f761-4a57-844c-74a8491e2b8a",
+      "name": "Test Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6500,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const report=$input.first().json;\nlet returnReportOnly=false;\ntry { returnReportOnly=$('Called by Test Runner').first().json.returnReportOnly===true; } catch (_) {}\nconst output={...report,status:report.failed>0?'FAIL':'PASS'};\nif(report.failed>0&&!returnReportOnly)throw new Error(report.failed+' scenarios failed. Open Test Report for expected and actual values.');\nreturn [{json:output}];"
+      },
+      "id": "e75e803d-027d-42b5-8162-1bf631fbe030",
+      "name": "Fail If Tests Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6724,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## UXR Search tests — real sub-workflow\nClick Execute workflow, then open Test Report. Six sequential scenarios call the ORIGINAL UXR Search. No copied search logic, no email sending, no table writes, no schedule or webhook.\n\nCustomer.io reads use real data and credentials in UXR Search; execution history may contain profile data. Do not publish this manual runner. Full suite failure is intentional when an assertion fails; report retains expected/actual results. A child workflow error may trigger its existing error handler.\n\nCSV duplicate input uses an eligible address discovered during this run. It tests input normalization and one result per address, NOT a guarantee that conflicting profiles are blocked. Live data is mutable; diagnose red tests before changing expectations.\n\nBefore future runs, review UXR Search if its behavior or external actions have changed.\n\n## Parent test runner\nCalled by Test Runner accepts returnReportOnly=true: failed assertions return a FAIL report instead of throwing, so the parent can aggregate all suites. Manual runs still fail on failed assertions. Unexpected runtime errors are caught by the parent call node. No publication is required for sub-workflow execution.",
+        "height": 368,
+        "width": 656,
+        "color": 5
+      },
+      "id": "315cd0db-6c73-4be0-bf80-abe2cfd25ea8",
+      "name": "Sticky Note 46cae6d9",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        176,
+        -528
+      ]
+    },
+    {
+      "id": "3a83d1ef-85f0-4b6c-843b-47218538c2fb",
+      "name": "Called by Test Runner",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        240
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "returnReportOnly",
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4e032109-9412-451e-87c7-f6cd2009962c",
+      "name": "Call 7 - CSV mixed input",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3600,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "csv",
+            "filters": "={{ { emails: [$('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || 'missing-fixture@example.invalid', '  '+($('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || '').toUpperCase()+'  ', '', 'not-an-email', 'uxr-unknown@example.invalid'] } }}",
+            "sampleSize": 10,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "d3426e2a-91e9-44ef-8659-bda2af96ff94",
+      "name": "Check 7 - CSV mixed input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3824,
+        128
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\nconst candidates=Array.isArray(r.candidates)?r.candidates:[], emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error&&Array.isArray(r.candidates),true,!r.error&&Array.isArray(r.candidates));\ncheck('Requested size normalized',r.requestedSize===10,10,r.requestedSize??null);\ncheck('Selection limit respected',candidates.length<=10,'<= 10',candidates.length);\ncheck('Count matches candidates',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Audience preserved',r.mode===\"csv\",\"csv\",r.mode??null);\ncheck('Unique mailboxes',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\ncheck('CSV normalized total',r.csvStats?.total===2,2,r.csvStats?.total??null);\ncheck('CSV accounting balances',Number.isInteger(r.csvStats?.found)&&Number.isInteger(r.csvStats?.notFoundOrCooldown)&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total,true,!!r.csvStats&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total);\ncheck('CSV selected count',r.csvStats?.selected===candidates.length,candidates.length,r.csvStats?.selected??null);\nconst fixture=$('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email;\ncheck('Live fixture available',!!fixture,true,!!fixture);\ncheck('Known mailbox selected exactly once',candidates.length===1&&emails[0]===String(fixture||'').trim().toLowerCase(),true,candidates.length===1&&emails[0]===String(fixture||'').trim().toLowerCase());\ncheck('Unknown addresses excluded',r.csvStats?.notFoundOrCooldown===1,1,r.csvStats?.notFoundOrCooldown??null);\ncheck('Eligibility attributes fetched',candidates.every(c=>c.attributes_fetched===true),true,candidates.every(c=>c.attributes_fetched===true));\nreturn [{json:{scenario:\"CSV mixed input\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      }
+    },
+    {
+      "id": "39fc09a1-0c38-410b-98e2-58414aad68cc",
+      "name": "Call 8 - CSV second chunk",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4160,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "csv",
+            "filters": "={{ { emails: [...Array.from({length:50}, (_, i) => 'uxr-chunk-'+i+'@example.invalid'), $('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || 'missing-fixture@example.invalid'] } }}",
+            "sampleSize": 1,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "138fbd1c-f6d7-4e98-8183-69f8f7796312",
+      "name": "Check 8 - CSV second chunk",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4384,
+        128
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\nconst candidates=Array.isArray(r.candidates)?r.candidates:[], emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error&&Array.isArray(r.candidates),true,!r.error&&Array.isArray(r.candidates));\ncheck('Requested size normalized',r.requestedSize===1,1,r.requestedSize??null);\ncheck('Selection limit respected',candidates.length<=1,'<= 1',candidates.length);\ncheck('Count matches candidates',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Audience preserved',r.mode===\"csv\",\"csv\",r.mode??null);\ncheck('Unique mailboxes',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\ncheck('CSV normalized total',r.csvStats?.total===51,51,r.csvStats?.total??null);\ncheck('CSV accounting balances',Number.isInteger(r.csvStats?.found)&&Number.isInteger(r.csvStats?.notFoundOrCooldown)&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total,true,!!r.csvStats&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total);\ncheck('CSV selected count',r.csvStats?.selected===candidates.length,candidates.length,r.csvStats?.selected??null);\nconst fixture=$('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email;\ncheck('Live fixture available',!!fixture,true,!!fixture);\ncheck('Known mailbox selected exactly once',candidates.length===1&&emails[0]===String(fixture||'').trim().toLowerCase(),true,candidates.length===1&&emails[0]===String(fixture||'').trim().toLowerCase());\ncheck('Unknown addresses excluded',r.csvStats?.notFoundOrCooldown===50,50,r.csvStats?.notFoundOrCooldown??null);\ncheck('Eligibility attributes fetched',candidates.every(c=>c.attributes_fetched===true),true,candidates.every(c=>c.attributes_fetched===true));\nreturn [{json:{scenario:\"CSV second chunk\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      }
+    },
+    {
+      "id": "21ff5efc-9ffa-47ba-97bf-0bb4eb60d6a3",
+      "name": "Call 9 - CSV maximum cap",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4720,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "csv",
+            "filters": {
+              "emails": []
+            },
+            "sampleSize": 999,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "538c4b29-0fd3-4b8d-a859-2d62979e8e52",
+      "name": "Check 9 - CSV maximum cap",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4944,
+        128
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\nconst candidates=Array.isArray(r.candidates)?r.candidates:[], emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error&&Array.isArray(r.candidates),true,!r.error&&Array.isArray(r.candidates));\ncheck('Requested size normalized',r.requestedSize===200,200,r.requestedSize??null);\ncheck('Selection limit respected',candidates.length<=200,'<= 200',candidates.length);\ncheck('Count matches candidates',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Audience preserved',r.mode===\"csv\",\"csv\",r.mode??null);\ncheck('Unique mailboxes',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\ncheck('CSV normalized total',r.csvStats?.total===0,0,r.csvStats?.total??null);\ncheck('CSV accounting balances',Number.isInteger(r.csvStats?.found)&&Number.isInteger(r.csvStats?.notFoundOrCooldown)&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total,true,!!r.csvStats&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total);\ncheck('CSV selected count',r.csvStats?.selected===candidates.length,candidates.length,r.csvStats?.selected??null);\ncheck('Empty CSV returns no candidates',candidates.length===0,0,candidates.length);\nreturn [{json:{scenario:\"CSV maximum cap\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      }
+    },
+    {
+      "id": "e43d7be8-2124-40b1-9bc3-047781976277",
+      "name": "Call 10 - CSV everyone mode",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5280,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "csv",
+            "filters": {
+              "emails": []
+            },
+            "sampleSize": 0,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "137342af-a336-44b0-92d3-16b33b9e307b",
+      "name": "Check 10 - CSV everyone mode",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5504,
+        128
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\nconst candidates=Array.isArray(r.candidates)?r.candidates:[], emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error&&Array.isArray(r.candidates),true,!r.error&&Array.isArray(r.candidates));\ncheck('Requested size normalized',r.requestedSize===200,200,r.requestedSize??null);\ncheck('Selection limit respected',candidates.length<=200,'<= 200',candidates.length);\ncheck('Count matches candidates',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Audience preserved',r.mode===\"csv\",\"csv\",r.mode??null);\ncheck('Unique mailboxes',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\ncheck('CSV normalized total',r.csvStats?.total===0,0,r.csvStats?.total??null);\ncheck('CSV accounting balances',Number.isInteger(r.csvStats?.found)&&Number.isInteger(r.csvStats?.notFoundOrCooldown)&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total,true,!!r.csvStats&&r.csvStats.found+r.csvStats.notFoundOrCooldown===r.csvStats.total);\ncheck('CSV selected count',r.csvStats?.selected===candidates.length,candidates.length,r.csvStats?.selected??null);\ncheck('Empty CSV returns no candidates',candidates.length===0,0,candidates.length);\nreturn [{json:{scenario:\"CSV everyone mode\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      }
+    },
+    {
+      "id": "f9ab14af-21a3-44dc-a018-fe2f92fd96f7",
+      "name": "Call 11 - Non-users audience",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5840,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "6uEc2xCDjqeG0OJt",
+          "cachedResultName": "UXR Search"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "non_users",
+            "filters": {},
+            "sampleSize": 2,
+            "excludeRecentDays": 60
+          },
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "type": "string",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "filters",
+              "displayName": "filters",
+              "type": "object",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sampleSize",
+              "displayName": "sampleSize",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeRecentDays",
+              "displayName": "excludeRecentDays",
+              "type": "number",
+              "required": false,
+              "display": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "1f0a7c30-0c2f-4a46-9c06-8f0edd8e1c2a",
+      "name": "Check 11 - Non-users audience",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6064,
+        128
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\nconst candidates=Array.isArray(r.candidates)?r.candidates:[], emails=candidates.map(c=>String(c.email||'').trim().toLowerCase());\ncheck('One result object',rows.length===1,1,rows.length);\ncheck('Search completed without error',!r.error&&Array.isArray(r.candidates),true,!r.error&&Array.isArray(r.candidates));\ncheck('Requested size normalized',r.requestedSize===2,2,r.requestedSize??null);\ncheck('Selection limit respected',candidates.length<=2,'<= 2',candidates.length);\ncheck('Count matches candidates',r.sampleSize===candidates.length,candidates.length,r.sampleSize??null);\ncheck('Audience preserved',r.mode===\"volunteers\",\"volunteers\",r.mode??null);\ncheck('Unique mailboxes',new Set(emails).size===emails.length,emails.length,new Set(emails).size);\ncheck('Identifiers present',candidates.every(c=>!!c.cio_id),true,candidates.every(c=>!!c.cio_id));\ncheck('Non-user audience has candidates',candidates.length>0,true,candidates.length>0);\ncheck('Only aware or new participants',candidates.every(c=>['aware','new'].includes(c.n8n_usage)),true,candidates.every(c=>['aware','new'].includes(c.n8n_usage)));\ncheck('Alias applies non-user filter',JSON.stringify(r.filtersApplied?.n8n_usage)===JSON.stringify(['aware','new']),['aware','new'],r.filtersApplied?.n8n_usage??null);\nreturn [{json:{scenario:\"Non-users audience\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',candidateCount:candidates.length,checks}}];"
+      }
+    }
+  ],
+  "connections": {
+    "Run Search Tests": {
+      "main": [
+        [
+          {
+            "node": "Call 1 - CSV empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 1 - CSV empty": {
+      "main": [
+        [
+          {
+            "node": "Check 1 - CSV empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 1 - CSV empty": {
+      "main": [
+        [
+          {
+            "node": "Call 2 - CSV invalid addresses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 2 - CSV invalid addresses": {
+      "main": [
+        [
+          {
+            "node": "Check 2 - CSV invalid addresses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 2 - CSV invalid addresses": {
+      "main": [
+        [
+          {
+            "node": "Call 3 - CSV unknown address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 3 - CSV unknown address": {
+      "main": [
+        [
+          {
+            "node": "Check 3 - CSV unknown address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 3 - CSV unknown address": {
+      "main": [
+        [
+          {
+            "node": "Call 4 - Volunteers smoke",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 4 - Volunteers smoke": {
+      "main": [
+        [
+          {
+            "node": "Check 4 - Volunteers smoke",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 4 - Volunteers smoke": {
+      "main": [
+        [
+          {
+            "node": "Call 5 - Cloud users smoke",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 5 - Cloud users smoke": {
+      "main": [
+        [
+          {
+            "node": "Check 5 - Cloud users smoke",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 5 - Cloud users smoke": {
+      "main": [
+        [
+          {
+            "node": "Call 6 - CSV duplicate input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 6 - CSV duplicate input": {
+      "main": [
+        [
+          {
+            "node": "Check 6 - CSV duplicate input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Report": {
+      "main": [
+        [
+          {
+            "node": "Fail If Tests Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called by Test Runner": {
+      "main": [
+        [
+          {
+            "node": "Call 1 - CSV empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 6 - CSV duplicate input": {
+      "main": [
+        [
+          {
+            "node": "Call 7 - CSV mixed input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 7 - CSV mixed input": {
+      "main": [
+        [
+          {
+            "node": "Check 7 - CSV mixed input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 7 - CSV mixed input": {
+      "main": [
+        [
+          {
+            "node": "Call 8 - CSV second chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 8 - CSV second chunk": {
+      "main": [
+        [
+          {
+            "node": "Check 8 - CSV second chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 8 - CSV second chunk": {
+      "main": [
+        [
+          {
+            "node": "Call 9 - CSV maximum cap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 9 - CSV maximum cap": {
+      "main": [
+        [
+          {
+            "node": "Check 9 - CSV maximum cap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 9 - CSV maximum cap": {
+      "main": [
+        [
+          {
+            "node": "Call 10 - CSV everyone mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 10 - CSV everyone mode": {
+      "main": [
+        [
+          {
+            "node": "Check 10 - CSV everyone mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 10 - CSV everyone mode": {
+      "main": [
+        [
+          {
+            "node": "Call 11 - Non-users audience",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 11 - Non-users audience": {
+      "main": [
+        [
+          {
+            "node": "Check 11 - Non-users audience",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 11 - Non-users audience": {
+      "main": [
+        [
+          {
+            "node": "Test Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "4e77e3f8-20fc-498e-a6cb-eb1c2aeb359b",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "18LaAMBxIP1EjHef",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "65919421-4926-4c4a-b68d-e3ae9718e0bd",
+      "name": "Existing Search scenarios",
+      "nodeIds": [
+        "e9e60727-1275-4574-992b-65d30e2002c3",
+        "cdfa76da-9c63-4015-b16c-1e39a67b828a",
+        "910b009e-43f7-49f6-a0d0-20f57d38167b",
+        "16a4e6ff-63f4-4f80-9743-aa90e4db82a4",
+        "6a6e4a7d-af86-43d5-93e5-c338f6251a2c",
+        "5b65a775-2527-47d8-ab93-4298bda91dfb",
+        "a31bb988-a647-4df1-b5ba-4242769008bf",
+        "1d884874-f943-42ce-9951-c5fe6017c04b",
+        "bc7e4f46-718a-4fd2-af81-8fc1019126b4",
+        "88c2a009-ef13-45d9-94da-62043aea8df3",
+        "385ba891-bfa6-4f54-bec5-463b2293c2e2",
+        "96e2300c-0a3e-497b-9b76-dc98874d13b0"
+      ]
+    },
+    {
+      "id": "62406956-2dbf-4cef-94ec-0fd2c3ecd2bd",
+      "name": "CSV and non-user regression scenarios",
+      "nodeIds": [
+        "4e032109-9412-451e-87c7-f6cd2009962c",
+        "d3426e2a-91e9-44ef-8659-bda2af96ff94",
+        "39fc09a1-0c38-410b-98e2-58414aad68cc",
+        "138fbd1c-f6d7-4e98-8183-69f8f7796312",
+        "21ff5efc-9ffa-47ba-97bf-0bb4eb60d6a3",
+        "538c4b29-0fd3-4b8d-a859-2d62979e8e52",
+        "e43d7be8-2124-40b1-9bc3-047781976277",
+        "137342af-a336-44b0-92d3-16b33b9e307b",
+        "f9ab14af-21a3-44dc-a018-fe2f92fd96f7",
+        "1f0a7c30-0c2f-4a46-9c06-8f0edd8e1c2a"
+      ]
+    },
+    {
+      "id": "20cd5710-8bb4-4f83-a693-f16d8139c864",
+      "name": "Test report",
+      "nodeIds": [
+        "f4abf99e-f761-4a57-844c-74a8491e2b8a",
+        "e75e803d-027d-42b5-8162-1bf631fbe030"
+      ]
+    }
+  ]
+}

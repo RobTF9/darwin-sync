@@ -1,0 +1,272 @@
+{
+  "id": "ao1KXd7ceUJX8Hyw",
+  "name": "UXR Coverage Probe [scratch]",
+  "description": "Temporary probe: samples random stamped profiles (via uxr_shard) that pass the quality gates and reports the % having each filter attribute, plus top values (country format, plans). Read-only. Safe to delete.",
+  "nodes": [
+    {
+      "id": "1179bc71-f9ba-42c9-8605-1eb118a6961f",
+      "name": "Probe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "uxr-coverage-probe",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "71561554-8fcc-4e93-9353-f8520818ca03"
+    },
+    {
+      "id": "380d2e89-9361-46f4-8d19-4458b498bbc2",
+      "name": "Build Shard Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const body = $input.first().json.body || {};\nconst mode = ['non_users','volunteers'].includes(body.mode) ? body.mode : 'n8n_users';\nconst extra = body.filters && typeof body.filters === 'object' ? body.filters : {};\nconst rawClauses = Array.isArray(body.rawClauses) ? body.rawClauses : [];\nfunction withExtra(base) {\n  for (const [k, v] of Object.entries(extra)) {\n    if (Array.isArray(v)) base.push({ or: v.map(x => ({ attribute: { field: k, operator: 'eq', value: String(x) } })) });\n    else if (v !== null && v !== undefined && v !== '') base.push({ attribute: { field: k, operator: 'eq', value: String(v) } });\n  }\n  for (const c of rawClauses) base.push(c);\n  return base;\n}\nif (mode === 'volunteers') {\n  const base = withExtra([\n    { attribute: { field: 'email', operator: 'exists' } },\n    { attribute: { field: 'origin', operator: 'eq', value: 'user_research_webform' } }\n  ]);\n  return [{ json: { mode, paginated: true, sampleTarget: Number(body.sample) || 400, cioFilter: { filter: { and: base } } } }];\n}\nconst shards = Number(body.shards) || 40;\nconst used = new Set();\nwhile (used.size < shards) used.add(Math.floor(Math.random() * 4096));\nconst base = mode === 'n8n_users' ? [\n  { attribute: { field: 'email', operator: 'exists' } },\n  { not: { attribute: { field: 'unsubscribed', operator: 'eq', value: 'true' } } },\n  { attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } },\n  { attribute: { field: 'confirmed', operator: 'eq', value: 'true' } }\n] : [\n  { attribute: { field: 'email', operator: 'exists' } },\n  { attribute: { field: 'origin', operator: 'eq', value: 'user_research_webform' } },\n  { not: { attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } } }\n];\nwithExtra(base);\nreturn Array.from(used).map(sh => ({ json: { mode, paginated: false, shard: sh, sampleTarget: Number(body.sample) || 200, cioFilter: { filter: { and: base.concat([{ attribute: { field: 'uxr_shard', operator: 'eq', value: String(sh) } }]) } } } }));"
+      }
+    },
+    {
+      "id": "2e1168d6-92f2-4721-a823-9c778719f0f3",
+      "name": "Query Shard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.customer.io/v1/customers",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "customerIoApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.cioFilter) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "start",
+                    "value": "={{ $response.body.next }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body || !$response.body.next }}",
+              "limitPagesFetched": true,
+              "maxRequests": "={{ $json.paginated ? 12 : 1 }}"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "customerIoApi": {
+          "id": "qecydLSpSosOfmJw",
+          "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a344db08-cb24-40ba-9f7e-3b5d19bbc6dc",
+      "name": "Collect & Sample",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const q = $('Build Shard Queries').all().map(i => i.json);\nconst pages = $input.all().map(i => i.json);\nlet errors = 0, rows = [], perShard = [];\npages.forEach((p, idx) => {\n  const status = p.statusCode || 0;\n  if (status >= 400) { errors++; return; }\n  const ids = (p.body && p.body.identifiers) || [];\n  perShard.push(ids.length);\n  rows = rows.concat(ids.map(r => ({ cio_id: r.cio_id, id: r.id, email: r.email })));\n});\n// dedupe (paginated mode may repeat none, but be safe)\nconst seen = new Set(); rows = rows.filter(r => { if (seen.has(r.cio_id)) return false; seen.add(r.cio_id); return true; });\nfor (let i = rows.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }\nconst target = (q[0] && q[0].sampleTarget) || 200;\nconst sample = rows.slice(0, target);\nconst meta = { mode: q[0] && q[0].mode, paginated: !!(q[0] && q[0].paginated), queries: q.length, pagesOrShards: pages.length, queryErrors: errors, collected: rows.length, perPageMin: perShard.length ? Math.min(...perShard) : 0, perPageMax: perShard.length ? Math.max(...perShard) : 0, sampled: sample.length };\nif (sample.length === 0) return [{ json: { __empty: true, meta } }];\nreturn sample.map(r => ({ json: { ...r, meta } }));"
+      }
+    },
+    {
+      "id": "980806e2-c088-4436-888d-4b0d145a7086",
+      "name": "Fetch Attributes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.__empty ? 'https://api.customer.io/v1/customers/none/attributes' : ('https://api.customer.io/v1/customers/' + $json.cio_id + '/attributes?id_type=cio_id') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "customerIoApi",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 600
+            }
+          }
+        }
+      },
+      "credentials": {
+        "customerIoApi": {
+          "id": "qecydLSpSosOfmJw",
+          "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "aa04d6a8-2a59-485e-9211-f321fb66cfd6",
+      "name": "Aggregate Coverage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const samples = $('Collect & Sample').all().map(i => i.json);\nconst meta = (samples[0] && samples[0].meta) || {};\nconst fetched = $input.all().map(i => i.json);\nconst fields = ['cloud_plan','cloud_plan_status','job_role','utm_user_role','company_size','country','timezone','tech_skills_count','marketing_consent','instance_last_seen_at','wf_bucket','services_bucket','ai_wfs_bucket','days_bucket','successful_prod_exec_workflows','services_count','ai_active_wfs','sync_from_big_query','first_name','n8n_usage','tech_skills','last_user_research_invite_date','uxr_shard','unsubscribed','origin'];\nconst present = {}; fields.forEach(f => present[f] = 0);\nconst values = { cloud_plan: {}, cloud_plan_status: {}, job_role: {}, utm_user_role: {}, company_size: {}, country: {}, timezone: {}, tech_skills_count: {}, origin: {}, n8n_usage: {}, tech_skills: {} };\nlet ok = 0, notFound = 0;\nfor (const r of fetched) {\n  const a = r && r.customer && r.customer.attributes;\n  if (!a) { notFound++; continue; }\n  ok++;\n  for (const f of fields) { const v = a[f]; if (v !== undefined && v !== null && String(v).trim() !== '') present[f]++; }\n  for (const f of Object.keys(values)) { const v = a[f]; if (v !== undefined && v !== null && String(v) !== '') { const k = String(v).slice(0, 40); values[f][k] = (values[f][k] || 0) + 1; } }\n}\nconst pct = {}; for (const f of fields) pct[f] = ok ? Math.round(100 * present[f] / ok) : null;\nconst top = {}; for (const f of Object.keys(values)) top[f] = Object.entries(values[f]).sort((a,b)=>b[1]-a[1]).slice(0, 30).map(([k,v]) => k + ': ' + v);\nreturn [{ json: { meta, profilesWithAttributes: ok, notFound, coveragePct: pct, topValues: top } }];"
+      },
+      "executeOnce": false
+    },
+    {
+      "id": "4153accb-9d94-4ee8-a8f4-050d5a0e8025",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "respondWith": "allIncomingItems"
+      }
+    }
+  ],
+  "connections": {
+    "Probe Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Shard Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Shard Queries": {
+      "main": [
+        [
+          {
+            "node": "Query Shard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Shard": {
+      "main": [
+        [
+          {
+            "node": "Collect & Sample",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect & Sample": {
+      "main": [
+        [
+          {
+            "node": "Fetch Attributes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Attributes": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Coverage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Coverage": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "70923fcc-999b-4c27-afd8-ab11b64a0118",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "FfjFJ1a0edUECSdp",
+  "isArchived": false,
+  "nodeGroups": []
+}

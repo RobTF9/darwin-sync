@@ -1,0 +1,679 @@
+{
+  "id": "3DAzktrBB5f3RIfH",
+  "name": "UXR Tests - Recruiting Start",
+  "description": "Six invalid-input scenarios call original Recruiting Start. No valid Slack context or Send calls. Output assertions; inspect child traces for side effects. Manual or Run All.",
+  "nodes": [
+    {
+      "id": "5d72fd65-41f7-411a-a97d-2d8fc3b9952b",
+      "name": "Run Start Tests",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ac34626b-f200-4f7a-9357-82818b9f9f2d",
+      "name": "Call 1 - Empty context",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "8Ypvt6VuLiQCMZT7"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel_id": "",
+            "thread_ts": "",
+            "user_id": ""
+          },
+          "schema": [
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "230d222b-baf5-463b-8299-cd49584545c4",
+      "name": "Check 1 - Empty context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One response',rows.length===1,1,rows.length);\ncheck('Start explicitly rejected',r.success===false,false,r.success??null);\ncheck('Correct validation message',r.message===\"Missing or invalid Slack context (channel_id=empty, thread_ts=empty). Tell the user something went wrong and the recruiting wizard did not start.\",\"Missing or invalid Slack context (channel_id=empty, thread_ts=empty). Tell the user something went wrong and the recruiting wizard did not start.\",r.message??null);\ncheck('No unexpected execution error',!r.error,true,!r.error);\nreturn [{json:{scenario:\"Empty context\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',checks}}];"
+      }
+    },
+    {
+      "id": "9e277175-fe38-4d32-a24a-23a3277dbc2e",
+      "name": "Call 2 - Missing channel",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "8Ypvt6VuLiQCMZT7"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel_id": "",
+            "thread_ts": "1790497636.000001",
+            "user_id": ""
+          },
+          "schema": [
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "ac9d236c-c636-4c76-9b4f-71e256d76636",
+      "name": "Check 2 - Missing channel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One response',rows.length===1,1,rows.length);\ncheck('Start explicitly rejected',r.success===false,false,r.success??null);\ncheck('Correct validation message',r.message===\"Missing or invalid Slack context (channel_id=empty, thread_ts=1790497636.000001). Tell the user something went wrong and the recruiting wizard did not start.\",\"Missing or invalid Slack context (channel_id=empty, thread_ts=1790497636.000001). Tell the user something went wrong and the recruiting wizard did not start.\",r.message??null);\ncheck('No unexpected execution error',!r.error,true,!r.error);\nreturn [{json:{scenario:\"Missing channel\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',checks}}];"
+      }
+    },
+    {
+      "id": "21832515-bf5b-4382-be00-6e400fa4e22d",
+      "name": "Call 3 - Whitespace channel",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        96
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "8Ypvt6VuLiQCMZT7"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel_id": "   ",
+            "thread_ts": "1790497636.000001",
+            "user_id": ""
+          },
+          "schema": [
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "fbdb8832-d9b8-4474-a93b-9eac6de19b7a",
+      "name": "Check 3 - Whitespace channel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One response',rows.length===1,1,rows.length);\ncheck('Start explicitly rejected',r.success===false,false,r.success??null);\ncheck('Correct validation message',r.message===\"Missing or invalid Slack context (channel_id=empty, thread_ts=1790497636.000001). Tell the user something went wrong and the recruiting wizard did not start.\",\"Missing or invalid Slack context (channel_id=empty, thread_ts=1790497636.000001). Tell the user something went wrong and the recruiting wizard did not start.\",r.message??null);\ncheck('No unexpected execution error',!r.error,true,!r.error);\nreturn [{json:{scenario:\"Whitespace channel\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',checks}}];"
+      }
+    },
+    {
+      "id": "17c129b7-d7de-4c67-8bbc-2af63a6082f1",
+      "name": "Call 4 - Missing timestamp",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        96
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "8Ypvt6VuLiQCMZT7"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel_id": "UXR_TEST_INVALID_CHANNEL",
+            "thread_ts": "",
+            "user_id": ""
+          },
+          "schema": [
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a2f5a508-697a-493b-ae31-a34aca11e69d",
+      "name": "Check 4 - Missing timestamp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One response',rows.length===1,1,rows.length);\ncheck('Start explicitly rejected',r.success===false,false,r.success??null);\ncheck('Correct validation message',r.message===\"Missing or invalid Slack context (channel_id=UXR_TEST_INVALID_CHANNEL, thread_ts=empty). Tell the user something went wrong and the recruiting wizard did not start.\",\"Missing or invalid Slack context (channel_id=UXR_TEST_INVALID_CHANNEL, thread_ts=empty). Tell the user something went wrong and the recruiting wizard did not start.\",r.message??null);\ncheck('No unexpected execution error',!r.error,true,!r.error);\nreturn [{json:{scenario:\"Missing timestamp\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',checks}}];"
+      }
+    },
+    {
+      "id": "7546746b-9a1f-4c67-8c44-8c934271d7fc",
+      "name": "Call 5 - Malformed timestamp",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2016,
+        96
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "8Ypvt6VuLiQCMZT7"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel_id": "UXR_TEST_INVALID_CHANNEL",
+            "thread_ts": "not-a-timestamp",
+            "user_id": ""
+          },
+          "schema": [
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "01e8212f-eb6e-463b-8ea3-94b55abbf84a",
+      "name": "Check 5 - Malformed timestamp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One response',rows.length===1,1,rows.length);\ncheck('Start explicitly rejected',r.success===false,false,r.success??null);\ncheck('Correct validation message',r.message===\"Missing or invalid Slack context (channel_id=UXR_TEST_INVALID_CHANNEL, thread_ts=not-a-timestamp). Tell the user something went wrong and the recruiting wizard did not start.\",\"Missing or invalid Slack context (channel_id=UXR_TEST_INVALID_CHANNEL, thread_ts=not-a-timestamp). Tell the user something went wrong and the recruiting wizard did not start.\",r.message??null);\ncheck('No unexpected execution error',!r.error,true,!r.error);\nreturn [{json:{scenario:\"Malformed timestamp\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',checks}}];"
+      }
+    },
+    {
+      "id": "d96b02eb-b715-43fe-bd73-18ad66fffab1",
+      "name": "Call 6 - Integer timestamp",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2464,
+        96
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "8Ypvt6VuLiQCMZT7"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel_id": "UXR_TEST_INVALID_CHANNEL",
+            "thread_ts": "1790497636",
+            "user_id": ""
+          },
+          "schema": [
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "type": "string",
+              "required": false,
+              "display": true
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "0fd12c51-9c82-405d-9ee6-26f1751ff6f1",
+      "name": "Check 6 - Integer timestamp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const rows=$input.all(), r=rows[0]?.json||{}, checks=[];\nfunction check(name,ok,expected,actual){checks.push({name,status:ok?'PASS':'FAIL',expected,actual});}\ncheck('One response',rows.length===1,1,rows.length);\ncheck('Start explicitly rejected',r.success===false,false,r.success??null);\ncheck('Correct validation message',r.message===\"Missing or invalid Slack context (channel_id=UXR_TEST_INVALID_CHANNEL, thread_ts=1790497636). Tell the user something went wrong and the recruiting wizard did not start.\",\"Missing or invalid Slack context (channel_id=UXR_TEST_INVALID_CHANNEL, thread_ts=1790497636). Tell the user something went wrong and the recruiting wizard did not start.\",r.message??null);\ncheck('No unexpected execution error',!r.error,true,!r.error);\nreturn [{json:{scenario:\"Integer timestamp\",status:checks.every(c=>c.status==='PASS')?'PASS':'FAIL',checks}}];"
+      }
+    },
+    {
+      "id": "525075a0-7209-4fe0-9510-0a417670b00a",
+      "name": "Test Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const results=[$('Check 1 - Empty context').first().json,$('Check 2 - Missing channel').first().json,$('Check 3 - Whitespace channel').first().json,$('Check 4 - Missing timestamp').first().json,$('Check 5 - Malformed timestamp').first().json,$('Check 6 - Integer timestamp').first().json];\nconst checks=results.flatMap(r=>r.checks);const failed=results.filter(r=>r.status==='FAIL').length;\nreturn [{json:{suite:'UXR Recruiting Start integration tests',testedWorkflowId:'8Ypvt6VuLiQCMZT7',status:failed?'FAIL':'PASS',runAt:new Date().toISOString(),scenarios:results.length,failed,passed:results.length-failed,assertions:checks.length,assertionsFailed:checks.filter(c=>c.status==='FAIL').length,results,limitations:['Invalid input only. Valid starts and existing sessions are not covered.','Assertions check returned output. Inspect child execution traces to verify no Slack or session nodes ran.']}}];"
+      }
+    },
+    {
+      "id": "abae336f-d414-4e2c-91ba-bde035432555",
+      "name": "Fail If Tests Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3136,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const r=$input.first().json;let only=false;try{only=$('Called by Test Runner').first().json.returnReportOnly===true;}catch(_){}if(r.failed>0&&!only)throw new Error('Recruiting Start tests failed. Inspect Test Report.');return $input.all();"
+      }
+    },
+    {
+      "id": "762e2810-d93c-4857-be9b-3bb94f65fe80",
+      "name": "Called by Test Runner",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    }
+  ],
+  "connections": {
+    "Run Start Tests": {
+      "main": [
+        [
+          {
+            "node": "Call 1 - Empty context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 1 - Empty context": {
+      "main": [
+        [
+          {
+            "node": "Check 1 - Empty context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 1 - Empty context": {
+      "main": [
+        [
+          {
+            "node": "Call 2 - Missing channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 2 - Missing channel": {
+      "main": [
+        [
+          {
+            "node": "Check 2 - Missing channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 2 - Missing channel": {
+      "main": [
+        [
+          {
+            "node": "Call 3 - Whitespace channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 3 - Whitespace channel": {
+      "main": [
+        [
+          {
+            "node": "Check 3 - Whitespace channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 3 - Whitespace channel": {
+      "main": [
+        [
+          {
+            "node": "Call 4 - Missing timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 4 - Missing timestamp": {
+      "main": [
+        [
+          {
+            "node": "Check 4 - Missing timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 4 - Missing timestamp": {
+      "main": [
+        [
+          {
+            "node": "Call 5 - Malformed timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 5 - Malformed timestamp": {
+      "main": [
+        [
+          {
+            "node": "Check 5 - Malformed timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 5 - Malformed timestamp": {
+      "main": [
+        [
+          {
+            "node": "Call 6 - Integer timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 6 - Integer timestamp": {
+      "main": [
+        [
+          {
+            "node": "Check 6 - Integer timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 6 - Integer timestamp": {
+      "main": [
+        [
+          {
+            "node": "Test Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Report": {
+      "main": [
+        [
+          {
+            "node": "Fail If Tests Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called by Test Runner": {
+      "main": [
+        [
+          {
+            "node": "Call 1 - Empty context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "6c508e4f-39a8-481d-b9bc-1a5d40352526",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "18LaAMBxIP1EjHef",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "7806e615-e655-4cbf-a0b3-f46198bc3c49",
+      "name": "Missing or blank context",
+      "nodeIds": [
+        "ac34626b-f200-4f7a-9357-82818b9f9f2d",
+        "230d222b-baf5-463b-8299-cd49584545c4",
+        "9e277175-fe38-4d32-a24a-23a3277dbc2e",
+        "ac9d236c-c636-4c76-9b4f-71e256d76636",
+        "21832515-bf5b-4382-be00-6e400fa4e22d",
+        "fbdb8832-d9b8-4474-a93b-9eac6de19b7a"
+      ]
+    },
+    {
+      "id": "f03e0d07-1b65-46b2-95c5-98a99856c34c",
+      "name": "Invalid timestamps",
+      "nodeIds": [
+        "17c129b7-d7de-4c67-8bbc-2af63a6082f1",
+        "a2f5a508-697a-493b-ae31-a34aca11e69d",
+        "7546746b-9a1f-4c67-8c44-8c934271d7fc",
+        "01e8212f-eb6e-463b-8ea3-94b55abbf84a",
+        "d96b02eb-b715-43fe-bd73-18ad66fffab1",
+        "0fd12c51-9c82-405d-9ee6-26f1751ff6f1"
+      ]
+    },
+    {
+      "id": "f75df98f-ee7e-4dbb-8d73-db52d7bf6053",
+      "name": "Report",
+      "nodeIds": [
+        "525075a0-7209-4fe0-9510-0a417670b00a",
+        "abae336f-d414-4e2c-91ba-bde035432555"
+      ]
+    }
+  ]
+}

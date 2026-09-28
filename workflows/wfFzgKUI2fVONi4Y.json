@@ -1,9 +1,11 @@
 {
   "id": "wfFzgKUI2fVONi4Y",
   "name": "Darwin-NPS backfill",
+  "description": null,
   "nodes": [
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "projectId": {
           "__rl": true,
           "mode": "id",
@@ -21,9 +23,9 @@
         0
       ],
       "credentials": {
-        "googleBigQueryOAuth2Api": {
-          "id": "92ZMRuOZEOJHwoRi",
-          "name": "Nik's Big Query"
+        "googleApi": {
+          "id": "0pCOXJXMqCYd7C37",
+          "name": "BigQuery n8n Service Account"
         }
       }
     },
@@ -537,7 +539,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "b935ad77-7e78-4682-9298-9240b6f5c1b3",
+  "versionId": "05f9427b-026d-47af-b4d1-ebf90c7a55e0",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

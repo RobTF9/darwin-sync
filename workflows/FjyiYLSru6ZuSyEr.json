@@ -1,0 +1,414 @@
+{
+  "id": "FjyiYLSru6ZuSyEr",
+  "name": "UXR Calendly Booking Webhook",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## UXR Calendly Booking\nCalendly organization webhook (invitee.created) -> this URL. Only bookings made through a wizard link count: Prepare Send appends utm_source=uxr_recruiting and utm_campaign=<batch_id> to the Calendly link, Calendly echoes them in payload.tracking.\n\nFlow: match the invitee email to the batch candidate -> status booked + booked_at -> booked_count +1 on the session -> :tada: message in the recruiting thread (skipped when the session has no thread).\n\nThe webhook subscription lives in Calendly (organization scope) and was created via the API with Giulio's PAT. Signing-key check: not implemented yet (staging).",
+        "height": 300,
+        "width": 520
+      },
+      "id": "490090f4-50ae-49a1-80d8-4b8fd521fa6a",
+      "name": "Sticky Note d5d6072b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -368
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "uxr-calendly-booking",
+        "options": {}
+      },
+      "id": "1ddd7b94-26e4-45e3-819d-e949cb1c5090",
+      "name": "Calendly Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "63d30c16-435e-48ba-93c6-926e896a3029"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = ($('Load Config').first() || {}).json || {};\nconst utmSource = String(cfg.calendlyUtmSource || 'uxr_recruiting');\nconst b = $('Calendly Webhook').first().json.body || {};\nconst p = b.payload || {};\nconst t = p.tracking || {};\nconst ev = p.scheduled_event || {};\n// Only invitee.created bookings that came through a wizard link (utm_source = Config calendlyUtmSource, utm_campaign = <batch_id>)\nif (b.event !== 'invitee.created') return [];\nif (String(t.utm_source || '') !== utmSource || !t.utm_campaign) return [];\nreturn [{ json: {\n  batch_id: String(t.utm_campaign),\n  email: String(p.email || '').trim().toLowerCase(),\n  invitee_name: p.name || '',\n  event_name: ev.name || 'Research session',\n  start_time: ev.start_time || '',\n  booked_at: new Date().toISOString(),\n  invitee_uri: p.uri || ''\n} }];"
+      },
+      "id": "8e9e3f49-8df0-435d-9b7e-6276c9382ac4",
+      "name": "Parse Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "kg4tyWXVPE6h5pH6",
+          "cachedResultName": "UXR Recruiting - Candidates"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "batch_id",
+              "keyValue": "={{ $json.batch_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "4450baa0-b245-425e-967e-c9658655643f",
+      "name": "Get Batch Candidates",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const bk = $('Parse Booking').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.email);\nconst row = rows.find(r => String(r.email).trim().toLowerCase() === bk.email);\n// Unknown email for this batch (forwarded link, typo): nothing to update\nif (!row) return [];\nreturn [{ json: { ...bk, row_id: row.id, already_booked: row.status === 'booked' } }];"
+      },
+      "id": "067395bb-d83c-4301-891c-7c24406c7ca7",
+      "name": "Match Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "kg4tyWXVPE6h5pH6",
+          "cachedResultName": "UXR Recruiting - Candidates"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyValue": "={{ $json.row_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ],
+          "value": {
+            "status": "booked",
+            "booked_at": "={{ $json.booked_at }}"
+          },
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "49ec0f45-6e75-4570-b357-0781b25806c3",
+      "name": "Mark Candidate Booked",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "UXR Recruiting - Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "batch_id",
+              "keyValue": "={{ $('Match Candidate').first().json.batch_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "id": "cbdfa3b1-16c5-49b5-bb10-efadc5408f4c",
+      "name": "Get Session By Batch",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const bk = $('Match Candidate').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.session_key);\nif (!rows.length) return [];\nconst s = rows[0];\nconst count = (Number(s.booked_count) || 0) + (bk.already_booked ? 0 : 1);\nconst when = bk.start_time ? new Date(bk.start_time).toUTCString().replace(':00 GMT', ' UTC') : 'a date to be confirmed';\nconst text = ':tada: *New booking!* `' + bk.email + '`' + (bk.invitee_name ? ' (' + bk.invitee_name + ')' : '') + ' booked *' + bk.event_name + '* for ' + when + '.\\n_' + count + ' booking' + (count === 1 ? '' : 's') + ' so far for batch `' + bk.batch_id + '`' + (s.requested_count ? ' (' + s.requested_count + ' invited)' : '') + '._';\nreturn [{ json: { session_key: s.session_key, booked_count: count, channel: s.channel || '', thread_ts: s.thread_ts || '', text } }];"
+      },
+      "id": "8816c555-c813-4a30-a2b0-1b82ee3dd37e",
+      "name": "Bump Booked Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WiCU0xKx5UzjGWkS",
+          "cachedResultName": "UXR Recruiting - Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_key",
+              "keyValue": "={{ $json.session_key }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "session_key"
+          ],
+          "value": {
+            "booked_count": "={{ $json.booked_count }}"
+          },
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "db5b2b52-755e-40eb-b43a-771f9696b1f6",
+      "name": "Update Session Count",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Bump Booked Count').first().json;\n// Sessions created before 2026-09-22 14:00 lost channel/thread_ts (Handler bug): skip the Slack post, the tables are still updated\nif (!b.channel || !b.thread_ts) return [];\nreturn [{ json: b }];"
+      },
+      "id": "0ee7272f-d143-4c7e-92e4-97272176fb5a",
+      "name": "Has Slack Thread?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.channel }}"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $json.thread_ts }}"
+            }
+          }
+        }
+      },
+      "id": "8b0c6ac8-0584-4bac-af1d-3eb6c9c6c509",
+      "name": "Post Booking In Thread",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2240,
+        0
+      ],
+      "webhookId": "15ff893a-92b7-4d3a-acf3-3c7c752911e7",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "bwOgNKo1fCRR0BMv",
+          "cachedResultName": "UXR Config"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "schema": [],
+          "matchingColumns": []
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "bb3f421e-e0ae-4ea5-8c81-0ae850d09f11",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Parse Booking": {
+      "main": [
+        [
+          {
+            "node": "Get Batch Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Batch Candidates": {
+      "main": [
+        [
+          {
+            "node": "Match Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Candidate": {
+      "main": [
+        [
+          {
+            "node": "Mark Candidate Booked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Candidate Booked": {
+      "main": [
+        [
+          {
+            "node": "Get Session By Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Session By Batch": {
+      "main": [
+        [
+          {
+            "node": "Bump Booked Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bump Booked Count": {
+      "main": [
+        [
+          {
+            "node": "Update Session Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Session Count": {
+      "main": [
+        [
+          {
+            "node": "Has Slack Thread?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Slack Thread?": {
+      "main": [
+        [
+          {
+            "node": "Post Booking In Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendly Webhook": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Parse Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "edd514a9-2df7-49e8-bf8a-d1bb7c658296",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "prCy2Gu2VEMt3ALB",
+  "isArchived": false,
+  "nodeGroups": []
+}
