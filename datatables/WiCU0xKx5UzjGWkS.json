@@ -109,6 +109,12 @@
       "name": "csv_emails_json",
       "type": "string",
       "index": 17
+    },
+    {
+      "id": "kBs00aHHxhOKytqW",
+      "name": "sample_target_count",
+      "type": "number",
+      "index": 18
     }
   ],
   "ownedBy": {
@@ -117,5 +123,5 @@
     "teamName": "Darwin"
   },
   "createdAt": "2026-08-07T16:56:45.637Z",
-  "updatedAt": "2026-09-23T06:47:14.767Z"
+  "updatedAt": "2026-09-29T05:16:27.704Z"
 }
