@@ -23,7 +23,7 @@
             {
               "id": "live-mode",
               "name": "liveMode",
-              "value": true,
+              "value": false,
               "type": "boolean"
             },
             {
@@ -202,7 +202,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "2ec52da8-5fb9-471f-a6ee-396e4dd5e8c8",
+  "versionId": "f8022064-6fc3-4e59-a48a-3096da1c32a8",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

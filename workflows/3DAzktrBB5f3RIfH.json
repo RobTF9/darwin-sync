@@ -34,7 +34,8 @@
           "value": {
             "channel_id": "",
             "thread_ts": "",
-            "user_id": ""
+            "user_id": "",
+            "test_mode": true
           },
           "schema": [
             {
@@ -55,6 +56,13 @@
               "id": "user_id",
               "displayName": "user_id",
               "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
               "required": false,
               "display": true
             }
@@ -102,7 +110,8 @@
           "value": {
             "channel_id": "",
             "thread_ts": "1790497636.000001",
-            "user_id": ""
+            "user_id": "",
+            "test_mode": true
           },
           "schema": [
             {
@@ -123,6 +132,13 @@
               "id": "user_id",
               "displayName": "user_id",
               "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
               "required": false,
               "display": true
             }
@@ -170,7 +186,8 @@
           "value": {
             "channel_id": "   ",
             "thread_ts": "1790497636.000001",
-            "user_id": ""
+            "user_id": "",
+            "test_mode": true
           },
           "schema": [
             {
@@ -191,6 +208,13 @@
               "id": "user_id",
               "displayName": "user_id",
               "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
               "required": false,
               "display": true
             }
@@ -238,7 +262,8 @@
           "value": {
             "channel_id": "UXR_TEST_INVALID_CHANNEL",
             "thread_ts": "",
-            "user_id": ""
+            "user_id": "",
+            "test_mode": true
           },
           "schema": [
             {
@@ -259,6 +284,13 @@
               "id": "user_id",
               "displayName": "user_id",
               "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
               "required": false,
               "display": true
             }
@@ -306,7 +338,8 @@
           "value": {
             "channel_id": "UXR_TEST_INVALID_CHANNEL",
             "thread_ts": "not-a-timestamp",
-            "user_id": ""
+            "user_id": "",
+            "test_mode": true
           },
           "schema": [
             {
@@ -327,6 +360,13 @@
               "id": "user_id",
               "displayName": "user_id",
               "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
               "required": false,
               "display": true
             }
@@ -374,7 +414,8 @@
           "value": {
             "channel_id": "UXR_TEST_INVALID_CHANNEL",
             "thread_ts": "1790497636",
-            "user_id": ""
+            "user_id": "",
+            "test_mode": true
           },
           "schema": [
             {
@@ -395,6 +436,13 @@
               "id": "user_id",
               "displayName": "user_id",
               "type": "string",
+              "required": false,
+              "display": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
               "required": false,
               "display": true
             }
@@ -634,7 +682,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "6c508e4f-39a8-481d-b9bc-1a5d40352526",
+  "versionId": "7227cda4-52bc-4734-945c-a8af9855dea5",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

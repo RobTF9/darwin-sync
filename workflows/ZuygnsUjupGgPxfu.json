@@ -30,7 +30,8 @@
               "emails": []
             },
             "sampleSize": 3,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -68,6 +69,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -121,7 +129,8 @@
               ]
             },
             "sampleSize": 3,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -159,6 +168,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -210,7 +226,8 @@
               ]
             },
             "sampleSize": 3,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -248,6 +265,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -295,7 +319,8 @@
             "mode": "volunteers",
             "filters": {},
             "sampleSize": 2,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -333,6 +358,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -380,7 +412,8 @@
             "mode": "n8n_users",
             "filters": {},
             "sampleSize": 3,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -418,6 +451,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -465,7 +505,8 @@
             "mode": "csv",
             "filters": "={{ { emails: [ $('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || 'missing-fixture@example.invalid', ('  ' + ($('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || 'missing-fixture@example.invalid').toUpperCase() + '  ') ] } }}",
             "sampleSize": 1,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -503,6 +544,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -621,7 +669,8 @@
             "mode": "csv",
             "filters": "={{ { emails: [$('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || 'missing-fixture@example.invalid', '  '+($('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || '').toUpperCase()+'  ', '', 'not-an-email', 'uxr-unknown@example.invalid'] } }}",
             "sampleSize": 10,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -659,6 +708,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -706,7 +762,8 @@
             "mode": "csv",
             "filters": "={{ { emails: [...Array.from({length:50}, (_, i) => 'uxr-chunk-'+i+'@example.invalid'), $('Call 5 - Cloud users smoke').first().json.candidates?.[0]?.email || 'missing-fixture@example.invalid'] } }}",
             "sampleSize": 1,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -744,6 +801,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -793,7 +857,8 @@
               "emails": []
             },
             "sampleSize": 999,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -831,6 +896,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -880,7 +952,8 @@
               "emails": []
             },
             "sampleSize": 0,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -918,6 +991,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -965,7 +1045,8 @@
             "mode": "non_users",
             "filters": {},
             "sampleSize": 2,
-            "excludeRecentDays": 60
+            "excludeRecentDays": 60,
+            "test_mode": true
           },
           "schema": [
             {
@@ -1003,6 +1084,13 @@
               "display": true,
               "defaultMatch": false,
               "canBeUsedToMatch": true
+            },
+            {
+              "id": "test_mode",
+              "displayName": "test_mode",
+              "type": "boolean",
+              "required": false,
+              "display": true
             }
           ],
           "matchingColumns": [],
@@ -1312,7 +1400,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "4e77e3f8-20fc-498e-a6cb-eb1c2aeb359b",
+  "versionId": "f36b2841-b688-40ed-8a61-f86d98d302b4",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
