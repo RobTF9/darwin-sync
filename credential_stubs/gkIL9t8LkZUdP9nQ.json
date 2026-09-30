@@ -1,10 +1,9 @@
 {
-  "id": "tNYo3eGqheixdzIb",
-  "name": "Webhook Auth",
-  "type": "httpHeaderAuth",
+  "id": "gkIL9t8LkZUdP9nQ",
+  "name": "Workspace credentials - robert @ n8n",
+  "type": "slackManagerOAuth2Api",
   "data": {
-    "name": "",
-    "value": ""
+    "accountIdentifier": ""
   },
   "ownedBy": {
     "type": "team",

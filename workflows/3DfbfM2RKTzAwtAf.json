@@ -1,0 +1,423 @@
+{
+  "id": "3DfbfM2RKTzAwtAf",
+  "name": "DarwinSession",
+  "description": "MCP tool sub-workflow. Fetches one Darwin Slack session (thread) by channel_id + thread_ts and returns compact message rows. Read-only.",
+  "nodes": [
+    {
+      "id": "8b911bc1-74d8-49d9-b36f-25a2b5b3b4d8",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -480,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "channel_id",
+              "type": "string"
+            },
+            {
+              "name": "thread_ts",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "726d916d-f331-4db3-b99f-3a2887729bc5",
+      "name": "Fetch Replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -240,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/conversations.replies",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.channel_id }}"
+            },
+            {
+              "name": "ts",
+              "value": "={{ $json.thread_ts }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 1250
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "d7d95eb3-d570-46c1-a43d-14bf7847130a",
+      "name": "Replies OK",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true && ($json.messages || []).length > 0 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5d6c1433-b9b2-4738-a577-1cf84c641d3b",
+      "name": "Split Messages",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "messages"
+      }
+    },
+    {
+      "id": "0fbe91a9-2287-46fb-9512-8e75a6432400",
+      "name": "Compact",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s-ts",
+              "name": "ts",
+              "type": "string",
+              "value": "={{ $json.ts }}"
+            },
+            {
+              "id": "s-when",
+              "name": "at",
+              "type": "string",
+              "value": "={{ new Date(parseFloat($json.ts) * 1000).toISOString() }}"
+            },
+            {
+              "id": "s-user",
+              "name": "user",
+              "type": "string",
+              "value": "={{ $json.user || $json.bot_id || '' }}"
+            },
+            {
+              "id": "s-bot",
+              "name": "from_bot",
+              "type": "boolean",
+              "value": "={{ !!$json.bot_id || ['U09Q22R53T6', 'U0BLRFB0FJR'].includes($json.user) }}"
+            },
+            {
+              "id": "s-text",
+              "name": "text",
+              "type": "string",
+              "value": "={{ ($json.text || '').slice(0, 600) }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e084187b-fca2-438f-a499-fe76d5bee8f8",
+      "name": "Distinct Users",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        720,
+        160
+      ],
+      "parameters": {
+        "operation": "removeDuplicateInputItems",
+        "compare": "selectedFields",
+        "fieldsToCompare": "user"
+      }
+    },
+    {
+      "id": "6e788291-2489-4c7c-89df-91b2cdca15b8",
+      "name": "Fetch User Names",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.info",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user",
+              "value": "={{ $json.user }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 700
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "386fda84-8d39-4588-b194-c32bc612c1e4",
+      "name": "Name Rows",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1200,
+        160
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n-user",
+              "name": "user",
+              "type": "string",
+              "value": "={{ $json.user ? $json.user.id : '' }}"
+            },
+            {
+              "id": "n-name",
+              "name": "user_name",
+              "type": "string",
+              "value": "={{ $json.user ? (($json.user.profile && ($json.user.profile.display_name || $json.user.profile.real_name)) || $json.user.real_name || $json.user.name || '') : '' }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "21f1a53b-b6ef-4397-97aa-3216152e773f",
+      "name": "Attach Names",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByFields",
+        "fieldsToMatchString": "user",
+        "joinMode": "enrichInput1"
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Fetch Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Replies": {
+      "main": [
+        [
+          {
+            "node": "Replies OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replies OK": {
+      "main": [
+        [
+          {
+            "node": "Split Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Messages": {
+      "main": [
+        [
+          {
+            "node": "Compact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compact": {
+      "main": [
+        [
+          {
+            "node": "Attach Names",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Distinct Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Distinct Users": {
+      "main": [
+        [
+          {
+            "node": "Fetch User Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User Names": {
+      "main": [
+        [
+          {
+            "node": "Name Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Name Rows": {
+      "main": [
+        [
+          {
+            "node": "Attach Names",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "e8b12280-7247-40d8-945a-c627ed865918",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wWGhCjDluNfE1cPJ",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "fea99516-59cb-4c03-bacc-b82d50b69e0c",
+      "name": "Fetch session",
+      "nodeIds": [
+        "726d916d-f331-4db3-b99f-3a2887729bc5",
+        "d7d95eb3-d570-46c1-a43d-14bf7847130a",
+        "5d6c1433-b9b2-4738-a577-1cf84c641d3b",
+        "0fbe91a9-2287-46fb-9512-8e75a6432400"
+      ],
+      "description": "One conversations.replies call for the thread, reduced to compact message rows"
+    },
+    {
+      "id": "0d6d8b80-18c7-4a5d-9a26-ac38aab7c841",
+      "name": "Resolve names",
+      "nodeIds": [
+        "e084187b-fca2-438f-a499-fe76d5bee8f8",
+        "6e788291-2489-4c7c-89df-91b2cdca15b8",
+        "386fda84-8d39-4588-b194-c32bc612c1e4"
+      ],
+      "description": "users.info per distinct user; failed lookups produce an empty user_name"
+    }
+  ]
+}

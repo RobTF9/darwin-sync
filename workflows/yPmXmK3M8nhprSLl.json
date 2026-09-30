@@ -1,0 +1,872 @@
+{
+  "id": "yPmXmK3M8nhprSLl",
+  "name": "DarwinMessages",
+  "description": "MCP tool sub-workflow. Lists initial (thread-starting) Slack messages that involve Darwin since a date. No reply fetching. Excludes eval channels by default. Read-only.",
+  "nodes": [
+    {
+      "id": "24d5825b-63cd-46bf-a544-82ae58a7b36d",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1760,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "oldest",
+              "type": "string"
+            },
+            {
+              "name": "bot_user_id",
+              "type": "string"
+            },
+            {
+              "name": "exclude_channels",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a9fac0ab-12cb-4d54-a691-63a234f780ad",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -1520,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-env",
+              "name": "env",
+              "type": "string",
+              "value": "={{ $vars.env || 'production' }}"
+            },
+            {
+              "id": "cfg-mention",
+              "name": "mention",
+              "type": "string",
+              "value": "={{ '<@' + ((($json.bot_user_id || '').trim()) || (($vars.env || 'production') === 'staging' ? 'U0BLRFB0FJR' : 'U09Q22R53T6')) + '>' }}"
+            },
+            {
+              "id": "cfg-bots",
+              "name": "bots",
+              "type": "array",
+              "value": "={{ ['U09Q22R53T6', 'U0BLRFB0FJR'].concat((($json.bot_user_id || '').trim()) ? [($json.bot_user_id || '').trim()] : []) }}"
+            },
+            {
+              "id": "cfg-oldest",
+              "name": "oldest_epoch",
+              "type": "string",
+              "value": "={{ String(Math.floor(new Date((($json.oldest || '').trim() || '2026-07-25') + 'T00:00:00Z').getTime() / 1000)) }}"
+            },
+            {
+              "id": "cfg-excluded",
+              "name": "excluded",
+              "type": "array",
+              "value": "={{ ('C0BQH5S6P1P,C09DRCJLQCE,' + ($json.exclude_channels || '')).split(',').map(s => s.trim()).filter(Boolean) }}"
+            },
+            {
+              "id": "cfg-types",
+              "name": "types",
+              "type": "array",
+              "value": "={{ ['public_channel', 'private_channel', 'im'] }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9b3104be-8437-4835-a564-1b9a77669389",
+      "name": "Split Types",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "types",
+        "options": {
+          "destinationFieldName": "type"
+        }
+      }
+    },
+    {
+      "id": "4bb1ff07-55bc-4b67-8591-8f5854ef162e",
+      "name": "List Conversations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1040,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.conversations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "types",
+              "value": "={{ $json.type }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 400
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "fb147f8c-fa71-450b-89f5-4ad9bb240325",
+      "name": "OK Pages",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -800,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true && ($json.channels || []).length > 0 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "adc27429-9abd-483a-a241-1ca75033271d",
+      "name": "Split Channels",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "channels"
+      }
+    },
+    {
+      "id": "29afd1dc-aea9-4f39-b3ba-2ec88ab2c9f0",
+      "name": "Readable Channels",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -320,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ !$('Config').first().json.excluded.includes($json.id) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cdd866db-4033-4ff3-9895-6d16d60b98b7",
+      "name": "Fetch History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -80,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/conversations.history",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "oldest",
+              "value": "={{ $('Config').first().json.oldest_epoch }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1250
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 1250
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000
+    },
+    {
+      "id": "772adc4d-fa43-4ad6-9032-6c0f8e0f1ba4",
+      "name": "History OK",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        160,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true && ($json.messages || []).length > 0 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "25718097-42c6-4455-8345-0bb0024a8a05",
+      "name": "Split Messages",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "messages"
+      }
+    },
+    {
+      "id": "38d2f3d0-b3f7-49e4-a675-c6c84f8efead",
+      "name": "Stamp Channel",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        640,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "st-ch",
+              "name": "channel_id",
+              "type": "string",
+              "value": "={{ $('Readable Channels').item.json.id }}"
+            },
+            {
+              "id": "st-name",
+              "name": "channel_name",
+              "type": "string",
+              "value": "={{ $('Readable Channels').item.json.name || $('Readable Channels').item.json.user || $('Readable Channels').item.json.id }}"
+            },
+            {
+              "id": "st-im",
+              "name": "is_im",
+              "type": "boolean",
+              "value": "={{ !!$('Readable Channels').item.json.is_im }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "79f14969-72c7-47d4-87ee-5ee657fa06b9",
+      "name": "Darwin Messages",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ (!$json.subtype || $json.subtype === 'thread_broadcast') && ((!$json.bot_id && !!$json.user && !$('Config').first().json.bots.includes($json.user) && ($json.is_im || ($json.text || '').includes($('Config').first().json.mention))) || ($json.reply_users || []).some(u => $('Config').first().json.bots.includes(u))) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cbcf9843-5228-44da-acf7-dc663786fa57",
+      "name": "Compact",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c-month",
+              "name": "month",
+              "type": "string",
+              "value": "={{ new Date(parseFloat($json.ts) * 1000).toISOString().slice(0, 7) }}"
+            },
+            {
+              "id": "c-ts",
+              "name": "ts",
+              "type": "string",
+              "value": "={{ $json.ts }}"
+            },
+            {
+              "id": "c-thread",
+              "name": "thread_ts",
+              "type": "string",
+              "value": "={{ $json.thread_ts || $json.ts }}"
+            },
+            {
+              "id": "c-ch",
+              "name": "channel_id",
+              "type": "string",
+              "value": "={{ $json.channel_id }}"
+            },
+            {
+              "id": "c-chn",
+              "name": "channel_name",
+              "type": "string",
+              "value": "={{ $json.channel_name }}"
+            },
+            {
+              "id": "c-im",
+              "name": "is_im",
+              "type": "boolean",
+              "value": "={{ $json.is_im }}"
+            },
+            {
+              "id": "c-user",
+              "name": "user",
+              "type": "string",
+              "value": "={{ $json.user || '' }}"
+            },
+            {
+              "id": "c-kind",
+              "name": "kind",
+              "type": "string",
+              "value": "={{ (!$json.bot_id && !!$json.user && !$('Config').first().json.bots.includes($json.user) && ($json.is_im || ($json.text || '').includes($('Config').first().json.mention))) ? 'initial' : 'thread_with_bot' }}"
+            },
+            {
+              "id": "c-rc",
+              "name": "reply_count",
+              "type": "number",
+              "value": "={{ $json.reply_count || 0 }}"
+            },
+            {
+              "id": "c-text",
+              "name": "text",
+              "type": "string",
+              "value": "={{ ($json.text || '').slice(0, 120) }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9e32fb83-e5d4-4b64-9735-c4d50128f4f7",
+      "name": "Dedupe",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        0
+      ],
+      "parameters": {
+        "operation": "removeDuplicateInputItems",
+        "compare": "selectedFields",
+        "fieldsToCompare": "channel_id, ts"
+      }
+    },
+    {
+      "id": "cbf22dee-e953-43fa-ad33-b82583394ed7",
+      "name": "Distinct Users",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        160
+      ],
+      "parameters": {
+        "operation": "removeDuplicateInputItems",
+        "compare": "selectedFields",
+        "fieldsToCompare": "user"
+      }
+    },
+    {
+      "id": "df32a1a6-d476-4ec1-8f34-d34ee25c7aa1",
+      "name": "Fetch User Names",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1840,
+        160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.info",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user",
+              "value": "={{ $json.user }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 700
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "821bff11-77c7-4edd-8961-7272791b08fd",
+      "name": "Name Rows",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2080,
+        160
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n-user",
+              "name": "user",
+              "type": "string",
+              "value": "={{ $json.user ? $json.user.id : '' }}"
+            },
+            {
+              "id": "n-name",
+              "name": "user_name",
+              "type": "string",
+              "value": "={{ $json.user ? (($json.user.profile && ($json.user.profile.display_name || $json.user.profile.real_name)) || $json.user.real_name || $json.user.name || '') : '' }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c6cf3807-e5d2-4601-b7a5-729d0d0d5bdf",
+      "name": "Attach Names",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2320,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByFields",
+        "fieldsToMatchString": "user",
+        "joinMode": "enrichInput1"
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Split Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Types": {
+      "main": [
+        [
+          {
+            "node": "List Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Conversations": {
+      "main": [
+        [
+          {
+            "node": "OK Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OK Pages": {
+      "main": [
+        [
+          {
+            "node": "Split Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Channels": {
+      "main": [
+        [
+          {
+            "node": "Readable Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Readable Channels": {
+      "main": [
+        [
+          {
+            "node": "Fetch History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch History": {
+      "main": [
+        [
+          {
+            "node": "History OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "History OK": {
+      "main": [
+        [
+          {
+            "node": "Split Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Messages": {
+      "main": [
+        [
+          {
+            "node": "Stamp Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp Channel": {
+      "main": [
+        [
+          {
+            "node": "Darwin Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Darwin Messages": {
+      "main": [
+        [
+          {
+            "node": "Compact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compact": {
+      "main": [
+        [
+          {
+            "node": "Dedupe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe": {
+      "main": [
+        [
+          {
+            "node": "Attach Names",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Distinct Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Distinct Users": {
+      "main": [
+        [
+          {
+            "node": "Fetch User Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User Names": {
+      "main": [
+        [
+          {
+            "node": "Name Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Name Rows": {
+      "main": [
+        [
+          {
+            "node": "Attach Names",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "87d798c1-cea9-4d0c-9103-f7da888f4da3",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wWGhCjDluNfE1cPJ",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "e45d67c4-4e35-4063-8078-8b7d9b827264",
+      "name": "Discover conversations",
+      "nodeIds": [
+        "a9fac0ab-12cb-4d54-a691-63a234f780ad",
+        "9b3104be-8437-4835-a564-1b9a77669389",
+        "4bb1ff07-55bc-4b67-8591-8f5854ef162e",
+        "fb147f8c-fa71-450b-89f5-4ad9bb240325",
+        "adc27429-9abd-483a-a241-1ca75033271d",
+        "29afd1dc-aea9-4f39-b3ba-2ec88ab2c9f0"
+      ],
+      "description": "Env config, then every conversation the Darwin bot can read, minus excluded channels"
+    },
+    {
+      "id": "bae01537-faf5-4891-8979-2ddeb4a7ebde",
+      "name": "Collect initial messages",
+      "nodeIds": [
+        "cdd866db-4033-4ff3-9895-6d16d60b98b7",
+        "772adc4d-fa43-4ad6-9032-6c0f8e0f1ba4",
+        "25718097-42c6-4455-8345-0bb0024a8a05",
+        "38d2f3d0-b3f7-49e4-a675-c6c84f8efead",
+        "79f14969-72c7-47d4-87ee-5ee657fa06b9",
+        "cbcf9843-5228-44da-acf7-dc663786fa57",
+        "9e32fb83-e5d4-4b64-9735-c4d50128f4f7"
+      ],
+      "description": "Page channel history and keep compact thread-starting messages that involve Darwin"
+    },
+    {
+      "id": "0f3a7db3-f68b-4c1e-8e65-481e88782a87",
+      "name": "Resolve names",
+      "nodeIds": [
+        "cbf22dee-e953-43fa-ad33-b82583394ed7",
+        "df32a1a6-d476-4ec1-8f34-d34ee25c7aa1",
+        "821bff11-77c7-4edd-8961-7272791b08fd"
+      ],
+      "description": "users.info per distinct user; failed lookups produce an empty user_name"
+    }
+  ]
+}

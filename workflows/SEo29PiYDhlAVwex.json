@@ -4,6 +4,11 @@
   "description": "MCP server that exposes the Darwin test suites as tools: run_integration_suite (IntegrationRun) and run_retrieval_suite (RetrievalRun).",
   "nodes": [
     {
+      "parameters": {
+        "authentication": "n8nOAuth2",
+        "path": "test-suites",
+        "instructions": "Test suite runners plus Slack usage inspection for the Darwin agent. run_integration_suite checks tool routing and tool results through the agent (integration_cases). run_retrieval_suite scores retrieval quality (retrieval_cases). run_consistency_suite scores cross-attempt agreement (consistency_cases). Suites run synchronously, write results to the shared testing Supabase project, and post reports to Slack; prefer one run at a time. get_darwin_messages lists initial Slack messages that involve Darwin (no replies, eval channels excluded); get_darwin_session fetches one thread's messages. Both are read-only."
+      },
       "id": "14538edc-c408-478c-8cd0-fb706b1f2a2b",
       "name": "Test Suites MCP Server",
       "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
@@ -12,22 +17,9 @@
         0,
         112
       ],
-      "parameters": {
-        "path": "test-suites",
-        "instructions": "Test suite runners for the Darwin agent. run_integration_suite checks tool routing and tool results through the agent (integration_cases). run_retrieval_suite scores retrieval quality through the agent (retrieval_cases). Both run synchronously, write results to the shared testing Supabase project, and post reports to Slack. Prefer one run at a time.",
-        "authentication": "n8nOAuth2"
-      },
       "webhookId": "5139af08-b39d-44b9-b831-30dda220b1f8"
     },
     {
-      "id": "37399d5a-a387-4b7f-afc7-91b042cd0b06",
-      "name": "run_integration_suite",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        16,
-        336
-      ],
       "parameters": {
         "description": "Runs the Darwin integration test suite (IntegrationRun). Executes every enabled case in integration_cases through the agent, evaluates assertions, writes integration_results, and posts a summary to Slack (#C09DRCJLQCE). Runs synchronously — a full run takes 2-5 minutes. Returns the Slack post result. Input: requested_by (who or what asked for the run).",
         "workflowId": {
@@ -55,17 +47,17 @@
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         }
-      }
-    },
-    {
-      "id": "322f010a-a740-415a-a766-5aaf5f991cf8",
-      "name": "run_retrieval_suite",
+      },
+      "id": "37399d5a-a387-4b7f-afc7-91b042cd0b06",
+      "name": "run_integration_suite",
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        144,
+        -64,
         336
-      ],
+      ]
+    },
+    {
       "parameters": {
         "description": "Runs the Darwin retrieval eval suite (RetrievalRun). Executes retrieval_cases through the agent, scores them, writes retrieval_results, and posts a report to Slack (#C09DRCJLQCE). Runs synchronously — a full run takes 5-10 minutes. Inputs (all optional): requested_by; category (multi-turn | source-specific | broad | time-bound | structure); slug (one case); transport (direct | slack, default direct); channel_id (Slack channel for slack-transport threads, default C0BQH5S6P1P); bot_id (Darwin bot user, env-aware default).",
         "workflowId": {
@@ -143,6 +135,168 @@
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         }
+      },
+      "id": "322f010a-a740-415a-a766-5aaf5f991cf8",
+      "name": "run_retrieval_suite",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        144,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Runs the Darwin consistency eval suite (ConsistencyRun, pass^k). Each enabled case in consistency_cases asks Darwin the same question k times in isolated sessions; an LLM judge scores cross-attempt agreement; a case passes when at least min_consistent attempts agree. Writes consistency_attempts + consistency_results, posts a report to Slack (#C09DRCJLQCE). Runs synchronously — a full case takes 5-10 minutes. Inputs (optional): requested_by; slug (one case).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "V7FifvIpAD3l5Jf7"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requested_by": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('requested_by', 'Who or what requested this run.', 'string') }}",
+            "slug": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('slug', 'Optional single case slug to run. Empty = all enabled cases for this environment.', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "slug",
+              "displayName": "slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "6a393c89-7bc1-47ce-8929-7534685a9ba1",
+      "name": "run_consistency_suite",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        352,
+        336
+      ]
+    },
+    {
+      "id": "07bfb2c8-ab0c-4585-8e92-ce157b473442",
+      "name": "get_darwin_messages",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        336
+      ],
+      "parameters": {
+        "description": "Lists every initial (thread-starting) Slack message that involves Darwin since a date, across all conversations the bot can read. Fast: scans channel history only, never fetches replies. Excludes eval channels (C0BQH5S6P1P, C09DRCJLQCE) and bot-authored noise. Returns one row per thread: month, ts, thread_ts, channel_id, channel_name, is_im, user, user_name (Slack display name; empty when lookup fails), kind ('initial' = a human asked Darwin directly; 'thread_with_bot' = Darwin replied inside a thread started by someone else or by a bot post — use get_darwin_session to see who asked), reply_count, text (120-char preview). Use get_darwin_session to drill into any thread. Inputs (all optional): oldest (YYYY-MM-DD, default 2026-07-25); bot_user_id (override env default); exclude_channels (extra CSV channel IDs).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "yPmXmK3M8nhprSLl"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "oldest": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('oldest', 'Earliest date to scan, YYYY-MM-DD. Empty = 2026-07-25 (Darwin launch).', 'string') }}",
+            "bot_user_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('bot_user_id', 'Darwin bot user ID to look for. Empty = env default (prod U09Q22R53T6, staging U0BLRFB0FJR).', 'string') }}",
+            "exclude_channels": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('exclude_channels', 'Extra comma-separated Slack channel IDs to exclude. Empty = only the default eval channels.', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "oldest",
+              "displayName": "oldest",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "bot_user_id",
+              "displayName": "bot_user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "exclude_channels",
+              "displayName": "exclude_channels",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      }
+    },
+    {
+      "id": "6e90a72b-9cb0-4079-99b1-c5a4f627d78c",
+      "name": "get_darwin_session",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        336
+      ],
+      "parameters": {
+        "description": "Fetches one Darwin Slack session (thread) and returns its messages as compact rows: ts, at (ISO time), user, user_name (Slack display name; empty when lookup fails), from_bot, text (600-char cut). Returns nothing when the thread does not exist or is not readable. Inputs (both required): channel_id (Slack channel ID); thread_ts (thread parent ts — take both from a get_darwin_messages row).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "3DfbfM2RKTzAwtAf"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('channel_id', 'Slack channel ID the thread lives in.', 'string') }}",
+            "thread_ts": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('thread_ts', 'Thread parent ts from get_darwin_messages.', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
       }
     }
   ],
@@ -168,14 +322,48 @@
           }
         ]
       ]
+    },
+    "run_consistency_suite": {
+      "ai_tool": [
+        [
+          {
+            "node": "Test Suites MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_darwin_messages": {
+      "ai_tool": [
+        [
+          {
+            "node": "Test Suites MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_darwin_session": {
+      "ai_tool": [
+        [
+          {
+            "node": "Test Suites MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "fa3d6b5b-75f1-4933-9a05-39a24a0dc1a7",
+  "versionId": "754dc38c-c55d-4fbd-8bba-9c679057348e",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

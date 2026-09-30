@@ -1,0 +1,499 @@
+{
+  "id": "ukJaE5JPDjOBiUec",
+  "name": "ConsistencyDispatch",
+  "description": "Consistency eval worker (Slack transport): posts ONE attempt of ONE case as Rob @mentioning the Darwin bot in the eval-threads channel, polls reactions for completion, captures the answer from agent_trace (fallback: thread reply), evaluates anchors, inser",
+  "nodes": [
+    {
+      "id": "04185f23-cb08-4baa-bbf9-1bc7dc7e248e",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        80
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "case_id"
+            },
+            {
+              "name": "attempt"
+            },
+            {
+              "name": "channel_id"
+            },
+            {
+              "name": "bot_id"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "745222d1-ee49-4713-95d8-1560f43737d9",
+      "name": "Load Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        224,
+        80
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "consistency_cases",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Input').item.json.case_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "511a7fe9-4dcf-48af-98d8-12f7454f8728",
+      "name": "Post Question",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        80
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Input').item.json.channel_id || 'C0BQH5S6P1P' }}"
+        },
+        "text": "=<@{{ $('Input').item.json.bot_id || ($vars.env === 'production' ? 'U09Q22R53T6' : 'U0BLRFB0FJR') }}> {{ $json.prompt }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      },
+      "webhookId": "0b0be688-a9c5-4980-8a01-3e4122dfb68d"
+    },
+    {
+      "id": "c5e864ee-6fa9-40e6-99e9-257f88d5615a",
+      "name": "Session Ts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        672,
+        80
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "session-ts",
+              "name": "session_ts",
+              "value": "={{ $json.message && $json.message.ts ? $json.message.ts : ($json.message_timestamp || $json.ts) }}",
+              "type": "string"
+            },
+            {
+              "id": "channel",
+              "name": "channel",
+              "value": "={{ $('Input').item.json.channel_id || 'C0BQH5S6P1P' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bc24b380-89fa-47db-beaf-b2e8d65c3a7d",
+      "name": "Pace Reply",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        80
+      ],
+      "parameters": {
+        "amount": 15
+      },
+      "webhookId": "feecb334-cf7c-4ac6-826f-267affecb3e4"
+    },
+    {
+      "id": "1f2e3bf0-7979-4a30-b404-d881add481e1",
+      "name": "Get Reactions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "url": "={{ 'https://slack.com/api/reactions.get?channel=' + $('Session Ts').first().json.channel + '&timestamp=' + $('Session Ts').first().json.session_ts }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      }
+    },
+    {
+      "id": "03fa0f5d-1947-45c2-996a-b51343fbf79b",
+      "name": "Check Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const reactions = ($json.message && $json.message.reactions) || [];\nconst done = reactions.some(r => r.name === 'white_check_mark' || r.name === 'x');\nlet prev = null;\ntry { prev = $('Check Done').item.json; } catch (e) { prev = null; }\nconst polls = prev ? (prev.polls || 0) + 1 : 1;\nreturn [{ json: { done: done, timedOut: !done && polls >= 24, polls: polls } }];"
+      }
+    },
+    {
+      "id": "cf8689c5-bffb-4f6e-abc7-a5812947ba53",
+      "name": "Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-done",
+              "leftValue": "={{ $json.done }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cond-timeout",
+              "leftValue": "={{ $json.timedOut }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8f57f8eb-36a5-40b7-97ce-b264ca642d1e",
+      "name": "Fetch Thread",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1792,
+        80
+      ],
+      "parameters": {
+        "resource": "channel",
+        "operation": "replies",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Session Ts').first().json.channel }}"
+        },
+        "ts": "={{ $('Session Ts').first().json.session_ts }}",
+        "limit": 100,
+        "filters": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      },
+      "webhookId": "aaec1995-a102-44f0-9587-248e4956c62c"
+    },
+    {
+      "id": "1754eab6-fd5d-4f0e-ac19-cd884f7e0d67",
+      "name": "Fetch Trace",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        80
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "agent_trace",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Session Ts').first().json.session_ts }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "f7b172fc-cacc-4caf-ace7-40c3e0bb6379",
+      "name": "Evaluate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        80
+      ],
+      "parameters": {
+        "jsCode": "const c = $('Load Case').first().json;\nconst inp = $('Input').first().json;\nconst ts = $('Session Ts').first().json.session_ts;\nconst botId = inp.bot_id || ($vars.env === 'production' ? 'U09Q22R53T6' : 'U0BLRFB0FJR');\nconst lastReact = $('Get Reactions').last().json;\nconst reactions = (lastReact.message && lastReact.message.reactions) || [];\nconst errored = reactions.some(r => r.name === 'x');\n\nconst seen = new Set();\nconst traceRows = $('Fetch Trace').all().map(i => i.json)\n  .filter(r => { if (r.id == null || seen.has(r.id)) return false; seen.add(r.id); return true; })\n  .sort((a, b) => a.id - b.id);\nconst replies = $('Fetch Thread').all().map(i => i.json);\nconst botMsgs = replies.filter(m => (m.user === botId || m.bot_id) && m.ts !== ts);\nconst slackAnswer = botMsgs.length ? String(botMsgs[botMsgs.length - 1].text || '') : '';\nconst traceAnswer = traceRows.length ? String(traceRows[traceRows.length - 1].output || '') : '';\nconst answer = traceAnswer || slackAnswer;\n\nlet status = 'ok';\nif (errored) status = 'error';\nelse if (!answer) status = 'error';\n\nconst norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');\nconst calledN = [];\nfor (const row of traceRows) {\n  let steps = row.steps;\n  if (typeof steps === 'string') { try { steps = JSON.parse(steps); } catch (e) { steps = []; } }\n  if (!Array.isArray(steps)) steps = [];\n  for (const st of steps) {\n    if (!st || !st.tool) continue;\n    const n = norm(st.tool);\n    if (!calledN.includes(n)) calledN.push(n);\n  }\n}\n\nlet anchors = c.anchors;\nif (typeof anchors === 'string') { try { anchors = JSON.parse(anchors); } catch (e) { anchors = []; } }\nif (!Array.isArray(anchors)) anchors = [];\nconst results = [];\nif (status === 'ok') {\n  const answerN = answer.toLowerCase();\n  for (const a of anchors) {\n    let pass = false;\n    if (a.type === 'tool_called') pass = calledN.includes(norm(a.value));\n    else if (a.type === 'tool_not_called') pass = !calledN.includes(norm(a.value));\n    else if (a.type === 'contains') pass = answerN.includes(String(a.value).toLowerCase());\n    else if (a.type === 'not_contains') pass = !answerN.includes(String(a.value).toLowerCase());\n    if (!pass) status = 'anchor_fail';\n    results.push({ type: a.type, value: a.value, pass });\n  }\n}\n\nconst base = String($vars.instance_url || 'https://darwin-staging.app.n8n.cloud').replace(/\\/$/, '');\nreturn [{ json: {\n  run_id: inp.run_id,\n  case_id: inp.case_id,\n  attempt: Number(inp.attempt),\n  status: status,\n  agent_output: (answer || (errored ? 'agent errored (x reaction)' : 'timed out waiting for reply')).slice(0, 12000),\n  called_tools: calledN,\n  anchor_results: results,\n  session_id: ts,\n  execution_url: base + '/workflow/' + $workflow.id + '/executions/' + $execution.id\n} }];"
+      }
+    },
+    {
+      "id": "63f3da1e-d6f6-4048-b325-3c4237d0f759",
+      "name": "Save Attempt",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2464,
+        80
+      ],
+      "parameters": {
+        "operation": "create",
+        "tableId": "consistency_attempts",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "attempt",
+              "fieldValue": "={{ $json.attempt }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "agent_output",
+              "fieldValue": "={{ $json.agent_output }}"
+            },
+            {
+              "fieldId": "called_tools",
+              "fieldValue": "={{ $json.called_tools }}"
+            },
+            {
+              "fieldId": "anchor_results",
+              "fieldValue": "={{ $json.anchor_results }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.session_id }}"
+            },
+            {
+              "fieldId": "execution_url",
+              "fieldValue": "={{ $json.execution_url }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Load Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Case": {
+      "main": [
+        [
+          {
+            "node": "Post Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Question": {
+      "main": [
+        [
+          {
+            "node": "Session Ts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Ts": {
+      "main": [
+        [
+          {
+            "node": "Pace Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace Reply": {
+      "main": [
+        [
+          {
+            "node": "Get Reactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Reactions": {
+      "main": [
+        [
+          {
+            "node": "Check Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Done": {
+      "main": [
+        [
+          {
+            "node": "Done?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Done?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Thread",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pace Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Thread": {
+      "main": [
+        [
+          {
+            "node": "Fetch Trace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Trace": {
+      "main": [
+        [
+          {
+            "node": "Evaluate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate": {
+      "main": [
+        [
+          {
+            "node": "Save Attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "8e674b4c-94fc-4e2f-becc-05a3f96db8cf",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "yXWCkp7gwDtUZKmH",
+  "isArchived": false,
+  "nodeGroups": []
+}

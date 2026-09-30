@@ -1,0 +1,285 @@
+{
+  "id": "vibyXJVSA53WXzjm",
+  "name": "ConsistencyDispatch",
+  "description": "Consistency eval worker: runs ONE attempt of ONE case from consistency_cases through the Darwin agent with a fresh per-attempt session, evaluates anchor assertions, inserts into consistency_attempts. Inputs: run_id, case_id, attempt.",
+  "nodes": [
+    {
+      "id": "94ede4fd-20a7-400e-8e3e-2d93d5232e11",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "case_id"
+            },
+            {
+              "name": "attempt"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cb25710f-7b95-466d-b704-77f8eac8e1c6",
+      "name": "Load Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "consistency_cases",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Input').item.json.case_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "c572969e-be53-4856-b734-0231b238ed7e",
+      "name": "Call Darwin",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HDMvthliXrAcZrXp"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chatInput": "={{ $json.prompt }}",
+            "sessionId": "={{ 'consistency-' + $('Input').item.json.run_id + '-' + $('Input').item.json.case_id + '-' + $('Input').item.json.attempt }}",
+            "channel": "",
+            "env": "",
+            "thread_ts": "",
+            "user": "consistency-eval"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "env",
+              "displayName": "env",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "thread_ts",
+              "displayName": "thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "user",
+              "displayName": "user",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "2e22b439-b9e7-4e8e-850d-cdb17b311ea1",
+      "name": "Evaluate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const c = $('Load Case').first().json;\nconst inp = $('Input').first().json;\nconst r = $input.first().json;\nlet status = 'ok';\nlet answer = '';\nconst called = [];\nif (r && r.error) {\n  status = 'error';\n  answer = typeof r.error === 'string' ? r.error : JSON.stringify(r.error);\n} else {\n  if (typeof r.output === 'string') answer = r.output;\n  else if (r.output !== undefined) answer = JSON.stringify(r.output);\n  else answer = JSON.stringify(r);\n  if (Array.isArray(r.intermediateSteps)) {\n    for (const s of r.intermediateSteps) {\n      const t = s && s.action && s.action.tool;\n      if (t) called.push(t);\n    }\n  }\n  if (!answer) status = 'error';\n}\nconst norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');\nconst calledN = [];\nfor (const t of called) { const n = norm(t); if (!calledN.includes(n)) calledN.push(n); }\nlet anchors = c.anchors;\nif (typeof anchors === 'string') { try { anchors = JSON.parse(anchors); } catch (e) { anchors = []; } }\nif (!Array.isArray(anchors)) anchors = [];\nconst results = [];\nif (status === 'ok') {\n  const answerN = answer.toLowerCase();\n  for (const a of anchors) {\n    let pass = false;\n    if (a.type === 'tool_called') pass = calledN.includes(norm(a.value));\n    else if (a.type === 'tool_not_called') pass = !calledN.includes(norm(a.value));\n    else if (a.type === 'contains') pass = answerN.includes(String(a.value).toLowerCase());\n    else if (a.type === 'not_contains') pass = !answerN.includes(String(a.value).toLowerCase());\n    if (!pass) status = 'anchor_fail';\n    results.push({ type: a.type, value: a.value, pass });\n  }\n}\nconst base = String($vars.instance_url || 'https://darwin-staging.app.n8n.cloud').replace(/\\/$/, '');\nreturn [{ json: {\n  run_id: inp.run_id,\n  case_id: inp.case_id,\n  attempt: Number(inp.attempt),\n  status: status,\n  agent_output: answer.slice(0, 12000),\n  called_tools: calledN,\n  anchor_results: results,\n  execution_url: base + '/workflow/' + $workflow.id + '/executions/' + $execution.id\n} }];"
+      }
+    },
+    {
+      "id": "89b84774-d07c-4a24-bc19-f6d19f1537f1",
+      "name": "Save Attempt",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "operation": "create",
+        "tableId": "consistency_attempts",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "attempt",
+              "fieldValue": "={{ $json.attempt }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "agent_output",
+              "fieldValue": "={{ $json.agent_output }}"
+            },
+            {
+              "fieldId": "called_tools",
+              "fieldValue": "={{ $json.called_tools }}"
+            },
+            {
+              "fieldId": "anchor_results",
+              "fieldValue": "={{ $json.anchor_results }}"
+            },
+            {
+              "fieldId": "execution_url",
+              "fieldValue": "={{ $json.execution_url }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Load Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Case": {
+      "main": [
+        [
+          {
+            "node": "Call Darwin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Darwin": {
+      "main": [
+        [
+          {
+            "node": "Evaluate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate": {
+      "main": [
+        [
+          {
+            "node": "Save Attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "47a6248f-12d3-4ce9-aa50-ddc51a17dc21",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "yXWCkp7gwDtUZKmH",
+  "isArchived": true,
+  "nodeGroups": []
+}

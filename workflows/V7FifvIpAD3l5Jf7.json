@@ -1,0 +1,1001 @@
+{
+  "id": "V7FifvIpAD3l5Jf7",
+  "name": "ConsistencyRun",
+  "description": "Consistency eval manager (pass^k): expands enabled consistency_cases into k attempts, dispatches ConsistencyDispatch in waves of 5, polls consistency_attempts, judges cross-attempt agreement per case (LLM judge + deterministic medoid cluster), writes cons",
+  "nodes": [
+    {
+      "id": "609c0921-8ba2-4edc-98c7-42754ae1c494",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        640
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "requested_by"
+            },
+            {
+              "name": "slug"
+            },
+            {
+              "name": "channel_id"
+            },
+            {
+              "name": "bot_id"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "312348cd-c35a-4e0c-9fda-3ccea289ecdb",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        832
+      ],
+      "parameters": {
+        "jsCode": "let input = null;\ntry { input = $('Input').item.json; } catch (e) { input = null; }\nreturn [{ json: {\n  requested_by: (input && input.requested_by) || 'manual',\n  slug: (input && input.slug) || '',\n  channel_id: (input && input.channel_id) || 'C0BQH5S6P1P',\n  bot_id: (input && input.bot_id) || ''\n} }];"
+      }
+    },
+    {
+      "id": "a0e5369c-791a-4127-b6e3-73f3dd30e93b",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        832
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "f66f9247-0136-4595-be3d-d6f6ed03707a",
+      "name": "Run Id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        448,
+        832
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "run-id",
+              "name": "run_id",
+              "value": "={{ 'consistency-' + $now.toFormat('yyyyLLdd-HHmmss') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "13d90834-5ff2-491e-9be9-01ee04b7307e",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        672,
+        832
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "consistency_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "enabled",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "13ab533d-7bf0-4f6d-9a66-cdf0ce59d0f7",
+      "name": "Filter Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        832
+      ],
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst rid = $('Run Id').first().json.run_id;\nconst env = String($vars.env || 'staging');\nconst out = [];\nfor (const item of $input.all()) {\n  const c = item.json;\n  if (cfg.slug && c.slug !== cfg.slug) continue;\n  if (c.env !== 'any' && c.env !== env) continue;\n  out.push({ json: Object.assign({}, c, { run_id: rid }) });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "7454bdbe-e2ca-48f6-85de-b23ccd2e4352",
+      "name": "Expand Attempts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        832
+      ],
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst out = [];\nfor (const item of $input.all()) {\n  const c = item.json;\n  const k = Number(c.k) || 5;\n  for (let a = 1; a <= k; a++) {\n    out.push({ json: { run_id: c.run_id, case_id: c.id, attempt: String(a), channel_id: cfg.channel_id, bot_id: cfg.bot_id } });\n  }\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "fe5c0787-b7a9-4e17-8367-a3d4aa3f323c",
+      "name": "Load Attempts",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        544
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "consistency_attempts",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Run Id').first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "90167e49-0ad4-4e1b-934c-5bd8d9aa2700",
+      "name": "Dispatch Attempt",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        768
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ukJaE5JPDjOBiUec"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.run_id }}",
+            "case_id": "={{ $json.case_id }}",
+            "attempt": "={{ $json.attempt }}",
+            "channel_id": "={{ $json.channel_id }}",
+            "bot_id": "={{ $json.bot_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "bot_id",
+              "displayName": "bot_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "57ab63b7-d55e-4a07-b26c-f107c2bcc54a",
+      "name": "Pace",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        912
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "db51ff69-90c1-4e66-a4d9-1f8ba89a886f"
+    },
+    {
+      "id": "d3c77446-8ba5-44af-9971-ba963a4f6343",
+      "name": "Batch",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1344,
+        832
+      ],
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      }
+    },
+    {
+      "id": "9003a225-1928-454d-98bc-dd384888b43b",
+      "name": "Poll Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        432
+      ],
+      "parameters": {
+        "jsCode": "const rid = $('Run Id').first().json.run_id;\nconst cases = $('Filter Cases').all().map(i => i.json);\nconst expected = cases.reduce((n, c) => n + (Number(c.k) || 5), 0);\nconst rows = $input.all().map(i => i.json).filter(r => r.run_id === rid);\nconst seen = new Set();\nlet landed = 0;\nfor (const r of rows) {\n  const key = r.case_id + '-' + r.attempt;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  landed++;\n}\nconst poll = ($runIndex || 0) + 1;\nreturn [{ json: { run_id: rid, expected: expected, landed: landed, polls: poll, complete: landed >= expected, timeout: poll >= 45 } }];"
+      }
+    },
+    {
+      "id": "bf910af7-6cc5-4ecf-8a65-29e5e8dcd5a8",
+      "name": "Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        432
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c-complete",
+              "leftValue": "={{ $json.complete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "c-timeout",
+              "leftValue": "={{ $json.timeout }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "97c7d705-722f-4999-86ec-b38f3bfbd9f7",
+      "name": "Cases For Judging",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        336
+      ],
+      "parameters": {
+        "jsCode": "const rid = $('Run Id').first().json.run_id;\nconst cases = $('Filter Cases').all().map(i => i.json);\nconst rows = $('Load Attempts').all().map(i => i.json).filter(r => r.run_id === rid);\nconst byCase = {};\nfor (const r of rows) {\n  if (!byCase[r.case_id]) byCase[r.case_id] = new Map();\n  if (!byCase[r.case_id].has(r.attempt)) byCase[r.case_id].set(r.attempt, r);\n}\nreturn cases.map(c => {\n  const attempts = Array.from((byCase[c.id] || new Map()).values()).sort((a, b) => a.attempt - b.attempt);\n  const ok = attempts.filter(a => a.status === 'ok');\n  return { json: Object.assign({}, c, {\n    attempts: attempts.map(a => ({ attempt: a.attempt, status: a.status, execution_url: a.execution_url })),\n    ok_attempts: ok.map(a => ({ attempt: a.attempt, answer: a.agent_output })),\n    ok_count: ok.length\n  }) };\n});"
+      }
+    },
+    {
+      "id": "3d0d19b1-90f8-4985-8c0a-59ac3ce6cf3b",
+      "name": "Load Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2688,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "consistency_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Run Id').first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "78b3cf8d-dda3-461b-b775-adfc16261eeb",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2976,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const rid = $('Run Id').first().json.run_id;\nconst cfg = $('Config').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r.run_id === rid);\nconst attemptRows = $('Load Attempts').all().map(i => i.json).filter(r => r.run_id === rid);\nconst caseItems = $('Cases For Judging').all().map(i => i.json);\nconst byCase = {};\nfor (const a of attemptRows) {\n  if (!byCase[a.case_id]) byCase[a.case_id] = new Map();\n  if (!byCase[a.case_id].has(a.attempt)) byCase[a.case_id].set(a.attempt, a);\n}\nconst ICON = { pass: '✅', fail: '❌', error: '💥' };\nconst lines = [];\nconst passed = rows.filter(r => r.status === 'pass').length;\nlines.push('## Consistency evals (pass^k) — `' + rid + '`', '');\nlines.push('**' + passed + '/' + rows.length + ' pass** · answers are live threads in <#' + cfg.channel_id + '>', '');\nlines.push('| Case | Status | Cluster | Accurate | Valid |');\nlines.push('| --- | --- | --- | --- | --- |');\nfor (const r of rows) {\n  lines.push('| `' + r.case_slug + '` | ' + (ICON[r.status] || '') + ' ' + r.status + ' | ' + (r.cluster_size === null || r.cluster_size === undefined ? '\\u2014' : r.cluster_size) + '/' + r.k + ' (min ' + r.min_consistent + ') | ' + (r.accurate_attempts === null || r.accurate_attempts === undefined ? '\\u2014' : r.accurate_attempts + '/' + r.k) + ' | ' + r.valid_attempts + '/' + r.k + ' |');\n}\nfor (const r of rows) {\n  let judge = r.judge;\n  if (typeof judge === 'string') { try { judge = JSON.parse(judge); } catch (e) { judge = null; } }\n  const claimsByAttempt = {};\n  if (judge && Array.isArray(judge.claims)) {\n    for (const c of judge.claims) claimsByAttempt[Number(c.attempt)] = c.core_claims || [];\n  }\n  const accByAttempt = {};\n  if (judge && Array.isArray(judge.accuracy)) {\n    for (const a of judge.accuracy) accByAttempt[Number(a.attempt)] = a;\n  }\n  const cluster = new Set(((judge && judge.cluster) || []).map(Number));\n  const medoid = judge ? Number(judge.medoid) : null;\n  lines.push('', '---', '', '### `' + r.case_slug + '` — ' + (ICON[r.status] || '') + ' ' + r.status);\n  const caseItem = caseItems.find(c => c.id === r.case_id);\n  if (caseItem) lines.push('', '> ' + String(caseItem.prompt).replace(/\\n+/g, ' '));\n  if (judge && judge.skipped) lines.push('', '_Judge skipped: ' + judge.reason + '_');\n  const attempts = Array.from((byCase[r.case_id] || new Map()).values()).sort((a, b) => a.attempt - b.attempt);\n  for (const a of attempts) {\n    const n = Number(a.attempt);\n    let membership;\n    if (a.status !== 'ok') membership = a.status === 'error' ? '💥 error' : '⚠️ anchor_fail';\n    else if (cluster.has(n)) membership = 'in cluster ✅' + (medoid === n ? ' · medoid' : '');\n    else if (judge && !judge.skipped) membership = 'OUTLIER ⚠️';\n    else membership = 'ok';\n    const acc = accByAttempt[n];\n    let accLabel = '';\n    if (acc) {\n      if (acc.contradicted === true) accLabel = ' · CONTRADICTS ground truth ⛔';\n      else if (Array.isArray(acc.missing) && acc.missing.length) accLabel = ' · incomplete: misses \\\"' + acc.missing.join('\\\", \\\"') + '\\\"';\n      else accLabel = ' · accurate ✅';\n    }\n    lines.push('', '**Attempt ' + a.attempt + '** — ' + membership + accLabel + (a.execution_url ? ' · <' + a.execution_url + '|exec>' : ''));\n    const claims = claimsByAttempt[n];\n    if (claims && claims.length) lines.push('_' + claims.join(' · ') + '_');\n  }\n  if (judge && Array.isArray(judge.pairs)) {\n    const dis = judge.pairs.filter(p => p.agree === false);\n    if (dis.length) {\n      lines.push('', '**Disagreements:**');\n      for (const p of dis) lines.push('- attempts ' + p.a + ' vs ' + p.b + ': ' + p.reason);\n    }\n  }\n}\nconst base = String($vars.instance_url || 'https://darwin-staging.app.n8n.cloud').replace(/\\/$/, '');\nlines.push('', '_Generated ' + new Date().toISOString() + '_ · <' + base + '/workflow/' + $workflow.id + '/executions/' + $execution.id + '|Dispatcher execution>');\nreturn [{ json: { markdown: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "761d29d9-dc5e-469d-821d-8a8c3476f9c3",
+      "name": "format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3264,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const PER_BLOCK = 2900;\nconst MAX_BLOCKS = 50;\nconst MAX_PAYLOAD_BYTES = 90000;\nconst TRUNCATION_NOTE = '\\n\\n_… (truncated: response too long for a single Slack message)_';\n\nlet text = $json.markdown ?? '';\nconst fullText = text;\n\nfunction estimatePayloadSize(blocksArr) {\n  return JSON.stringify(blocksArr).length + 20;\n}\n\nfunction splitIntoChunks(str, chunkSize, maxBlocks, maxBytes) {\n  const chunks = [];\n  const trialBlocks = [];\n\n  while (str.length > 0 && chunks.length < maxBlocks) {\n    if (str.length <= chunkSize) {\n      chunks.push(str);\n      trialBlocks.push({ type: 'markdown', text: str });\n      if (estimatePayloadSize(trialBlocks) > maxBytes) {\n        const removed = chunks.pop();\n        trialBlocks.pop();\n        const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n        const maxTextLen = Math.max(0, remaining - 60);\n        if (maxTextLen > 50) {\n          chunks.push(removed.slice(0, maxTextLen) + TRUNCATION_NOTE);\n        }\n      }\n      break;\n    }\n\n    const sliceTarget = str.slice(0, chunkSize);\n    const lastNewline = sliceTarget.lastIndexOf('\\n');\n    let chunk;\n    if (lastNewline > chunkSize - 500) {\n      chunk = str.slice(0, lastNewline);\n      str = str.slice(lastNewline + 1);\n    } else {\n      chunk = sliceTarget;\n      str = str.slice(chunkSize);\n    }\n\n    const tentativeBlocks = [...trialBlocks, { type: 'markdown', text: chunk }];\n    if (estimatePayloadSize(tentativeBlocks) > maxBytes) {\n      const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n      const maxTextLen = Math.max(0, remaining - 60);\n      if (maxTextLen > 50) {\n        chunks.push(chunk.slice(0, maxTextLen) + TRUNCATION_NOTE);\n      }\n      break;\n    }\n\n    chunks.push(chunk);\n    trialBlocks.push({ type: 'markdown', text: chunk });\n  }\n\n  if (str.length > 0 && chunks.length === maxBlocks) {\n    chunks[chunks.length - 1] = chunks[chunks.length - 1].replace(/\\n*$/, '') + TRUNCATION_NOTE;\n  }\n\n  return chunks;\n}\n\nconst chunks = splitIntoChunks(text, PER_BLOCK, MAX_BLOCKS, MAX_PAYLOAD_BYTES);\nconst blocks = chunks.map(t => ({ type: 'markdown', text: t }));\nconst content = { blocks };\n\nreturn [{ json: { blocksJson: JSON.stringify(content), output: fullText } }];"
+      }
+    },
+    {
+      "id": "c7b8d948-687d-4696-a474-01bdaa9a6d3e",
+      "name": "ChunkBlocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3488,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const MSG_BUDGET = 8000;\n\nconst blocksJson = $('format').first().json.blocksJson;\n\nlet blocks;\ntry {\n  blocks = JSON.parse(blocksJson).blocks;\n  if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('no blocks');\n} catch (e) {\n  return [{ json: { blocksJson, part: 1, totalParts: 1 } }];\n}\n\nconst messages = [];\nlet current = [];\nlet currentLen = 0;\n\nfor (const block of blocks) {\n  const len = (block.text || '').length;\n  if (current.length > 0 && currentLen + len > MSG_BUDGET) {\n    messages.push(current);\n    current = [];\n    currentLen = 0;\n  }\n  current.push(block);\n  currentLen += len;\n}\nif (current.length > 0) messages.push(current);\n\nreturn messages.map((msgBlocks, i) => ({\n  json: {\n    blocksJson: JSON.stringify({ blocks: msgBlocks }),\n    part: i + 1,\n    totalParts: messages.length,\n  },\n}));"
+      }
+    },
+    {
+      "id": "d4f68383-7ace-4ccd-a631-0a20faa4403f",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        3712,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09DRCJLQCE",
+          "mode": "id"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ $json.blocksJson }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "b1bfd6f1-2af1-49ad-97a1-33cc95849f4b"
+    },
+    {
+      "id": "d7ea9694-81b9-4584-ae8f-e9a09f7be8fe",
+      "name": "Enough OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2688,
+        416
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c-ok",
+              "leftValue": "={{ $json.ok_count }}",
+              "rightValue": "={{ $json.min_consistent }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aeb35cd7-f83e-49f7-90c1-7ad378398804",
+      "name": "Judge",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2912,
+        304
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify({ question: $json.prompt, judge_focus: $json.judge_focus, expected_claims: $json.expected_claims || null, answers: $json.ok_attempts }) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the consistency and accuracy judge for an agent evaluation.\n\nYou receive one research question, a judge_focus describing the single dimension on which answers must agree, optionally expected_claims (the ground-truth core claims for this question), and several answers produced by independent runs of the same research agent, labelled by attempt number.\n\nStep 1 - for each answer, extract its core claims on the judge_focus dimension as short normalized labels (3-8 words each). Ignore wording, ordering, formatting, citation and quote choices, markdown structure, and how many supporting quotes are shown.\n\nStep 2 - for every unordered pair of answers, decide whether they agree. Two answers agree ONLY when a reader of either would come away with the same knowledge on the judge_focus dimension: they name the same set of substantive claims. Surface differences never matter. But if one answer contains a substantive claim that the other does not name at all - one that changes what the reader knows or would act on - they DISAGREE. A different carving of the same content (lumping several claims into one broader theme that still conveys them) is agreement; genuinely absent content is not. A direct contradiction is always disagreement. Give a one-sentence reason for every pair. Return every unordered pair exactly once with a < b.\n\nStep 3 - only when expected_claims is provided: grade each answer against it. For each answer list which expected claims it covers (semantic coverage anywhere in the answer, not verbatim), which it misses entirely, and whether the answer states anything that contradicts an expected claim. Extra claims beyond the expected list are not errors unless they contradict it."
+        }
+      }
+    },
+    {
+      "id": "e17d7154-a79f-48c6-a830-f9184537ad1b",
+      "name": "Judge Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        2928,
+        528
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-opus-5",
+          "cachedResultName": "Claude Opus 5"
+        },
+        "options": {
+          "temperature": 0
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "id": "5ad36ec2-0657-438e-8bce-445534894e26",
+      "name": "Judge Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        3056,
+        528
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"claims\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"attempt\":{\"type\":\"number\"},\"core_claims\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Short normalized labels (3-8 words) for the answer core claims on the judge_focus dimension\"}},\"required\":[\"attempt\",\"core_claims\"]}},\"pairs\":{\"type\":\"array\",\"description\":\"Every unordered pair of attempts exactly once, a < b\",\"items\":{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"number\"},\"b\":{\"type\":\"number\"},\"agree\":{\"type\":\"boolean\"},\"reason\":{\"type\":\"string\",\"description\":\"One short sentence\"}},\"required\":[\"a\",\"b\",\"agree\",\"reason\"]}},\"accuracy\":{\"type\":\"array\",\"description\":\"Only when expected_claims was provided: one entry per answer\",\"items\":{\"type\":\"object\",\"properties\":{\"attempt\":{\"type\":\"number\"},\"covered\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Expected claims this answer covers semantically\"},\"missing\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Expected claims entirely absent from this answer\"},\"contradicted\":{\"type\":\"boolean\",\"description\":\"true when the answer states something that contradicts an expected claim\"},\"note\":{\"type\":\"string\",\"description\":\"One short sentence, only when missing is non-empty or contradicted is true\"}},\"required\":[\"attempt\",\"covered\",\"missing\",\"contradicted\"]}}},\"required\":[\"claims\",\"pairs\"]}"
+      }
+    },
+    {
+      "id": "7db86688-6754-4cb8-ae49-0430e527ca65",
+      "name": "Judge Verdict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3264,
+        304
+      ],
+      "parameters": {
+        "jsCode": "const c = $('Case Loop').first().json;\nconst raw = $input.first().json;\nconst out = raw.output || raw;\nconst okAttempts = (c.ok_attempts || []).map(a => Number(a.attempt));\nconst agree = new Map();\nfor (const p of (out.pairs || [])) {\n  const a = Number(p.a); const b = Number(p.b);\n  if (!isFinite(a) || !isFinite(b) || a === b) continue;\n  agree.set(Math.min(a, b) + '-' + Math.max(a, b), p.agree === true);\n}\nconst key = (x, y) => Math.min(x, y) + '-' + Math.max(x, y);\nconst counts = {};\nfor (const x of okAttempts) counts[x] = 0;\nfor (let i = 0; i < okAttempts.length; i++) {\n  for (let j = i + 1; j < okAttempts.length; j++) {\n    if (agree.get(key(okAttempts[i], okAttempts[j]))) { counts[okAttempts[i]]++; counts[okAttempts[j]]++; }\n  }\n}\nlet medoid = okAttempts[0];\nfor (const x of okAttempts) { if (counts[x] > counts[medoid]) medoid = x; }\nconst cluster = okAttempts.filter(x => x === medoid || agree.get(key(x, medoid)) === true);\n\n// Accuracy layer: an attempt is accurate when it covers EVERY expected claim\n// and contradicts none. Without expected_claims every ok attempt counts.\nlet expected = c.expected_claims;\nif (typeof expected === 'string') { try { expected = JSON.parse(expected); } catch (e) { expected = null; } }\nconst hasExpected = Array.isArray(expected) && expected.length > 0;\nconst accSet = new Set();\nif (hasExpected && Array.isArray(out.accuracy)) {\n  for (const a of out.accuracy) {\n    const n = Number(a.attempt);\n    if (!okAttempts.includes(n)) continue;\n    const missing = Array.isArray(a.missing) ? a.missing.length : 0;\n    if (a.contradicted !== true && missing === 0) accSet.add(n);\n  }\n}\nconst accurate = hasExpected ? okAttempts.filter(x => accSet.has(x)) : okAttempts;\nconst clusterAccurate = cluster.filter(x => accurate.includes(x));\nconst pass = clusterAccurate.length >= Number(c.min_consistent);\nreturn [{ json: {\n  run_id: c.run_id, case_id: c.id, case_slug: c.slug,\n  status: pass ? 'pass' : 'fail',\n  k: c.k, min_consistent: c.min_consistent,\n  valid_attempts: okAttempts.length,\n  cluster_size: cluster.length,\n  accurate_attempts: hasExpected ? accurate.length : null,\n  judge: { medoid: medoid, cluster: cluster, accurate: hasExpected ? accurate : null, claims: out.claims || [], pairs: out.pairs || [], accuracy: out.accuracy || null, attempts: c.attempts }\n} }];"
+      }
+    },
+    {
+      "id": "dea1d080-9368-4618-aeec-00b05019ff7a",
+      "name": "Save Result",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3488,
+        496
+      ],
+      "parameters": {
+        "operation": "create",
+        "tableId": "consistency_results",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "case_slug",
+              "fieldValue": "={{ $json.case_slug }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "k",
+              "fieldValue": "={{ $json.k }}"
+            },
+            {
+              "fieldId": "min_consistent",
+              "fieldValue": "={{ $json.min_consistent }}"
+            },
+            {
+              "fieldId": "valid_attempts",
+              "fieldValue": "={{ $json.valid_attempts }}"
+            },
+            {
+              "fieldId": "cluster_size",
+              "fieldValue": "={{ $json.cluster_size }}"
+            },
+            {
+              "fieldId": "accurate_attempts",
+              "fieldValue": "={{ $json.accurate_attempts }}"
+            },
+            {
+              "fieldId": "judge",
+              "fieldValue": "={{ $json.judge }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "1be34a70-a5f5-4b9d-b5bc-bbcc5f175562",
+      "name": "Case Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2464,
+        336
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "6232013a-0bf1-40d7-8850-3788323e9179",
+      "name": "No Judge Verdict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3264,
+        544
+      ],
+      "parameters": {
+        "jsCode": "const c = $input.first().json;\nconst status = (c.ok_count === 0) ? 'error' : 'fail';\nreturn [{ json: {\n  run_id: c.run_id, case_id: c.id, case_slug: c.slug,\n  status: status,\n  k: c.k, min_consistent: c.min_consistent,\n  valid_attempts: c.ok_count,\n  cluster_size: null,\n  judge: { skipped: true, reason: 'fewer than min_consistent attempts passed anchors', attempts: c.attempts }\n} }];"
+      }
+    },
+    {
+      "id": "47efbcc4-3a87-47d8-9298-049acb72288c",
+      "name": "Pace Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        576
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "c07018dd-025b-48ca-8e2d-7ee4ea0d1b1e"
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Run Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Id": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Filter Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Cases": {
+      "main": [
+        [
+          {
+            "node": "Expand Attempts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Attempts": {
+      "main": [
+        [
+          {
+            "node": "Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Attempts": {
+      "main": [
+        [
+          {
+            "node": "Poll Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Attempt": {
+      "main": [
+        [
+          {
+            "node": "Pace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace": {
+      "main": [
+        [
+          {
+            "node": "Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch": {
+      "main": [
+        [
+          {
+            "node": "Load Attempts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dispatch Attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Check": {
+      "main": [
+        [
+          {
+            "node": "Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete?": {
+      "main": [
+        [
+          {
+            "node": "Cases For Judging",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pace Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cases For Judging": {
+      "main": [
+        [
+          {
+            "node": "Case Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Results": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary": {
+      "main": [
+        [
+          {
+            "node": "format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format": {
+      "main": [
+        [
+          {
+            "node": "ChunkBlocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChunkBlocks": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enough OK?": {
+      "main": [
+        [
+          {
+            "node": "Judge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Judge Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge": {
+      "main": [
+        [
+          {
+            "node": "Judge Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Judge",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Judge",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge Verdict": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Result": {
+      "main": [
+        [
+          {
+            "node": "Case Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Case Loop": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enough OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Judge Verdict": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace Poll": {
+      "main": [
+        [
+          {
+            "node": "Load Attempts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "5b436407-c8bc-4985-8687-5a0b8355a662",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "yXWCkp7gwDtUZKmH",
+  "isArchived": false,
+  "nodeGroups": []
+}

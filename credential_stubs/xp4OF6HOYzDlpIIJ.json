@@ -1,0 +1,20 @@
+{
+  "id": "xp4OF6HOYzDlpIIJ",
+  "name": "n8n - FirstClassDarwin",
+  "type": "slackApi",
+  "data": {
+    "accessToken": "",
+    "signatureSecret": "",
+    "managedAppId": "",
+    "teamId": "",
+    "managerCredentialId": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}

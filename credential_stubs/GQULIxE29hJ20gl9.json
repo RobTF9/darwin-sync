@@ -1,10 +1,10 @@
 {
-  "id": "tNYo3eGqheixdzIb",
-  "name": "Webhook Auth",
-  "type": "httpHeaderAuth",
+  "id": "GQULIxE29hJ20gl9",
+  "name": "n8n - FirstClassDarwin",
+  "type": "slackApi",
   "data": {
-    "name": "",
-    "value": ""
+    "accessToken": "",
+    "signatureSecret": ""
   },
   "ownedBy": {
     "type": "team",

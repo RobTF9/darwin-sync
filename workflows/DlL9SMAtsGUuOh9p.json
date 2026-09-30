@@ -1,0 +1,664 @@
+{
+  "id": "DlL9SMAtsGUuOh9p",
+  "name": "UsageReport",
+  "description": "Sub-workflow tool for the Test Suites MCP server. Reads Slack history with the Darwin bot token and reports distinct users who interact with Darwin, month by month. Excludes eval channels by default. Read-only against Slack; writes nothing.",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "oldest"
+            },
+            {
+              "name": "bot_user_id"
+            },
+            {
+              "name": "exclude_channels"
+            }
+          ]
+        }
+      },
+      "id": "5015642b-ee95-461a-bbf0-fabd3383fd62",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1440,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resolve env-aware defaults for the usage report.\nconst inp = $input.first().json || {};\nconst env = $vars.env || 'production';\nconst bot = (inp.bot_user_id && String(inp.bot_user_id).trim()) || (env === 'staging' ? 'U0BLRFB0FJR' : 'U09Q22R53T6');\nconst otherBot = bot === 'U09Q22R53T6' ? 'U0BLRFB0FJR' : 'U09Q22R53T6';\nconst oldestStr = (inp.oldest && String(inp.oldest).trim()) || '2026-07-25';\nconst oldestEpoch = Math.floor(new Date(oldestStr + 'T00:00:00Z').getTime() / 1000);\n// Excluded by default: retrieval-eval Slack transport channel and the test-report channel.\nconst defaults = ['C0BQH5S6P1P', 'C09DRCJLQCE'];\nconst extra = String(inp.exclude_channels || '').split(',').map(s => s.trim()).filter(Boolean);\nreturn [{ json: { env: env, bot_id: bot, other_bot: otherBot, oldest: String(oldestEpoch), oldest_date: oldestStr, excluded: defaults.concat(extra) } }];"
+      },
+      "id": "f5286a8f-76b5-47ad-b900-c33d29aae11a",
+      "name": "Build Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1152,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://slack.com/api/users.conversations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "types",
+              "value": "={{ $json.type }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 400
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "96006957-a2f0-4965-afd7-eb6b281a0509",
+      "name": "List Conversations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -928,
+        -288
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per conversation the bot can read, minus excluded channels.\n// users.conversations returns only conversations the bot is a member of.\n// Pages from types the token has no scope for come back ok:false and are skipped;\n// Build Report re-reads them to report the scope gaps.\nconst cfg = $('Build Config').first().json;\nconst out = [];\nconst gaps = [];\nconst seen = {};\nfor (const page of $input.all()) {\n  const body = page.json;\n  if (!body || body.ok === false) {\n    gaps.push((body && (body.needed || body.error)) || 'unknown');\n    continue;\n  }\n  for (const c of (body.channels || [])) {\n    if (seen[c.id]) continue;\n    seen[c.id] = true;\n    if (cfg.excluded.includes(c.id)) continue;\n    out.push({ json: { channel_id: c.id, is_im: !!c.is_im, name: c.name || c.user || c.id } });\n  }\n}\nif (!out.length) throw new Error('No readable conversations. Scope gaps: ' + gaps.join(', '));\nreturn out;"
+      },
+      "id": "694e3f79-2979-4f9b-85f3-c0aa073c4ea5",
+      "name": "Flatten Conversations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deduplicate messages and thread-fetch requests across all channels.\nconst seenMsg = {};\nconst seenThread = {};\nconst out = [];\nfor (const it of $input.all()) {\n  const j = it.json;\n  if (j.kind === 'msg') {\n    const k = j.channel_id + ':' + j.ts;\n    if (seenMsg[k]) continue;\n    seenMsg[k] = true;\n    out.push({ json: j });\n  } else if (j.kind === 'thread') {\n    const k = j.channel_id + ':' + j.thread_ts;\n    if (seenThread[k]) continue;\n    seenThread[k] = true;\n    out.push({ json: j });\n  }\n}\nif (!out.length) out.push({ json: { kind: 'noop' } });\nreturn out;"
+      },
+      "id": "1cc3a3ba-25a0-4ea0-b554-46858e1741ed",
+      "name": "Classify Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only the thread-fetch requests; a marker item keeps the pipeline alive when there are none.\nconst out = [];\nfor (const it of $input.all()) {\n  if (it.json.kind === 'thread') out.push({ json: it.json });\n}\nif (!out.length) out.push({ json: { kind: 'thread', channel_id: '', is_im: false, thread_ts: '' } });\nreturn out;"
+      },
+      "id": "41303ada-b07b-4cc6-b7ee-4cc423bc7506",
+      "name": "Thread List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge direct messages and thread replies, dedupe, aggregate month by month.\nconst cfg = $('Build Config').first().json;\nconst all = [];\nfor (const it of $('Classify Results').all()) {\n  if (it.json.kind === 'msg') all.push(it.json);\n}\nfor (const it of $input.all()) {\n  if (it.json.kind === 'msg') all.push(it.json);\n}\nconst seen = {};\nconst msgs = [];\nfor (const m of all) {\n  const k = m.channel_id + ':' + m.ts;\n  if (seen[k]) continue;\n  seen[k] = true;\n  msgs.push(m);\n}\nconst months = {};\nconst totalUsers = {};\nconst totalThreads = {};\nfor (const m of msgs) {\n  const month = new Date(parseFloat(m.ts) * 1000).toISOString().slice(0, 7);\n  if (!months[month]) months[month] = { users: {}, messages: 0, threads: {} };\n  months[month].users[m.user] = (months[month].users[m.user] || 0) + 1;\n  months[month].messages += 1;\n  months[month].threads[m.channel_id + ':' + m.thread_ts] = true;\n  totalUsers[m.user] = (totalUsers[m.user] || 0) + 1;\n  totalThreads[m.channel_id + ':' + m.thread_ts] = true;\n}\nconst monthRows = Object.keys(months).sort().map(mo => ({\n  month: mo,\n  distinct_users: Object.keys(months[mo].users).length,\n  messages: months[mo].messages,\n  threads: Object.keys(months[mo].threads).length,\n  users: Object.entries(months[mo].users).sort((a, b) => b[1] - a[1]).map(e => ({ user: e[0], messages: e[1] }))\n}));\n// Scope gaps: conversation types the token could not list.\nconst gaps = [];\nfor (const it of $('List Conversations').all()) {\n  const b = it.json;\n  if (b && b.ok === false) gaps.push(b.needed || b.error || 'unknown');\n}\nreturn [{ json: {\n  env: cfg.env,\n  since: cfg.oldest_date,\n  excluded_channels: cfg.excluded,\n  scope_gaps: gaps,\n  months: monthRows,\n  totals: { distinct_users: Object.keys(totalUsers).length, messages: msgs.length, threads: Object.keys(totalThreads).length }\n} }];"
+      },
+      "id": "eeebb1d1-0597-4e94-827b-5c5446b7a7e1",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per distinct user for the name lookup.\nconst rep = $('Build Report').first().json;\nconst users = {};\nfor (const mo of rep.months) {\n  for (const u of mo.users) users[u.user] = true;\n}\nconst out = Object.keys(users).map(u => ({ json: { user: u } }));\nif (!out.length) out.push({ json: { user: 'USLACKBOT' } });\nreturn out;"
+      },
+      "id": "d5d12d58-dc44-4b25-8ad6-82d3c0da3720",
+      "name": "Distinct Users",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://slack.com/api/users.info",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user",
+              "value": "={{ $json.user }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 700
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "0f7ba04f-1819-4685-94cf-e84a7fce127d",
+      "name": "Fetch User Names",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2096,
+        -288
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attach display names; fall back to the raw user ID when the lookup fails.\nconst report = $('Build Report').first().json;\nconst names = {};\nfor (const it of $input.all()) {\n  const body = it.json;\n  if (body && body.ok && body.user) {\n    const p = body.user.profile || {};\n    names[body.user.id] = p.display_name || p.real_name || body.user.real_name || body.user.name;\n  }\n}\nfor (const mo of report.months) {\n  for (const u of mo.users) u.name = names[u.user] || u.user;\n}\nreport.generated_at = new Date().toISOString();\nreturn [{ json: report }];"
+      },
+      "id": "ddfc9937-39bc-420f-b279-aa3bfdd75411",
+      "name": "Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2320,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://slack.com/api/conversations.replies",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.channel_id }}"
+            },
+            {
+              "name": "ts",
+              "value": "={{ $json.thread_ts }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 1250
+            }
+          }
+        }
+      },
+      "id": "6986ed3b-5eca-485e-89ac-65294ccab2ee",
+      "name": "Fetch Replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1088,
+        -320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Qualifying human messages inside one thread.\nconst t = $('Threads Loop').first().json;\nconst cfg = $('Build Config').first().json;\nconst bots = [cfg.bot_id, cfg.other_bot];\nconst mention = '<@' + cfg.bot_id + '>';\nconst out = [];\nfor (const page of $input.all()) {\n  const body = page.json;\n  if (!body || body.ok === false) continue;\n  for (const m of (body.messages || [])) {\n    if (m.subtype && m.subtype !== 'thread_broadcast') continue;\n    if (!m.user || m.bot_id || bots.includes(m.user)) continue;\n    if (!(t.is_im || (m.text || '').includes(mention))) continue;\n    out.push({ json: { kind: 'msg', channel_id: t.channel_id, is_im: t.is_im, user: m.user, ts: m.ts, thread_ts: t.thread_ts } });\n  }\n}\nif (!out.length) out.push({ json: { kind: 'noop' } });\nreturn out;"
+      },
+      "id": "c5575b73-c06c-46e7-94e3-3a4817374715",
+      "name": "Tag Reply Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "4270a582-aa7f-4bd7-b0b3-5c87515b107b",
+      "name": "Threads Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        864,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://slack.com/api/conversations.history",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.channel_id }}"
+            },
+            {
+              "name": "oldest",
+              "value": "={{ $('Build Config').first().json.oldest }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 1250
+            }
+          }
+        }
+      },
+      "id": "1fad4411-15e3-4914-bd2b-ce0a86a483fd",
+      "name": "Fetch History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -144,
+        -320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000,
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep qualifying human messages and threads that need a replies fetch.\nconst ch = $('Channels Loop').first().json;\nconst cfg = $('Build Config').first().json;\nconst bots = [cfg.bot_id, cfg.other_bot];\nconst mention = '<@' + cfg.bot_id + '>';\nconst out = [];\nfor (const page of $input.all()) {\n  const body = page.json;\n  if (body.ok === false) continue;\n  for (const m of (body.messages || [])) {\n    if (m.subtype && m.subtype !== 'thread_broadcast') continue;\n    const isHuman = m.user && !m.bot_id && !bots.includes(m.user);\n    const qualifies = isHuman && (ch.is_im || (m.text || '').includes(mention));\n    const replyUsers = m.reply_users || [];\n    const needsReplies = (m.reply_count || 0) > 0 && (replyUsers.some(u => bots.includes(u)) || qualifies || bots.includes(m.user));\n    if (qualifies) out.push({ json: { kind: 'msg', channel_id: ch.channel_id, is_im: ch.is_im, user: m.user, ts: m.ts, thread_ts: m.thread_ts || m.ts } });\n    if (needsReplies) out.push({ json: { kind: 'thread', channel_id: ch.channel_id, is_im: ch.is_im, thread_ts: m.ts } });\n  }\n}\n// Always emit at least one item so the loop keeps moving.\nif (!out.length) out.push({ json: { kind: 'noop' } });\nreturn out;"
+      },
+      "id": "c03ed3ce-8585-4e45-a25a-faf123cc4e30",
+      "name": "Tag Channel Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "cec1afcf-7269-48d3-bd98-fe78b06b7ded",
+      "name": "Channels Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -368,
+        -240
+      ]
+    },
+    {
+      "id": "d3078ea5-672e-4b7d-90b0-374dc94ec4ab",
+      "name": "List Types",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        -288
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// One item per conversation type; each gets its own users.conversations call.\nreturn ['public_channel', 'private_channel', 'im'].map(t => ({ json: { type: t } }));"
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Build Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Conversations": {
+      "main": [
+        [
+          {
+            "node": "Flatten Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Conversations": {
+      "main": [
+        [
+          {
+            "node": "Channels Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Results": {
+      "main": [
+        [
+          {
+            "node": "Thread List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Thread List": {
+      "main": [
+        [
+          {
+            "node": "Threads Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Distinct Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Distinct Users": {
+      "main": [
+        [
+          {
+            "node": "Fetch User Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User Names": {
+      "main": [
+        [
+          {
+            "node": "Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Replies": {
+      "main": [
+        [
+          {
+            "node": "Tag Reply Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Reply Messages": {
+      "main": [
+        [
+          {
+            "node": "Threads Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads Loop": {
+      "main": [
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch History": {
+      "main": [
+        [
+          {
+            "node": "Tag Channel Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Channel Messages": {
+      "main": [
+        [
+          {
+            "node": "Channels Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Channels Loop": {
+      "main": [
+        [
+          {
+            "node": "Classify Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Config": {
+      "main": [
+        [
+          {
+            "node": "List Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Types": {
+      "main": [
+        [
+          {
+            "node": "List Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "6ba15078-1b9a-41b6-843f-67c2d59f7260",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fxhuxPGdNIHdYUsf",
+  "isArchived": true,
+  "nodeGroups": [
+    {
+      "id": "2cb09d80-99f7-4bba-bdba-f3475a5bd751",
+      "name": "Discover conversations",
+      "nodeIds": [
+        "f5286a8f-76b5-47ad-b900-c33d29aae11a",
+        "d3078ea5-672e-4b7d-90b0-374dc94ec4ab",
+        "96006957-a2f0-4965-afd7-eb6b281a0509",
+        "694e3f79-2979-4f9b-85f3-c0aa073c4ea5"
+      ],
+      "description": "Resolves env config and lists every conversation the Darwin bot can read"
+    },
+    {
+      "id": "adc37db5-2fa3-4df0-bee1-27132a66d5f7",
+      "name": "Scan channel history",
+      "nodeIds": [
+        "cec1afcf-7269-48d3-bd98-fe78b06b7ded",
+        "1fad4411-15e3-4914-bd2b-ce0a86a483fd",
+        "c03ed3ce-8585-4e45-a25a-faf123cc4e30"
+      ],
+      "description": "Pages through each conversation history and keeps Darwin interactions"
+    },
+    {
+      "id": "79a6b302-5e83-4cdd-8e6e-932d288a8389",
+      "name": "Fetch thread replies",
+      "nodeIds": [
+        "1cc3a3ba-25a0-4ea0-b554-46858e1741ed",
+        "41303ada-b07b-4cc6-b7ee-4cc423bc7506",
+        "4270a582-aa7f-4bd7-b0b3-5c87515b107b",
+        "6986ed3b-5eca-485e-89ac-65294ccab2ee",
+        "c5575b73-c06c-46e7-94e3-3a4817374715"
+      ],
+      "description": "Fetches replies for threads where Darwin took part"
+    },
+    {
+      "id": "a38ab2d2-65c9-4259-9247-007438c98254",
+      "name": "Aggregate & report",
+      "nodeIds": [
+        "eeebb1d1-0597-4e94-827b-5c5446b7a7e1",
+        "d5d12d58-dc44-4b25-8ad6-82d3c0da3720",
+        "0f7ba04f-1819-4685-94cf-e84a7fce127d",
+        "ddfc9937-39bc-420f-b279-aa3bfdd75411"
+      ],
+      "description": "Month-by-month distinct users, messages and threads, with display names"
+    }
+  ]
+}
