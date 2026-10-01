@@ -58,6 +58,7 @@
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "projectId": {
           "__rl": true,
           "mode": "id",
@@ -75,9 +76,9 @@
         640
       ],
       "credentials": {
-        "googleBigQueryOAuth2Api": {
-          "id": "92ZMRuOZEOJHwoRi",
-          "name": "Nik's Big Query"
+        "googleApi": {
+          "id": "0pCOXJXMqCYd7C37",
+          "name": "BigQuery n8n Service Account"
         }
       }
     },
@@ -389,7 +390,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -16,
+        32,
         208
       ]
     },
@@ -446,8 +447,8 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "page_id": "={{ $('Store Monthly Results').item.json.page_id }}",
-            "period_label": "={{ $('Store Monthly Results').item.json.period_label }}"
+            "page_id": "={{ $json.page_id }}",
+            "period_label": "={{ $json.period_label }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -483,7 +484,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        528,
+        432,
         0
       ]
     },
@@ -610,7 +611,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        256,
+        224,
         0
       ],
       "credentials": {
@@ -899,7 +900,7 @@
     "availableInMCP": true
   },
   "triggerCount": 1,
-  "versionId": "5acb7464-4431-478e-b253-2eeddbaedaad",
+  "versionId": "fd799945-5806-4540-97c5-6a7cc4a4992d",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

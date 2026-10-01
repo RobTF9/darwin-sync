@@ -143,6 +143,14 @@
       "homeProjectId": "2uAQ2XYnaFVSte2z",
       "createdAt": "2026-09-25T06:45:11.767Z",
       "updatedAt": "2026-09-25T06:45:11.767Z"
+    },
+    {
+      "id": "79endpVU3NtKdSel",
+      "name": "Agent Evals",
+      "parentFolderId": null,
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-09-30T14:46:30.097Z",
+      "updatedAt": "2026-09-30T14:46:30.097Z"
     }
   ]
 }

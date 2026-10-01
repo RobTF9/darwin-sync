@@ -1,6 +1,7 @@
 {
   "id": "78FVoqhcsy0Ku4Jy",
   "name": "NPS daily swipe",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -18,11 +19,12 @@
       "typeVersion": 1.3,
       "position": [
         0,
-        0
+        128
       ]
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "projectId": {
           "__rl": true,
           "mode": "id",
@@ -36,13 +38,13 @@
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        304,
-        0
+        224,
+        128
       ],
       "credentials": {
-        "googleBigQueryOAuth2Api": {
-          "id": "92ZMRuOZEOJHwoRi",
-          "name": "Nik's Big Query"
+        "googleApi": {
+          "id": "0pCOXJXMqCYd7C37",
+          "name": "BigQuery n8n Service Account"
         }
       }
     },
@@ -55,8 +57,8 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1568,
-        320
+        1256,
+        232
       ]
     },
     {
@@ -68,8 +70,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1264,
-        16
+        896,
+        0
       ]
     },
     {
@@ -91,8 +93,8 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.9,
       "position": [
-        1424,
-        16
+        1120,
+        0
       ]
     },
     {
@@ -104,8 +106,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1744,
-        16
+        1472,
+        128
       ],
       "retryOnFail": true,
       "maxTries": 2,
@@ -120,8 +122,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        608,
-        0
+        448,
+        128
       ],
       "retryOnFail": true,
       "maxTries": 2,
@@ -156,8 +158,8 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.3,
       "position": [
-        2064,
-        16
+        1696,
+        128
       ]
     },
     {
@@ -175,8 +177,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.5,
       "position": [
-        1280,
-        320
+        1128,
+        232
       ],
       "id": "6ae9c710-3fb6-47a5-ae95-bdbfda09e72d",
       "name": "Anthropic Chat Model",
@@ -197,8 +199,8 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        1024,
-        0
+        672,
+        128
       ]
     },
     {
@@ -286,8 +288,8 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        2320,
-        16
+        2592,
+        128
       ],
       "credentials": {
         "supabaseApi": {
@@ -297,27 +299,19 @@
       }
     },
     {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nreturn [{ json: { items, texts: items.map(it => it.feedback) } }];"
+      },
       "id": "76907e4c-2d39-4a0e-8f64-579665c63cde",
       "name": "Build Embedding Batch",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2064,
-        200
-      ],
-      "parameters": {
-        "jsCode": "const items = $input.all().map(i => i.json);\nreturn [{ json: { items, texts: items.map(it => it.feedback) } }];"
-      }
+        1920,
+        128
+      ]
     },
     {
-      "id": "12c19f6f-59ff-4fba-a011-abf00f5eb22f",
-      "name": "Embed Batch",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2160,
-        200
-      ],
       "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/embeddings",
@@ -328,6 +322,14 @@
         "jsonBody": "={{ JSON.stringify({ model: \"text-embedding-3-large\", input: $json.texts }) }}",
         "options": {}
       },
+      "id": "12c19f6f-59ff-4fba-a011-abf00f5eb22f",
+      "name": "Embed Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2144,
+        128
+      ],
       "credentials": {
         "openAiApi": {
           "id": "sp24DA5ZhuwP8VP6",
@@ -336,17 +338,17 @@
       }
     },
     {
+      "parameters": {
+        "jsCode": "const original = $('Build Embedding Batch').first().json.items;\nconst data = ($json.data || []).slice().sort((a, b) => a.index - b.index);\nreturn original.map((item, idx) => ({ json: { ...item, embedding: data[idx] ? data[idx].embedding : null } }));"
+      },
       "id": "bd445e40-1300-47af-a1cf-1b5733ea8c1a",
       "name": "Zip Embeddings",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2260,
-        200
-      ],
-      "parameters": {
-        "jsCode": "const original = $('Build Embedding Batch').first().json.items;\nconst data = ($json.data || []).slice().sort((a, b) => a.index - b.index);\nreturn original.map((item, idx) => ({ json: { ...item, embedding: data[idx] ? data[idx].embedding : null } }));"
-      }
+        2368,
+        128
+      ]
     }
   ],
   "connections": {
@@ -506,7 +508,7 @@
     "availableInMCP": true
   },
   "triggerCount": 1,
-  "versionId": "9a737ff8-2212-4e8a-933f-6530b349dc0d",
+  "versionId": "67c86152-c92c-42b1-90da-d75514b6606b",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
