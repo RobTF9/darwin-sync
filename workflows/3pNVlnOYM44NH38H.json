@@ -29,8 +29,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.payload || $json.body?.payload || $json;\nconst se = body.scheduled_event || body.event || {};\nconst eventTypeName = se.name || '';\n\nconst CD_EVENT_TYPE_UUID = 'ebd64db8-7c09-4e31-bc2e-339065fbb930';\nconst eventTypeUri = se.event_type || '';\nconst eventTypeUuid = eventTypeUri.split('/').pop();\nconst isCdBooking = eventTypeUuid === CD_EVENT_TYPE_UUID;\nif (!isCdBooking) {\n  return [];\n}\n\nconst memberships = se.event_memberships || [];\nconst host = memberships[0] || {};\n\nreturn [{\n  json: {\n    externalId: se.uri || body.uri || '',\n    organizerName: host.user_name || '',\n    organizerEmail: host.user_email || '',\n    title: eventTypeName,\n    description: (body.questions_and_answers || []).map(qa => (qa.question + ': ' + qa.answer)).join('\\n'),\n    startsAt: se.start_time || '',\n    endsAt: se.end_time || '',\n    rawPayload: JSON.stringify(body),\n  }\n}];",
-        "notes": "Matches on the Calendly event type UUID (ebd64db8-7c09-4e31-bc2e-339065fbb930) extracted from the event_type URI. Only bookings for this event type are processed; all others are skipped."
+        "jsCode": "const body = $json.payload || $json.body?.payload || $json;\nconst se = body.scheduled_event || body.event || {};\nconst eventTypeName = se.name || '';\n\nconst CD_EVENT_TYPE_UUID = 'ebd64db8-7c09-4e31-bc2e-339065fbb930';\nconst eventTypeUri = se.event_type || '';\nconst eventTypeUuid = eventTypeUri.split('/').pop();\nconst isCdBooking = eventTypeUuid === CD_EVENT_TYPE_UUID;\nif (!isCdBooking) {\n  return [];\n}\n\nconst memberships = se.event_memberships || [];\nconst host = memberships[0] || {};\n\nreturn [{\n  json: {\n    externalId: se.uri || body.uri || '',\n    organizerName: host.user_name || '',\n    organizerEmail: host.user_email || '',\n    title: eventTypeName,\n    description: (body.questions_and_answers || []).map(qa => (qa.question + ': ' + qa.answer)).join('\\n'),\n    startsAt: se.start_time || '',\n    endsAt: se.end_time || '',\n    rawPayload: JSON.stringify(body),\n  }\n}];"
       },
       "id": "c958b319-1505-4800-ad8e-1edd80189f4e",
       "name": "Extract CD Booking (if research-with-n8n)",
@@ -68,12 +67,11 @@
     {
       "parameters": {
         "conditions": {
-          "combinator": "and",
           "options": {
             "caseSensitive": true,
             "leftValue": "",
             "typeValidation": "strict",
-            "version": 1
+            "version": 3
           },
           "conditions": [
             {
@@ -85,7 +83,8 @@
               },
               "rightValue": "invitee.created"
             }
-          ]
+          ],
+          "combinator": "and"
         },
         "options": {}
       },
@@ -194,7 +193,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "a3a07c85-10d0-4bf3-900e-438d9b5732b6",
+  "versionId": "b124b760-1eaf-45d1-aa83-9d25a49a79c5",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
