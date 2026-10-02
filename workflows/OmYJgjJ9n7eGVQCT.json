@@ -1,0 +1,695 @@
+{
+  "id": "OmYJgjJ9n7eGVQCT",
+  "name": "Session QA analyst",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "session-qa-analyst",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "7d6d1f28-2726-4ccc-80bd-44fa84e1228f",
+      "name": "Session QA Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        1760
+      ],
+      "webhookId": "67f5ffaf-f456-49f6-8f7d-0dce7bc6b659",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "session_id",
+              "value": "={{ $json.body?.session_id ?? $json.session_id ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "da8ecf13-f454-4b0c-ae59-41916229ba9c",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -96,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, transcript, transcript_object, project_id from session where id = $1",
+        "options": {
+          "queryReplacement": "={{ $json.session_id }}"
+        }
+      },
+      "id": "0922f0b9-39c9-453b-a4e8-bfd9e2b90150",
+      "name": "Fetch Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        128,
+        1760
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, prompt_text from question where project_id = $1 and status = 'active' and section != 'emergent_candidate' order by order_index",
+        "options": {
+          "queryReplacement": "={{ $json.project_id }}"
+        }
+      },
+      "id": "dd623d6a-2675-4136-a908-215697d5a9cb",
+      "name": "Fetch Project Questions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        352,
+        1760
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "questions",
+        "options": {}
+      },
+      "id": "8f0b25d1-1d53-442b-9276-86af7d50eb6f",
+      "name": "Aggregate Questions",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        560,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Interview transcript (timestamp markers in seconds):\n{{ $(\"Fetch Session\").item.json.transcript }}\n\nQuestions to answer (JSON array of {id, prompt_text}), in order:\n{{ JSON.stringify($json.questions) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a user research analyst performing structured, question-by-question extraction from an interview transcript. You are handed a fixed, ordered list of questions for this project. For each one, determine whether and where the PARTICIPANT addressed it, then extract a faithful summary and verbatim evidence. Separately, capture any distinct question the interviewer improvised that is not on that list.\n\nTranscript format: the transcript is a sequence of speaker turns labelled 'Speaker 0:', 'Speaker 1:', and so on, separated by blank lines. There are NO timestamps in the transcript. Do not produce, guess, or estimate timestamps for anything - timestamps are derived automatically downstream from the quote text. Your only job on evidence is the exact wording.\n\nWho is who: one speaker is the interviewer (they ask the questions, their turns are usually short) and one is the participant (they give the substantive answers, usually the longer turns). Work out which is which from the transcript itself.\n\nWhose words count as evidence - non-negotiable: every quote you return must be words spoken by the PARTICIPANT. Never quote the interviewer. A question being asked is not evidence that it was answered. If the only trace of a question in the transcript is the interviewer asking it, and the participant never responded to it in words, the correct output is was_asked false - even though the question was clearly posed. A participant doing something non-verbally, such as sharing their screen, is not a verbal answer unless they also describe it in words.\n\nDirection: work question-first, script to transcript, not transcript to script. For each question, search the transcript for where the participant addressed that question - the interviewer's actual wording will differ from the script, and a participant sometimes answers a later question unprompted while addressing an earlier one.\n\nFor each question: decide was_asked (true if the participant substantively addressed it, including unprompted; false if it never came up, was skipped, or drew no verbal response). If true, write a faithful 1-2 sentence summary of what the participant said, assign short open-coded tags (2-4 words, describing what was actually said, not the question topic), and collect every supporting clip - a question can be answered in several non-adjacent parts of the transcript. If false, leave summary/tags/clips empty - do not pad with \"no answer given\".\n\nFaithfulness rules: base everything only on what is in the transcript, no inference or interpretation. Every quote must be copied verbatim from the participant's speech, never paraphrased, cleaned up, or reconstructed. was_asked true requires at least one participant quote - if you cannot find one, the honest answer is was_asked false. When uncertain whether something counts as addressing the question, prefer false over stretching a tangential remark into an answer.\n\nEmergent questions: separately capture any distinct, substantive question the interviewer improvised that is not covered by the given list - a genuine follow-up, not small talk, not a request to repeat or clarify, not a reword of a question already in the list. For each one, question_text is that question paraphrased into a short, general, reusable form, and summary plus clips describe THE PARTICIPANT'S ANSWER to it - never a description of the interviewer asking it. If the participant did not answer it, leave it out entirely.\n\nReturn one answers entry per input question, in the same order given, plus emergent_questions."
+        }
+      },
+      "id": "32fae184-c1e5-4462-9177-4bdf34059412",
+      "name": "Extract Session Answers",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        784,
+        1760
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "77b68cee-94b3-4339-b290-7fcbf44e150e",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        784,
+        1968
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"answers\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"question_id\":{\"type\":\"string\",\"description\":\"Must match one of the input question ids\"},\"was_asked\":{\"type\":\"boolean\",\"description\":\"true only if the PARTICIPANT substantively addressed this question in their own words\"},\"summary\":{\"type\":\"string\",\"description\":\"1-2 sentences describing what the participant said. Empty string when was_asked is false.\"},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Short open-coded labels describing what was actually said\"},\"clips\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"quote\":{\"type\":\"string\",\"description\":\"Verbatim words spoken by the PARTICIPANT, copied exactly. Never the interviewer's question. Do not include timestamps - they are derived automatically downstream.\"}},\"required\":[\"quote\"]}}},\"required\":[\"question_id\",\"was_asked\",\"summary\",\"tags\",\"clips\"]}},\"emergent_questions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"question_text\":{\"type\":\"string\",\"description\":\"The improvised question, paraphrased into a short general reusable form\"},\"summary\":{\"type\":\"string\",\"description\":\"What the PARTICIPANT answered - never a description of the interviewer asking\"},\"clips\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"quote\":{\"type\":\"string\",\"description\":\"Verbatim words spoken by the PARTICIPANT in answer. Never the interviewer's question.\"}},\"required\":[\"quote\"]}}},\"required\":[\"question_text\",\"summary\",\"clips\"]}}},\"required\":[\"answers\",\"emergent_questions\"]}"
+      },
+      "id": "b5cf1ab9-22da-418e-a801-1faa2784bd53",
+      "name": "Session Answer Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        944,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.answers",
+        "options": {}
+      },
+      "id": "c5a4ac7d-bc2b-4f27-8611-3d918c891e3f",
+      "name": "Split Answers",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\n\n// The agent has to echo back the exact question_id for every question. It only\n// has to garble one UUID to break the insert on session_answer.question_id, and\n// across a whole project that is hundreds of reproductions. Validate against the\n// list we actually handed it - the same guard L2 applies to its citations.\n// Dropping is deliberate rather than re-matching by position: the schema asks\n// for one entry per question in order, but a single omission would shift every\n// later answer onto the wrong question.\nconst offered = $('Aggregate Questions').first().json.questions || [];\nconst validIds = new Set(offered.map(q => String(q.id)));\nconst qid = String(item.question_id || '');\nif (!validIds.has(qid)) { return null; }\n\nconst clips = item.clips || [];\nconst norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();\nconst words = $('Fetch Session').item.json.transcript_object || [];\nconst verifiedClips = [];\n\nif (Array.isArray(words) && words.length > 0) {\n  const stats = {};\n  for (const w of words) {\n    const sp = String(w.speaker);\n    if (!stats[sp]) stats[sp] = { words: 0, q: 0, first: Infinity };\n    stats[sp].words++;\n    const pw = w.punctuated_word || '';\n    if (pw.charAt(pw.length - 1) === '?') stats[sp].q++;\n    const st = Number(w.start);\n    if (!isNaN(st) && st < stats[sp].first) stats[sp].first = st;\n  }\n  const speakers = Object.keys(stats);\n  let participant = null;\n\n  if (speakers.length > 1) {\n    const anyQ = speakers.some(s => stats[s].q > 0);\n    const byQRate = speakers.slice().sort((a, b) => (stats[b].q / stats[b].words) - (stats[a].q / stats[a].words));\n    const byFirst = speakers.slice().sort((a, b) => stats[a].first - stats[b].first);\n    const interviewerQ = anyQ ? byQRate[0] : null;\n    const interviewerFirst = byFirst[0];\n    let interviewer = null;\n    if (interviewerQ !== null && interviewerQ === interviewerFirst) interviewer = interviewerQ;\n    else if (interviewerQ === null) interviewer = interviewerFirst;\n    if (interviewer !== null) {\n      const rest = speakers.filter(s => s !== interviewer);\n      if (rest.length > 0) {\n        rest.sort((a, b) => stats[b].words - stats[a].words);\n        participant = rest[0];\n      }\n    }\n  }\n\n  const tokens = words.map(w => norm(w.word));\n  const firstIndex = new Map();\n  for (let i = 0; i < tokens.length; i++) {\n    if (!firstIndex.has(tokens[i])) firstIndex.set(tokens[i], []);\n    firstIndex.get(tokens[i]).push(i);\n  }\n\n  for (const clip of clips) {\n    const q = norm(clip.quote).split(' ').filter(t => t.length > 0);\n    if (q.length === 0) continue;\n    const starts = firstIndex.get(q[0]) || [];\n    let found = -1;\n    for (const s of starts) {\n      if (s + q.length > tokens.length) break;\n      let ok = true;\n      for (let j = 1; j < q.length; j++) { if (tokens[s + j] !== q[j]) { ok = false; break; } }\n      if (ok) { found = s; break; }\n    }\n    if (found === -1) continue;\n    const end = found + q.length - 1;\n    const spanSpeakers = new Set();\n    for (let k = found; k <= end; k++) spanSpeakers.add(String(words[k].speaker));\n    if (spanSpeakers.size > 1) continue;\n    if (participant !== null && String(words[found].speaker) !== participant) continue;\n    verifiedClips.push({ quote: clip.quote, start_time: words[found].start, end_time: words[end].end });\n  }\n} else {\n  const t = norm($('Fetch Session').item.json.transcript || '');\n  for (const clip of clips) {\n    const nq = norm(clip.quote);\n    if (nq && t.indexOf(nq) !== -1) verifiedClips.push({ quote: clip.quote, start_time: null, end_time: null });\n  }\n}\n\nconst wasAsked = Boolean(item.was_asked) && verifiedClips.length > 0;\nreturn { json: { question_id: qid, was_asked: wasAsked, summary: wasAsked ? item.summary : '', tags: wasAsked ? (item.tags || []) : [], clips: verifiedClips } };"
+      },
+      "id": "3749e154-6410-40c4-a047-e1fbfe957ac7",
+      "name": "Verify Answer Quotes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "session_answer"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $('Normalize Input').item.json.session_id }}",
+            "question_id": "={{ $json.question_id }}",
+            "was_asked": "={{ $json.was_asked }}",
+            "summary": "={{ $json.summary }}",
+            "tags": "={{ $json.tags }}",
+            "clips": "={{ JSON.stringify($json.clips) }}"
+          },
+          "matchingColumns": [
+            "session_id",
+            "question_id"
+          ]
+        },
+        "options": {}
+      },
+      "id": "dfdbf202-cc6f-4328-84b8-a30955663600",
+      "name": "Insert Session Answer",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1584,
+        1632
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "answers_inserted",
+        "options": {}
+      },
+      "id": "8c74d7d5-bda2-4940-b752-6a37401c82ff",
+      "name": "Aggregate Inserted Answers",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "c44f9e96-8c7f-404c-ade7-9ec4a2af1bdc",
+      "name": "Combine Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2240,
+        1792
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.emergent_questions",
+        "options": {}
+      },
+      "id": "08c0919f-d225-4064-9053-bffda9bbbe42",
+      "name": "Split Emergent Questions",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\nconst clips = item.clips || [];\nconst norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();\nconst words = $('Fetch Session').item.json.transcript_object || [];\nconst verifiedClips = [];\n\nif (Array.isArray(words) && words.length > 0) {\n  const stats = {};\n  for (const w of words) {\n    const sp = String(w.speaker);\n    if (!stats[sp]) stats[sp] = { words: 0, q: 0, first: Infinity };\n    stats[sp].words++;\n    const pw = w.punctuated_word || '';\n    if (pw.charAt(pw.length - 1) === '?') stats[sp].q++;\n    const st = Number(w.start);\n    if (!isNaN(st) && st < stats[sp].first) stats[sp].first = st;\n  }\n  const speakers = Object.keys(stats);\n  let participant = null;\n\n  if (speakers.length > 1) {\n    const anyQ = speakers.some(s => stats[s].q > 0);\n    const byQRate = speakers.slice().sort((a, b) => (stats[b].q / stats[b].words) - (stats[a].q / stats[a].words));\n    const byFirst = speakers.slice().sort((a, b) => stats[a].first - stats[b].first);\n    const interviewerQ = anyQ ? byQRate[0] : null;\n    const interviewerFirst = byFirst[0];\n    let interviewer = null;\n    if (interviewerQ !== null && interviewerQ === interviewerFirst) interviewer = interviewerQ;\n    else if (interviewerQ === null) interviewer = interviewerFirst;\n    if (interviewer !== null) {\n      const rest = speakers.filter(s => s !== interviewer);\n      if (rest.length > 0) {\n        rest.sort((a, b) => stats[b].words - stats[a].words);\n        participant = rest[0];\n      }\n    }\n  }\n\n  const tokens = words.map(w => norm(w.word));\n  const firstIndex = new Map();\n  for (let i = 0; i < tokens.length; i++) {\n    if (!firstIndex.has(tokens[i])) firstIndex.set(tokens[i], []);\n    firstIndex.get(tokens[i]).push(i);\n  }\n\n  for (const clip of clips) {\n    const q = norm(clip.quote).split(' ').filter(t => t.length > 0);\n    if (q.length === 0) continue;\n    const starts = firstIndex.get(q[0]) || [];\n    let found = -1;\n    for (const s of starts) {\n      if (s + q.length > tokens.length) break;\n      let ok = true;\n      for (let j = 1; j < q.length; j++) { if (tokens[s + j] !== q[j]) { ok = false; break; } }\n      if (ok) { found = s; break; }\n    }\n    if (found === -1) continue;\n    const end = found + q.length - 1;\n    const spanSpeakers = new Set();\n    for (let k = found; k <= end; k++) spanSpeakers.add(String(words[k].speaker));\n    if (spanSpeakers.size > 1) continue;\n    if (participant !== null && String(words[found].speaker) !== participant) continue;\n    verifiedClips.push({ quote: clip.quote, start_time: words[found].start, end_time: words[end].end });\n  }\n} else {\n  const t = norm($('Fetch Session').item.json.transcript || '');\n  for (const clip of clips) {\n    const nq = norm(clip.quote);\n    if (nq && t.indexOf(nq) !== -1) verifiedClips.push({ quote: clip.quote, start_time: null, end_time: null });\n  }\n}\n\nif (verifiedClips.length === 0) { return null; }\nreturn { json: { question_text: item.question_text, summary: item.summary, clips: verifiedClips } };"
+      },
+      "id": "440ed676-12ad-4a0d-b981-9041e7cf7834",
+      "name": "Verify Emergent Quotes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "question"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('Fetch Session').item.json.project_id }}",
+            "section": "emergent_candidate",
+            "prompt_text": "={{ $json.question_text }}",
+            "order_index": 0,
+            "is_optional": false,
+            "status": "active"
+          }
+        },
+        "options": {}
+      },
+      "id": "35016dfe-3469-4ee6-bdf1-e99c1bc2b96a",
+      "name": "Insert Emergent Question",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1584,
+        1920
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "session_answer"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $('Normalize Input').item.json.session_id }}",
+            "question_id": "={{ $json.id }}",
+            "was_asked": true,
+            "summary": "={{ $('Verify Emergent Quotes').item.json.summary }}",
+            "tags": "={{ [] }}",
+            "clips": "={{ JSON.stringify($('Verify Emergent Quotes').item.json.clips) }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "5279c43f-d365-44ed-9653-d183be5954ac",
+      "name": "Insert Emergent Answer",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1808,
+        1920
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "emergent_inserted",
+        "options": {}
+      },
+      "id": "2eab7b6f-d691-42b6-8cfe-54c2e428d848",
+      "name": "Aggregate Inserted Emergent",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"questions_offered\": $('Repair Question Ids').first().json.repair.offered, \"answers_returned\": $('Repair Question Ids').first().json.repair.returned, \"answers_created\": ($json.answers_inserted || []).length, \"question_id_repaired\": $('Repair Question Ids').first().json.repair.repaired, \"answers_dropped_invalid_question_id\": $('Repair Question Ids').first().json.repair.dropped, \"duplicate_question_ids\": $('Repair Question Ids').first().json.repair.duplicate_ids, \"emergent_questions_logged\": ($json.emergent_inserted || []).length } }}",
+        "options": {}
+      },
+      "id": "711bf48c-2482-4768-9c10-c236d607061f",
+      "name": "Respond With Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2464,
+        1792
+      ]
+    },
+    {
+      "id": "af8b6ea0-cd95-4592-8057-470d9af62758",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        1960
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "session_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c6481948-8338-4a55-a20d-75b9bf7b4746",
+      "name": "Repair Question Ids",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        968,
+        1760
+      ],
+      "parameters": {
+        "jsCode": "// The agent must echo back the exact question_id for every question - hundreds\n// of UUID reproductions per project - and a single garbled one breaks the\n// insert on session_answer.question_id. Validation alone would cost that\n// answer, and a dropped answer looks exactly like a question the participant\n// never addressed, which is the silent loss this pipeline exists to avoid.\n//\n// Recover only the unambiguous case: if exactly one returned id is invalid and\n// exactly one offered id is unclaimed, the malformed entry can only belong to\n// that question. With two or more, assignment would depend on the agent having\n// kept its ordering, and a misattributed answer is worse than a missing one.\nconst raw = $input.first().json;\nconst out = raw.output || raw;\nconst answers = (out.answers || []).map(a => Object.assign({}, a));\nconst offered = $('Aggregate Questions').first().json.questions || [];\nconst offeredIds = offered.map(q => String(q.id));\nconst validIds = new Set(offeredIds);\n\nconst seen = new Map();\nfor (const a of answers) {\n  const id = String(a.question_id || '');\n  if (!validIds.has(id)) { continue; }\n  seen.set(id, (seen.get(id) || 0) + 1);\n}\nlet duplicates = 0;\nfor (const n of seen.values()) { if (n > 1) { duplicates += n - 1; } }\n\nconst unclaimed = offeredIds.filter(id => !seen.has(id));\nconst bad = answers.filter(a => !validIds.has(String(a.question_id || '')));\n\nlet repaired = 0;\nif (bad.length === 1 && unclaimed.length === 1) {\n  bad[0].question_id = unclaimed[0];\n  repaired = 1;\n}\n\nconst kept = answers.filter(a => validIds.has(String(a.question_id || '')));\nconst dropped = answers.length - kept.length;\n\nreturn [{ json: {\n  output: { answers: kept, emergent_questions: out.emergent_questions || [] },\n  repair: { offered: offeredIds.length, returned: answers.length, repaired: repaired, dropped: dropped, duplicate_ids: duplicates }\n} }];"
+      }
+    }
+  ],
+  "connections": {
+    "Session QA Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Session": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project Questions": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Questions": {
+      "main": [
+        [
+          {
+            "node": "Extract Session Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Session Answers": {
+      "main": [
+        [
+          {
+            "node": "Split Emergent Questions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Repair Question Ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Session Answers",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Answer Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extract Session Answers",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Answers": {
+      "main": [
+        [
+          {
+            "node": "Verify Answer Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Answer Quotes": {
+      "main": [
+        [
+          {
+            "node": "Insert Session Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Session Answer": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Inserted Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Inserted Answers": {
+      "main": [
+        [
+          {
+            "node": "Combine Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Results": {
+      "main": [
+        [
+          {
+            "node": "Respond With Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Emergent Questions": {
+      "main": [
+        [
+          {
+            "node": "Verify Emergent Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Emergent Quotes": {
+      "main": [
+        [
+          {
+            "node": "Insert Emergent Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Emergent Question": {
+      "main": [
+        [
+          {
+            "node": "Insert Emergent Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Emergent Answer": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Inserted Emergent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Inserted Emergent": {
+      "main": [
+        [
+          {
+            "node": "Combine Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Repair Question Ids": {
+      "main": [
+        [
+          {
+            "node": "Split Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "ae782a4f-e820-4e57-8271-27f92f936e96",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "2ikup33O6bj9W37l",
+  "isArchived": false,
+  "nodeGroups": []
+}
