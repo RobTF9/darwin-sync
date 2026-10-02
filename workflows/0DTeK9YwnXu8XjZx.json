@@ -1,0 +1,851 @@
+{
+  "id": "0DTeK9YwnXu8XjZx",
+  "name": "Finalize Project Analysis",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "finalize-project-analysis",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "a5d3b0c8-73b9-44d8-99b9-7e6823d49ba1",
+      "name": "Finalize Project Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        12592,
+        6880
+      ],
+      "webhookId": "2abd5bfa-b6aa-4bcd-aba5-f529462d89f2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "project_id",
+              "value": "={{ $json.body?.project_id ?? $json.project_id ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d5a57c26-47d0-4537-8387-2b0e0ed42f4c",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        12816,
+        6880
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with r as materialized (select gen_random_uuid() as run_id)\nselect q.id, q.prompt_text, r.run_id\nfrom question q cross join r\nwhere q.project_id = $1 and q.status = 'active' and q.section != 'emergent_candidate'\norder by q.order_index",
+        "options": {
+          "queryReplacement": "={{ $json.project_id }}"
+        }
+      },
+      "id": "b49c2120-5d4d-424f-99ff-2a9404fbd341",
+      "name": "Fetch Project Questions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        13040,
+        6880
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, run_id: $('Fetch Project Questions').first().json.run_id, run_marked_complete: Number($json.rows_marked_complete) > 0, rows_marked_complete: Number($json.rows_marked_complete), questions: Number($json.questions), findings_written: Number($json.findings_written), findings_proposed: Number($json.findings_proposed), findings_dropped: Number($json.findings_dropped), questions_with_drops: Number($json.questions_with_drops), questions_fully_dropped: Number($json.questions_fully_dropped) } }}",
+        "options": {}
+      },
+      "id": "842d9713-9efe-44a4-92d5-4041aca12c00",
+      "name": "Respond With Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        13488,
+        6688
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, session_id, was_asked, summary, tags, clips from session_answer where question_id = $1",
+        "options": {
+          "queryReplacement": "={{ $json.id }}"
+        }
+      },
+      "id": "ed9a26ea-665f-4760-ae2a-ec739e457559",
+      "name": "Fetch Session Answers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        13488,
+        6880
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst askedCount = items.length;\nconst answered = items.filter(a => a.was_asked);\nconst answeredCount = answered.length;\nconst tagCounts = {};\nfor (const a of answered) {\n  const tags = a.tags || [];\n  for (const t of tags) {\n    tagCounts[t] = (tagCounts[t] || 0) + 1;\n  }\n}\nconst tagBreakdown = Object.keys(tagCounts).map(k => ({ tag: k, count: tagCounts[k] }));\nconst sessionAnswersForLlm = answered.map(a => ({ session_answer_id: a.id, session_id: a.session_id, summary: a.summary, tags: a.tags, clips: a.clips }));\nreturn [{ json: { session_answers_for_llm: sessionAnswersForLlm, sessions_asked_count: askedCount, sessions_answered_count: answeredCount, tag_breakdown: tagBreakdown } }];"
+      },
+      "id": "668335de-266d-4b99-840f-69f89c439807",
+      "name": "Compute Coverage Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        13712,
+        6880
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Question: {{ $(\"Loop Questions\").item.json.prompt_text }}\n\nAnswered session_answer rows for this question (JSON array of {session_answer_id, session_id, summary, tags, clips}):\n{{ JSON.stringify($json.session_answers_for_llm) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You perform reflexive thematic analysis (Braun & Clarke, 2006) over the answers to one question, within one project - the project-level synthesis step above Darwin's single-session insights. The scope is fixed (this question, this project) and the coding is already done - every session_answer you receive is already a faithful, evidence-linked code. Your job is only to find what recurs and coheres across these already-coded answers, name it, and check it honestly.\n\nAn insight is not a tag and not 'the top mentioned tags' - it is a claim about shared meaning. Not an insight: 'several people mentioned Airtable'. Insight: 'people reach for Airtable as a stopgap because n8n's own storage feels too disposable to trust with anything they would mind losing'. If a candidate insight just restates this question's own topic, it is not ready - keep working it or drop it.\n\nYou choose the insights; they do not 'emerge'. Write 'the analysis identified...' or state the finding directly, never 'themes emerged' or 'patterns were discovered'.\n\nMethod: cluster the tags and summaries of the given rows by shared meaning, not shared wording. For every candidate, check internal homogeneity (do the extracts actually cohere) and external heterogeneity against the FULL set of rows given, not just the ones you clustered in. Do not discard weak signal - a pattern from one or two rows is a real observation, mark it is_minority true and report it plainly rather than upgrading it to the same weight as a well-supported finding. Actively look for rows that describe this differently or push back on it, and record that in divergent_note rather than smoothing it away.\n\nEvery finding must cite the exact session_answer_id values (from the input rows, verbatim - never invented) it is built from. A finding with no traceable session_answer_ids is a bug. If fewer than 3 rows were given, treat every finding as is_minority true - the sample is too small for a confident pattern.\n\nDo not compute counts or statistics yourself - you were only given already-answered rows and only need to produce findings, not a tally."
+        }
+      },
+      "id": "e9caf69e-0afb-401d-9770-1d6b113a6fed",
+      "name": "Synthesize Question Insight",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        13936,
+        6880
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "fd69a014-3981-4485-b607-c4df5099d00f",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        13952,
+        7120
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"findings\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"description\":\"3-7 words, specific, carries a point of view - not a domain/tag word\"},\"definition\":{\"type\":\"string\",\"description\":\"1-3 sentences: the core claim, understandable without seeing a quote first\"},\"is_minority\":{\"type\":\"boolean\",\"description\":\"true if this rests on one or two session_answers without corpus-wide corroboration\"},\"divergent_note\":{\"type\":[\"string\",\"null\"],\"description\":\"A documented disconfirming or minority view among the answered rows, or null\"},\"session_answer_ids\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"session_answer_id values this finding is built from - must trace to rows actually provided as input\"}},\"required\":[\"name\",\"definition\",\"is_minority\",\"divergent_note\",\"session_answer_ids\"]}}},\"required\":[\"findings\"]}"
+      },
+      "id": "959f6b3e-f476-45f2-a4e3-dc6fd6e2f6b5",
+      "name": "Findings Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        14080,
+        7120
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "question_insight"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "question_id": "={{ $('Loop Questions').item.json.id }}",
+            "generation": "={{ $now.toISO() }}",
+            "tag_breakdown": "={{ JSON.stringify($('Compute Coverage Stats').item.json.tag_breakdown) }}",
+            "sessions_asked_count": "={{ $('Compute Coverage Stats').item.json.sessions_asked_count }}",
+            "sessions_answered_count": "={{ $('Compute Coverage Stats').item.json.sessions_answered_count }}",
+            "run_id": "={{ $('Loop Questions').item.json.run_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "823329eb-f58a-4f49-ab47-3c9a0e7b4bcc",
+      "name": "Insert Question Insight",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        14288,
+        6880
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "question_insight_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "findings",
+              "value": "={{ $('Synthesize Question Insight').item.json.output.findings }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d0f4d1d9-0be0-4614-a733-d3fcd862962f",
+      "name": "Attach Findings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        14512,
+        6880
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "findings",
+        "include": "allOtherFields",
+        "options": {
+          "destinationFieldName": "finding"
+        }
+      },
+      "id": "c68ce0a6-219d-40a5-8822-5a8bbf578c32",
+      "name": "Split Findings",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        15536,
+        7008
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "question_insight_finding"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "question_insight_id": "={{ $json.question_insight_id }}",
+            "name": "={{ $json.finding.name }}",
+            "definition": "={{ $json.finding.definition }}",
+            "is_minority": "={{ $json.finding.is_minority }}",
+            "divergent_note": "={{ $json.finding.divergent_note }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "e816297c-7503-4369-bad0-f65134d25ef3",
+      "name": "Insert Finding",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        15760,
+        7008
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "question_insight_finding_evidence"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "finding_id": "={{ $json.finding_id }}",
+            "session_answer_id": "={{ $json.session_answer_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "3c99ffc7-c4bd-44a6-bcfa-41392630fe7a",
+      "name": "Insert Finding Evidence",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        16432,
+        7008
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "6778f743-eeb7-44d5-a784-17862baae4f9",
+      "name": "Loop Questions",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        13264,
+        6880
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const answeredCount = $('Compute Coverage Stats').item.json.sessions_answered_count;\nconst forceMinority = answeredCount < 3;\nconst findings = ($input.item.json.findings || []).map(f => ({ ...f, is_minority: forceMinority ? true : f.is_minority }));\nreturn { json: { question_insight_id: $input.item.json.question_insight_id, findings } };"
+      },
+      "id": "d22d3a2d-81ee-416b-bf15-35d1da769716",
+      "name": "Enforce Minority Threshold",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        15312,
+        7008
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "finding_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "e2",
+              "name": "session_answer_ids",
+              "value": "={{ $('Split Findings').item.json.finding.session_answer_ids }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6fc06ef7-eed0-435b-a3d0-3f9a12376942",
+      "name": "Attach Session IDs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        15984,
+        7008
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "session_answer_ids",
+        "include": "allOtherFields",
+        "options": {
+          "destinationFieldName": "session_answer_id"
+        }
+      },
+      "id": "ff5ed1be-86d3-4679-95f1-0f7e4b5b76e4",
+      "name": "Split Session IDs",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        16208,
+        7008
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = $input.item.json;\nconst findingsIn = (raw.output && raw.output.findings) || raw.findings || [];\nconst questionInsightId = $('Attach Findings').first().json.question_insight_id;\nconst validIds = new Set(($('Compute Coverage Stats').first().json.session_answers_for_llm || []).map(a => a.session_answer_id));\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst findings = findingsIn\n  .map(f => {\n    const verifiedIds = (f.session_answer_ids || []).filter(id => uuidRegex.test(id) && validIds.has(id));\n    return { ...f, session_answer_ids: verifiedIds };\n  })\n  .filter(f => f.session_answer_ids.length > 0);\nconst proposed = findingsIn.length;\nconst dropped = proposed - findings.length;\nreturn { json: { question_insight_id: questionInsightId, findings: findings, findings_proposed: proposed, findings_dropped: dropped } };"
+      },
+      "id": "2c81dd1b-03c5-4b62-9174-4d1524ad3bdb",
+      "name": "Verify Finding Citations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        15088,
+        6880
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "b659c851-be9c-4fda-932a-93e333ef261a",
+      "name": "Consolidation Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        14752,
+        7120
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"findings\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"description\":\"3-7 words, specific, carries a point of view\"},\"definition\":{\"type\":\"string\",\"description\":\"1-3 sentences stating the core claim\"},\"is_minority\":{\"type\":\"boolean\",\"description\":\"Re-judged for merged findings based on combined evidence\"},\"divergent_note\":{\"type\":[\"string\",\"null\"],\"description\":\"Preserved or combined from the source findings; never dropped\"},\"session_answer_ids\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Exactly the union of ids from the merged findings. Never invent an id.\"}},\"required\":[\"name\",\"definition\",\"is_minority\",\"divergent_note\",\"session_answer_ids\"]}}},\"required\":[\"findings\"]}"
+      },
+      "id": "9acf5ae2-4674-4d44-845f-b4b9be0c3a9d",
+      "name": "Consolidation Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        14880,
+        7120
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Question: {{ $('Loop Questions').item.json.prompt_text }}\n\nCandidate findings to review (JSON):\n{{ JSON.stringify($json.findings) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the consolidation step in a thematic analysis pipeline. You receive the full list of candidate findings another analyst drafted for ONE research question. Your only job is to merge the ones that are genuinely the same claim expressed in different words.\n\nYou never see the underlying interview evidence and you cannot create new claims. If the input list is empty, return an empty findings array. If it contains one finding, return it unchanged.\n\nMerge two findings only when they make the same underlying claim. Do not merge findings that are merely about the same topic. In particular: a majority claim and a documented minority or dissenting view on the same subject are NOT duplicates - keeping them distinct is the point of the analysis, and collapsing them destroys exactly the disagreement this analysis exists to surface.\n\nBias toward NOT merging. Leaving two similar findings separate is a mild cosmetic problem; collapsing two genuinely distinct findings into one vague claim destroys real signal. When unsure, keep them separate.\n\nWhen you do merge:\n- Write one name and definition that covers the merged claim accurately, without overreaching beyond what the source findings actually claimed.\n- session_answer_ids must be exactly the union of the ids from the findings you merged. Never invent an id, and never use an id that was not in the input.\n- Re-judge is_minority for the merged finding based on the combined evidence - two thin findings that turn out to be the same claim may no longer be thin once combined.\n- Preserve divergent_note: keep it, or combine both if each source had one. Never drop a divergent note.\n\nReturn the final list of findings - merged where justified, untouched otherwise. Returning the input unchanged is a normal, common, correct outcome."
+        }
+      },
+      "id": "d804cad8-2b16-433b-984b-14771a9d30fe",
+      "name": "Consolidate Findings",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        14736,
+        6880
+      ],
+      "onError": "stopWorkflow",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with upd as (\n  update question_insight\n  set findings_proposed = $2::int,\n      findings_dropped = $3::int\n  where id = $1::uuid\n  returning id\n)\nselect coalesce((select id::text from upd), 'no_row_updated') as updated",
+        "options": {
+          "queryReplacement": "={{ $('Attach Findings').first().json.question_insight_id }},{{ $('Verify Finding Citations').first().json.findings_proposed }},{{ $('Verify Finding Citations').first().json.findings_dropped }}"
+        }
+      },
+      "id": "13c4f859-f835-4095-9ed7-6e88f046a770",
+      "name": "Record Drop Stats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        15536,
+        7168
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with mark as (\n  -- Reached only after every question insight of this run is written, so this\n  -- is where the run can honestly be called complete. A run that dies earlier\n  -- never gets here and stays invisible to question_insight_current and to\n  -- L3's input selection.\n  update question_insight\n  set completed_at = now()\n  where run_id = $1::uuid and completed_at is null\n  returning 1\n)\nselect\n  count(*) as questions,\n  sum(findings_proposed) as findings_proposed,\n  sum(findings_dropped) as findings_dropped,\n  count(*) filter (where findings_dropped > 0) as questions_with_drops,\n  count(*) filter (where findings_proposed > 0 and findings_dropped = findings_proposed) as questions_fully_dropped,\n  (select count(*) from mark) as rows_marked_complete,\n  (select count(*) from question_insight_finding f join question_insight q2 on q2.id = f.question_insight_id where q2.run_id = $1) as findings_written\nfrom question_insight\nwhere run_id = $1",
+        "options": {
+          "queryReplacement": "={{ $('Fetch Project Questions').first().json.run_id }}"
+        }
+      },
+      "id": "9fad313a-fb8c-422e-ba46-4c80e0b81145",
+      "name": "Summarize L2 Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        13488,
+        6528
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "f7869bca-14d2-40eb-9f5b-bc35867a4fbc",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        12592,
+        7080
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "project_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Finalize Project Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project Questions": {
+      "main": [
+        [
+          {
+            "node": "Loop Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Session Answers": {
+      "main": [
+        [
+          {
+            "node": "Compute Coverage Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Coverage Stats": {
+      "main": [
+        [
+          {
+            "node": "Synthesize Question Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synthesize Question Insight": {
+      "main": [
+        [
+          {
+            "node": "Insert Question Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Synthesize Question Insight",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Findings Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Synthesize Question Insight",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Question Insight": {
+      "main": [
+        [
+          {
+            "node": "Attach Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Findings": {
+      "main": [
+        [
+          {
+            "node": "Consolidate Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Findings": {
+      "main": [
+        [
+          {
+            "node": "Insert Finding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Finding": {
+      "main": [
+        [
+          {
+            "node": "Attach Session IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Questions": {
+      "main": [
+        [
+          {
+            "node": "Summarize L2 Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Session Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enforce Minority Threshold": {
+      "main": [
+        [
+          {
+            "node": "Split Findings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Record Drop Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Session IDs": {
+      "main": [
+        [
+          {
+            "node": "Split Session IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Session IDs": {
+      "main": [
+        [
+          {
+            "node": "Insert Finding Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Finding Citations": {
+      "main": [
+        [
+          {
+            "node": "Enforce Minority Threshold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidation Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Consolidate Findings",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidation Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Consolidate Findings",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidate Findings": {
+      "main": [
+        [
+          {
+            "node": "Verify Finding Citations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Drop Stats": {
+      "main": [
+        [
+          {
+            "node": "Loop Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize L2 Run": {
+      "main": [
+        [
+          {
+            "node": "Respond With Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "32a7afd8-413e-4384-9370-ca4cd93ee346",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "2ikup33O6bj9W37l",
+  "isArchived": false,
+  "nodeGroups": []
+}
