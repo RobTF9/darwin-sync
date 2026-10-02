@@ -1,0 +1,567 @@
+{
+  "id": "TJqdHcbpQ8Lhjlsx",
+  "name": "Script Parser",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "script-parser",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "d219aa80-9cc4-439f-a58d-0f35cd8f9de7",
+      "name": "Parse Script Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "d9aaec51-e16b-48bf-a3aa-7a8a866df680",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "project_id",
+              "value": "={{ $json.body?.project_id ?? $json.project_id ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4d837ac9-c19c-4f0a-8c6e-d2ec353abb32",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, script from project where id = $1",
+        "options": {
+          "queryReplacement": "={{ $json.project_id }}"
+        }
+      },
+      "id": "98668782-078e-4940-9a4f-8952f60e90ed",
+      "name": "Fetch Project Script",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, key, prompt_text, section, source_field from question_template where active = true order by order_index",
+        "options": {}
+      },
+      "id": "de97a2c8-0529-4f0c-b6c5-79b56f31416d",
+      "name": "Fetch Active Templates",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        672,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "templates",
+        "options": {}
+      },
+      "id": "e47a9d63-f734-44c0-a3d5-416d0b498455",
+      "name": "Aggregate Templates",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Interview script:\n{{ $(\"Fetch Project Script\").item.json.script }}\n\nKnown question templates (JSON array of {id,key,prompt_text,section,source_field}):\n{{ JSON.stringify($json.templates) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You parse a user-research interview script into a flat, ordered list of atomic questions, then match each one against a library of known reusable question templates.\n\nDirection: script to structured list, not transcript to script. You only ever see the script text here, never a transcript.\n\nStep 1 - split compound lines. A single script line often bundles more than one atomic ask (e.g. \"What is your job? What does the company do? How many people work there?\" is three atomic questions, not one). Split every compound line into its separate atomic questions before matching. Preserve wording faithfully from the script - do not invent questions that are not there, and do not paraphrase into different words than the script uses.\n\nStep 1b - stimulus blocks. A question is sometimes written as a lead-in line followed by a bulleted list of items the participant must react to - for example \"I will now share a list of different actions. I would like to know, per each of them, if you know what they are\" followed by five named actions. That whole block is ONE real participant question. Emit it as a single question and carry the list items into prompt_text so the wording stands on its own (e.g. \"...: Writing JavaScript functions; Using SQL to query a database; Configuring API authentication\"). Never drop the lead-in, and never emit the individual items as separate questions.\n\nStep 1c - phrasing is not the test. A line can be a participant question without a question mark and without interrogative form. \"I would like to know X\", \"Tell me about X\" and \"I will now share a list and ask you about each of them\" are all asks the participant answers out loud. The test is whether the participant is expected to speak in response - never whether the line ends in \"?\".\n\nStep 2 - infer section per question from its position and framing: context_setting (role, company, tenure, technical ability - usually early), toolstack (current tools, alternatives), deep_dive (this cycle's open-ended research questions), optional (marked [Optional] in the script), closure (thanks/wrap-up - usually skip these, they are not real questions).\n\nStep 3 - match against templates. For each atomic question, decide: does it mean the same underlying thing as one of the given templates (regardless of exact wording), or is it genuinely a distinct, bespoke question for this project? Set template_key to that template's key if matched, or null if bespoke.\n\nStep 4 - TWO SEPARATE JUDGEMENTS. Do not let one influence the other. This is the single most important instruction here.\n\n(a) is_participant_question - is this something the interviewer asks the participant, that the participant could answer?\nSet it FALSE only for lines that are not questions to a participant at all: instructions addressed to the interviewer (\"Probe on what they are using each thing for\", \"Ask follow-ups here\"), researcher notes written in italics, section headings, and bare fragments carrying no ask. The test for FALSE is that the participant never hears the line, or hears it and has nothing to answer.\nSet it TRUE for everything a participant could answer - including short follow-ups like \"Why?\", \"Which tool?\" or \"Can you tell me more?\" that depend on the preceding question, and including lines phrased as statements that still elicit an answer.\nWHEN IN DOUBT, SET IT TRUE. The costs are not symmetric: a question wrongly included produces a low-coverage insight a human can see and ignore, while a question wrongly excluded produces nothing at all and is invisible to everyone downstream. Silent omission is the worse failure.\n\n(b) confidence - this is ONLY about template matching, and it has NO bearing on whether the question gets used.\n\"clear\" = you can confidently say it matches a specific template, or confidently say it is bespoke. Being bespoke is the common case and is \"clear\".\n\"unclear\" = you genuinely cannot tell whether it is a reworded template or a distinct question.\nAn \"unclear\" verdict means only that no template gets attached. The question is still analysed in full. Never mark a real question unclear in order to flag it - use is_participant_question for that, and only for genuine non-questions.\n\nStep 5 - completeness check before you return. Walk the script top to bottom and confirm that every line which elicits something from the participant is represented in your output, either as its own question or folded into a stimulus block. Dropping a line entirely is the worst failure available to you: it yields no question, no answer, and no warning to anyone. If you are unsure whether a line belongs, emit it with is_participant_question true rather than leaving it out.\n\nRules: base everything only on the script text given. Preserve the script's own order via order_index. Do not fabricate closure/small-talk lines as questions."
+        }
+      },
+      "id": "9459d0eb-3e4d-4d53-bb75-4c1177da4bc2",
+      "name": "Parse Script Into Questions",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1104,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "578f2909-b35a-4946-aa31-912c353ec353",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        208
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"questions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"prompt_text\":{\"type\":\"string\",\"description\":\"Atomic question wording, taken faithfully from the script\"},\"section\":{\"type\":\"string\",\"enum\":[\"context_setting\",\"toolstack\",\"deep_dive\",\"optional\",\"closure\"]},\"order_index\":{\"type\":\"number\"},\"is_optional\":{\"type\":\"boolean\"},\"is_participant_question\":{\"type\":\"boolean\",\"description\":\"true if a participant could answer this, including short follow-ups. false ONLY for interviewer instructions, section headings and bare non-questions. When in doubt, true - a wrongly included question is visible and ignorable, a wrongly excluded one is invisible.\"},\"template_key\":{\"type\":[\"string\",\"null\"],\"description\":\"key of the matching question_template, or null if bespoke\"},\"confidence\":{\"type\":\"string\",\"enum\":[\"clear\",\"unclear\"],\"description\":\"ONLY about template matching, and never a reason to exclude a question. clear = confidently matched or confidently bespoke; unclear = cannot tell which. unclear simply means no template is attached.\"}},\"required\":[\"prompt_text\",\"section\",\"order_index\",\"is_optional\",\"is_participant_question\",\"template_key\",\"confidence\"]}}},\"required\":[\"questions\"]}"
+      },
+      "id": "c27e0aea-16e3-45d5-8c9c-4a4cd57fbd6f",
+      "name": "Question List Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1264,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.questions",
+        "options": {}
+      },
+      "id": "0c0c186e-f4d1-48e9-83a1-10eeafb97523",
+      "name": "Split Questions",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "question"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('Normalize Input').item.json.project_id }}",
+            "template_id": "={{ $json.confidence === \"clear\" && $json.template_key ? ($('Aggregate Templates').item.json.templates.find(t => t.key === $json.template_key)?.id ?? null) : null }}",
+            "section": "={{ $json.section }}",
+            "prompt_text": "={{ $json.prompt_text }}",
+            "order_index": "={{ $json.order_index }}",
+            "is_optional": "={{ $json.is_optional }}",
+            "status": "={{ $json.is_participant_question === false ? \"excluded_ambiguous\" : \"active\" }}",
+            "template_match_method": "={{ $json.template_key ? ($json.confidence === \"clear\" ? \"agent\" : \"agent_unclear\") : null }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "template_id",
+              "displayName": "template_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "parent_question_id",
+              "displayName": "parent_question_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "section",
+              "displayName": "section",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prompt_text",
+              "displayName": "prompt_text",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "order_index",
+              "displayName": "order_index",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "is_optional",
+              "displayName": "is_optional",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "template_match_method",
+              "displayName": "template_match_method",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "template_match_score",
+              "displayName": "template_match_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "809e75b4-a55c-4f2c-9bde-3f41fbebcb2a",
+      "name": "Insert Question Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1680,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "inserted",
+        "options": {}
+      },
+      "id": "47241a80-db45-4517-bd18-42de24087b34",
+      "name": "Aggregate Inserted Questions",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1904,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, questions_created: $json.inserted.length, active: $json.inserted.filter(q => q.status === 'active').length, template_matched: $json.inserted.filter(q => q.template_id).length, excluded_count: $json.inserted.filter(q => q.status !== 'active').length, excluded: $json.inserted.filter(q => q.status !== 'active').map(q => q.prompt_text), script_coverage: $('Check Script Coverage').first().json.coverage } }}",
+        "options": {}
+      },
+      "id": "4674c285-58e5-4cef-82fe-f147461e07c5",
+      "name": "Respond With Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2128,
+        0
+      ]
+    },
+    {
+      "id": "61d2f39c-e1cf-4b5d-b12d-6e98c76810e7",
+      "name": "Check Script Coverage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1288,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const script = $('Fetch Project Script').first().json.script || '';\nconst questions = ($input.first().json.output && $input.first().json.output.questions) || [];\n\nconst STOP = new Set(['and','the','for','are','any','can','did','does','how','why','who','one','our','out','get','got','use','not','but','its','you','your','that','this','they','them','have','been','about','would','could','there','their','when','from','into','more','some','only','than','then','also','just','like','made','tell','what','with','was','were','has','had','will','yes','all','way','ever','anything','something']);\n\nconst toks = (s) => (s || '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, ' ')\n  .split(' ')\n  .filter(t => t.length >= 3 && !STOP.has(t));\n\nconst emitted = new Set();\nfor (const q of questions) { for (const t of toks(q.prompt_text)) emitted.add(t); }\n\nconst candidates = [];\nfor (const raw of script.split('\\n')) {\n  const trimmed = raw.trim();\n  if (!/^[-*+]\\s+/.test(trimmed)) continue;\n  let text = trimmed.replace(/^[-*+]\\s+/, '');\n  text = text.replace(/\\*[^*]+\\*/g, ' ');\n  text = text.replace(/\\[Optional\\]/gi, ' ');\n  text = text.replace(/[*_`#]/g, ' ').replace(/\\s+/g, ' ').trim();\n  if (text.length < 8) continue;\n  candidates.push(text);\n}\n\nconst unmatched = [];\nfor (const c of candidates) {\n  const ct = toks(c);\n  if (ct.length === 0) continue;\n  let hit = 0;\n  for (const t of ct) { if (emitted.has(t)) hit++; }\n  const cov = hit / ct.length;\n  if (cov < 0.5) unmatched.push({ script_line: c, coverage: Math.round(cov * 100) / 100 });\n}\n\nreturn [{ json: { output: { questions }, coverage: { script_lines_checked: candidates.length, unmatched_count: unmatched.length, unmatched_script_lines: unmatched } } }];"
+      }
+    },
+    {
+      "id": "30af09fc-402e-4fed-9268-6192abe8fda5",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "project_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Parse Script Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Project Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Project Script": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Templates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Templates": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Templates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Templates": {
+      "main": [
+        [
+          {
+            "node": "Parse Script Into Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Parse Script Into Questions",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question List Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Parse Script Into Questions",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Questions": {
+      "main": [
+        [
+          {
+            "node": "Insert Question Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Question Row": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Inserted Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Inserted Questions": {
+      "main": [
+        [
+          {
+            "node": "Respond With Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Script Into Questions": {
+      "main": [
+        [
+          {
+            "node": "Check Script Coverage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Script Coverage": {
+      "main": [
+        [
+          {
+            "node": "Split Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "de575ba2-6e0b-4377-9557-c8234bb77c0a",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "2ikup33O6bj9W37l",
+  "isArchived": false,
+  "nodeGroups": []
+}
