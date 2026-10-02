@@ -1,0 +1,1448 @@
+{
+  "id": "UkNYDrsAeE2CkFBA",
+  "name": "ProjectInsightSynthesis",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "project-insight-synthesis",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e331385a-4505-49f3-820e-83571aec487b",
+      "name": "Project Insight Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1600,
+        3216
+      ],
+      "webhookId": "10e498bb-9677-4a23-9c69-64e202336baa",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "project_id",
+              "value": "={{ $json.body?.project_id ?? $json.project_id ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1280b719-b9d8-4103-99f3-b56410ba882a",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1888,
+        3440
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with src as (\n  -- Latest COMPLETE L2 run. Without the completed_at guard a half-written L2\n  -- run would be selected as input and silently feed the whole analysis.\n  select qi.run_id as source_run_id\n  from question_insight qi\n  join question q on q.id = qi.question_id\n  where q.project_id = $1\n    and qi.completed_at is not null\n  group by qi.run_id\n  order by max(qi.created_at) desc\n  limit 1\n),\nr as materialized (select gen_random_uuid() as run_id)\nselect\n  f.id as finding_id,\n  q.id as question_id,\n  q.prompt_text as question,\n  f.name,\n  f.definition,\n  f.is_minority,\n  count(distinct sa.session_id) as sessions,\n  r.run_id,\n  src.source_run_id\nfrom src\ncross join r\njoin question_insight qi on qi.run_id = src.source_run_id\njoin question q on q.id = qi.question_id\njoin question_insight_finding f on f.question_insight_id = qi.id\njoin question_insight_finding_evidence e on e.finding_id = f.id\njoin session_answer sa on sa.id = e.session_answer_id\ngroup by f.id, q.id, q.prompt_text, f.name, f.definition, f.is_minority, r.run_id, src.source_run_id\norder by q.id",
+        "options": {
+          "queryReplacement": "={{ $json.project_id }}"
+        }
+      },
+      "id": "0ba4ae25-b3df-4399-94e3-4daf171ee66f",
+      "name": "Fetch Findings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2112,
+        3440
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "findings",
+        "options": {}
+      },
+      "id": "f4e138c7-cd65-4dc9-9c60-98836268dd23",
+      "name": "Aggregate Findings",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2336,
+        3440
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Findings from every question in this project (JSON array of {finding_id, question, name, definition, is_minority, sessions}):\n{{ JSON.stringify($json.findings) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are given every finding from a research project's question-by-question analysis. Each finding is a claim about what participants said in answer to one specific interview question, together with that question, how many participants back it, and whether it was marked a minority observation (one or two people).\n\nYour job is to state the main insights of the project as a whole.\n\nThe interview questions are instruments, not the questions anyone wants answered. A finding lives under one question. A project insight is something no single question could show. The strongest signal available to you is recurrence across DIFFERENT questions: when the same underlying claim surfaces under many separate questions, participants kept returning to it unprompted, and that is stronger corroboration than one well-supported finding under a single question.\n\nAim for roughly 6 to 10 insights - fewer if the material genuinely does not support more, more if it clearly does. Do not pad to reach a number and do not drop real signal to fit one. Work through the whole list before you finish: a finding you do not cite is treated as belonging to no insight at all, and a substantial pattern you leave out is simply lost.\n\nEach insight must be ONE claim. If you are tempted to join two claims with 'but' or 'and', they are two insights.\n\nState each claim at the level the findings actually support. The next step checks every claim against the underlying verbatim quotes and will narrow anything overstated, so reaching too far does not strengthen an insight - it just gets rewritten smaller.\n\nDo not use quantifier words: some, several, many, most, a few, often, generally. Participant and question counts are computed exactly and separately from your output.\n\nFor each insight give a name of 3 to 8 words stating the claim rather than the topic, a statement of the claim in 1-3 sentences, and the finding_ids it is built from. Cite every finding that genuinely supports it, not only the clearest one: those citations are what the claim gets checked against next, and a finding you leave out cannot be used as evidence later.\n\nCite only finding_ids present in the input, copied exactly. Do not restate a single finding as an insight. Do not merge a broadly supported claim with a documented minority or dissenting one - those are separate insights, and collapsing them destroys the disagreement this analysis exists to surface.\n\nState only what the findings support. No recommendations, no implications, no advice about what anyone should do."
+        }
+      },
+      "id": "3e96bb4a-d780-468c-adb5-79174f1e10cf",
+      "name": "Propose Project Insights",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2352,
+        2976
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "b91a77d2-6ae3-4b83-a0b7-c9810556e3cc",
+      "name": "Proposal Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2368,
+        3216
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"insights\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"description\":\"3-8 words, states the claim itself, not the topic\"},\"statement\":{\"type\":\"string\",\"description\":\"1-3 sentences stating the project-level claim\"},\"finding_ids\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"finding_id values from the input that support this insight, copied verbatim\"}},\"required\":[\"name\",\"statement\",\"finding_ids\"]}}},\"required\":[\"insights\"]}"
+      },
+      "id": "6691d30b-2532-46e4-9848-6c800435c39b",
+      "name": "Proposal Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2496,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst insights = (raw.output && raw.output.insights) || raw.insights || [];\nconst findings = $('Aggregate Findings').first().json.findings || [];\nconst byId = new Map();\nfor (const f of findings) { byId.set(String(f.finding_id), f); }\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst out = [];\nfor (const ins of insights) {\n  const ids = [];\n  const seen = new Set();\n  for (const id of (ins.finding_ids || [])) {\n    const s = String(id);\n    if (!uuidRegex.test(s)) { continue; }\n    if (!byId.has(s)) { continue; }\n    if (seen.has(s)) { continue; }\n    seen.add(s);\n    ids.push(s);\n  }\n  if (ids.length === 0) { continue; }\n  const questions = new Set();\n  for (const id of ids) { questions.add(String(byId.get(id).question_id)); }\n  out.push({ json: { name: ins.name, statement: ins.statement, finding_ids: ids, findings_count: ids.length, questions_count: questions.size, refs_dropped: (ins.finding_ids || []).length - ids.length } });\n}\nreturn out;"
+      },
+      "id": "823f80d5-2905-4ad0-a3bc-14c4634ef317",
+      "name": "Verify Finding Refs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        3088
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with mark as (\n  -- This node runs only after every insight of the run is written, so it is\n  -- the honest place to declare the run complete. A run that dies earlier\n  -- never reaches here and stays invisible to project_insight_current.\n  update project_insight\n  set completed_at = now()\n  where run_id = $1::uuid and completed_at is null\n  returning 1\n)\nselect\n  count(*) as insights,\n  count(*) filter (where corroboration = 'strong') as strong,\n  count(*) filter (where corroboration = 'moderate') as moderate,\n  count(*) filter (where corroboration = 'thin') as thin,\n  count(*) filter (where supplementary) as supplementary,\n  count(*) filter (where raters_agreeing = 2) as both_raters,\n  count(*) filter (where raters_agreeing = 1) as single_rater,\n  count(*) filter (where raters_agreeing = 1 and 'gpt-5.4' = any(rater_models)) as gpt_only,\n  count(*) filter (where raters_agreeing = 1 and 'claude-opus-5-5' = any(rater_models)) as claude_only,\n  max(rater_a_proposed) as rater_a_proposed,\n  max(rater_b_proposed) as rater_b_proposed,\n  round(avg(agreement_jaccard) filter (where raters_agreeing = 2), 3) as avg_agreement,\n  (select count(*) from mark) as rows_marked_complete,\n  (select count(*) from clip c join project_insight p on p.id = c.project_insight_id where p.run_id = $1) as evidence_clips,\n  (select count(*) from project_insight_finding l join project_insight p on p.id = l.project_insight_id where p.run_id = $1) as finding_links,\n  (select count(distinct l.finding_id) from project_insight_finding l join project_insight p on p.id = l.project_insight_id where p.run_id = $1) as findings_cited,\n  (select count(*) from question_insight_finding f join question_insight qi on qi.id = f.question_insight_id\n     where qi.run_id = (select distinct source_run_id from project_insight where run_id = $1 limit 1)) as findings_available\nfrom project_insight\nwhere run_id = $1",
+        "options": {
+          "queryReplacement": "={{ $('Fetch Findings').first().json.run_id }}"
+        }
+      },
+      "id": "2056b713-a279-4a41-b26a-e01268437030",
+      "name": "Summarize Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        4976,
+        2992
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, run_id: $('Fetch Findings').first().json.run_id, source_run_id: $('Fetch Findings').first().json.source_run_id, run_marked_complete: Number($json.rows_marked_complete) > 0, rows_marked_complete: Number($json.rows_marked_complete), analyst_a_proposed: Number($json.rater_a_proposed), analyst_b_proposed: Number($json.rater_b_proposed), groups_returned: $('Adjudicate').first().json._stats.groups_returned, orphans_recovered: $('Adjudicate').first().json._stats.orphans_recovered, primary_fallbacks: $('Adjudicate').first().json._stats.primary_fallbacks, findings_cited: Number($json.findings_cited), findings_available: Number($json.findings_available), coverage_pct: Math.round(100 * Number($json.findings_cited) / Math.max(1, Number($json.findings_available))), proposed_total: $('Adjudicate').all().length, kept: Number($json.insights), rejected: $('Adjudicate').all().length - Number($json.insights), both_raters: Number($json.both_raters), single_rater: Number($json.single_rater), gpt_only: Number($json.gpt_only), claude_only: Number($json.claude_only), avg_agreement: Number($json.avg_agreement), supplementary_kept: Number($json.supplementary), strong: Number($json.strong), moderate: Number($json.moderate), thin: Number($json.thin), evidence_clips: Number($json.evidence_clips), finding_links: Number($json.finding_links) } }}",
+        "options": {}
+      },
+      "id": "116a7169-44b0-4960-a419-31dbbbcd5269",
+      "name": "Respond With Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        5200,
+        2992
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  e.session_answer_id,\n  sa.session_id,\n  f.id as finding_id,\n  c->>'quote' as quote,\n  (c->>'start_time')::numeric as start_time,\n  (c->>'end_time')::numeric as end_time,\n  cohort.project_sessions\nfrom question_insight_finding f\njoin question_insight_finding_evidence e on e.finding_id = f.id\njoin session_answer sa on sa.id = e.session_answer_id\ncross join lateral jsonb_array_elements(sa.clips) c\ncross join (\n  -- cohort size for proportional corroboration; evaluated once, not per row\n  select count(*)::int as project_sessions\n  from session\n  where project_id = $2::uuid\n    and coalesce(array_length(transcript_object, 1), 0) > 0\n) cohort\nwhere f.id = any(string_to_array($1, '|')::uuid[])",
+        "options": {
+          "queryReplacement": "={{ $json.finding_ids.join('|') }},{{ $('Normalize Input').first().json.project_id }}"
+        }
+      },
+      "id": "255189f5-30b9-433d-998e-c142efb16a3a",
+      "name": "Fetch Insight Evidence",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        4976,
+        3184
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "quotes",
+        "options": {}
+      },
+      "id": "a4a78196-32fb-448b-a70d-1b04230e933b",
+      "name": "Aggregate Insight Evidence",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        5200,
+        3184
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Candidate project insight:\nname: {{ $('Loop Insights').first().json.name }}\nstatement: {{ $('Loop Insights').first().json.statement }}\n\nVerbatim participant quotes behind the findings this insight cites (JSON array of {session_answer_id, session_id, quote}):\n{{ JSON.stringify($json.quotes) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the grounding step. You receive one candidate project insight and the verbatim participant quotes behind every finding it cites.\n\nYour job is to make the claim true to the evidence, and then evidence it.\n\nNARROWING IS THE NORMAL OUTCOME AND IT IS A SUCCESS. If these quotes support a more limited version of the claim than the one you were handed, rewrite the name and statement to be that narrower claim, set supported to true, and evidence it. Never reject a claim because it arrived stated too broadly - fix it. The previous step deliberately proposes at the level the findings suggest, and correcting that level is precisely your job.\n\nSet supported to false ONLY when these quotes support no claim of this kind whatsoever - when there is nothing in this territory worth stating at all. That is rare. If you find yourself writing that the quotes do not support the original claim, you are in the narrowing case, not the rejection case: state the claim the quotes DO support and set supported to true.\n\nThe statement is the claim itself, stated positively and directly. It must never describe what the evidence fails to show, never mention quotes or evidence or findings or this analysis, and never hedge about its own support. A statement containing a phrase like 'the quotes do not support' is always wrong - that thought belongs in your choice of claim, not in the text.\n\nDo not use quantifier words: some, several, many, most, a few, often, generally. The number of participants and the number of questions behind this claim are counted exactly and separately, so a vague quantifier adds nothing and understates what is already known. Write the claim as a direct statement about what participants do, think or experience.\n\nName: 3 to 8 words, stating the claim rather than the topic.\n\nChoose 2 to 5 quotes. Prefer quotes from different participants over several from the same person, and prefer quotes where the participant states the point in their own words over ones that merely touch the topic. Some quotes you are given will be short, vague or off-point, because they were selected to evidence a narrower finding than this one - that is expected, just ignore them.\n\nEvery quote you return must be copied exactly as given, character for character, alongside its session_answer_id. Never edit, trim, join or paraphrase a quote. Anything that does not match the provided list exactly is discarded automatically, so an edited quote is a lost quote.\n\nState only what the quotes support. No recommendations and no implications."
+        }
+      },
+      "id": "8542ac99-ddbe-4b9f-9bcf-bb398aa3f995",
+      "name": "Ground And Select Quotes",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        5424,
+        3184
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "cb3bf5c1-89cd-4abc-bd25-931cd0d4864b",
+      "name": "Grounding Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        5440,
+        3408
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"supported\":{\"type\":\"boolean\",\"description\":\"true whenever the quotes support any claim in this territory, including a narrower one than proposed. false ONLY when no claim of this kind is supported at all - rare.\"},\"name\":{\"type\":\"string\",\"description\":\"3-8 words stating the claim, narrowed to fit the evidence\"},\"statement\":{\"type\":\"string\",\"description\":\"The claim itself, stated positively. Never describes what the evidence fails to show. No quantifier words like some, several, many or often.\"},\"quotes\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"session_answer_id\":{\"type\":\"string\",\"description\":\"Copied exactly from the provided quote\"},\"quote\":{\"type\":\"string\",\"description\":\"Copied character for character from the provided list, never edited\"}},\"required\":[\"session_answer_id\",\"quote\"]}}},\"required\":[\"supported\",\"name\",\"statement\",\"quotes\"]}"
+      },
+      "id": "c7708d3b-27b2-49a7-873b-158dc8b2550a",
+      "name": "Grounding Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        5568,
+        3408
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst out = raw.output || raw;\nconst pool = $('Aggregate Insight Evidence').first().json.quotes || [];\nconst base = $('Loop Insights').first().json;\nconst keyOf = (sa, q) => String(sa) + '||' + String(q);\nconst poolMap = new Map();\nfor (const p of pool) { poolMap.set(keyOf(p.session_answer_id, p.quote), p); }\nconst picked = [];\nconst seen = new Set();\n// The same verbatim moment can sit under two session_answer_ids (one quote\n// evidencing two questions). clip has a unique (insight, moment) constraint,\n// so dedupe by moment as well or the insert fails mid-loop.\nconst momentSeen = new Set();\nlet droppedNoTimestamp = 0;\nlet droppedDupMoment = 0;\nfor (const s of (out.quotes || [])) {\n  const k = keyOf(s.session_answer_id, s.quote);\n  if (!poolMap.has(k) || seen.has(k)) { continue; }\n  seen.add(k);\n  const p = poolMap.get(k);\n  // clip.start_time and clip.end_time are NOT NULL. A quote without word-level\n  // timestamps cannot become a clip, so drop it here rather than let the insert\n  // fail mid-loop.\n  if (p.start_time === null || p.start_time === undefined || p.end_time === null || p.end_time === undefined) { droppedNoTimestamp++; continue; }\n  const mk = String(p.session_id) + '|' + String(p.start_time) + '|' + String(p.end_time);\n  if (momentSeen.has(mk)) { droppedDupMoment++; continue; }\n  momentSeen.add(mk);\n  picked.push({ session_answer_id: p.session_answer_id, session_id: p.session_id, quote: p.quote, start_time: p.start_time, end_time: p.end_time });\n}\nconst sessions = new Set();\nfor (const p of pool) { sessions.add(String(p.session_id)); }\nconst sessionsCount = sessions.size;\nconst questionsCount = base.questions_count;\nconst findingsCount = base.findings_count;\n\n// Corroboration is PROPORTIONAL to the cohort. The old absolute thresholds\n// (3 sessions = strong) were written for a small study: on a 22-participant\n// project that is 14% of people, so 22 of 25 insights read 'strong' and the\n// column separated nothing. The question floors stay, so an insight resting on\n// a single question cannot reach 'strong' on session breadth alone.\nconst cohort = Number((pool[0] || {}).project_sessions) || 0;\nlet corroboration;\nif (cohort > 0) {\n  const share = sessionsCount / cohort;\n  corroboration = (share >= 0.75 && questionsCount >= 3) ? 'strong'\n                : ((share >= 0.40 && questionsCount >= 2) ? 'moderate' : 'thin');\n} else {\n  // Cohort size unavailable - fall back to the old absolute rule rather than\n  // silently labelling every insight thin.\n  corroboration = (sessionsCount >= 3 && questionsCount >= 3) ? 'strong'\n                : ((sessionsCount >= 2 && questionsCount >= 2) ? 'moderate' : 'thin');\n}\n\nconst supported = Boolean(out.supported) && picked.length > 0;\nreturn [{ json: { supported: supported, name: out.name || base.name, statement: out.statement || base.statement, quotes: picked, finding_ids: base.finding_ids, attached_ids: base.attached_ids || [], findings_count: findingsCount, questions_count: questionsCount, sessions_count: sessionsCount, cohort_sessions: cohort, corroboration: corroboration, supplementary: base.supplementary === true, raters_agreeing: base.raters_agreeing || 1, rater_models: base.rater_models || [], agreement_jaccard: (base.agreement_jaccard === undefined ? null : base.agreement_jaccard), alt_statement: base.alt_statement || null, quotes_dropped: (out.quotes || []).length - picked.length, quotes_dropped_no_timestamp: droppedNoTimestamp, quotes_dropped_dup_moment: droppedDupMoment } }];"
+      },
+      "id": "c7de667f-1c6f-4422-8ba6-2ef21f789d61",
+      "name": "Verify Selected Quotes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5776,
+        3184
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.supported }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "be448708-dd09-4d23-9f62-45f02db3bff7",
+      "name": "Insight Supported?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6000,
+        3312
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "1e098d18-50f7-4808-9731-f8c000c6ac49",
+      "name": "Loop Insights",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        4752,
+        3312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const proposed = $input.all().map(i => i.json);\nconst findings = $('Aggregate Findings').first().json.findings || [];\nconst cited = new Set();\nfor (const p of proposed) { for (const id of (p.finding_ids || [])) { cited.add(String(id)); } }\nconst uncovered = [];\nfor (const f of findings) {\n  if (cited.has(String(f.finding_id))) { continue; }\n  if (f.is_minority) { continue; }\n  uncovered.push({ finding_id: f.finding_id, question: f.question, name: f.name, definition: f.definition, sessions: f.sessions });\n}\nconst existing = proposed.map(p => ({ name: p.name, statement: p.statement }));\nreturn [{ json: { uncovered: uncovered, existing: existing, uncovered_count: uncovered.length, proposed_count: proposed.length } }];"
+      },
+      "id": "b0607ac2-6419-42ca-abe5-0147b79f57c1",
+      "name": "Coverage Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        3088
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "90588ab5-00bd-4b24-8048-38e6d274b9b3",
+      "name": "Supplementary Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        3168,
+        3216
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"insights\":{\"type\":\"array\",\"description\":\"Additional insights. An empty array is a correct and common answer.\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"description\":\"3-8 words stating the claim, not the topic\"},\"statement\":{\"type\":\"string\",\"description\":\"1-3 sentences stating the claim. No quantifier words.\"},\"finding_ids\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"finding_id values from the uncited list, copied verbatim\"}},\"required\":[\"name\",\"statement\",\"finding_ids\"]}}},\"required\":[\"insights\"]}"
+      },
+      "id": "0c7c8ae4-7f16-4c0c-8560-0ebe109664ba",
+      "name": "Supplementary Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        3296,
+        3216
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Findings that no proposed insight cites (JSON array of {finding_id, question, name, definition, sessions}):\n{{ JSON.stringify($json.uncovered) }}\n\nInsights already proposed - do not restate these:\n{{ JSON.stringify($json.existing) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the coverage check in a project-level research synthesis.\n\nA first pass proposed insights for this project from its question-by-question findings. You are given the findings that no proposed insight cites, plus the insights already proposed.\n\nYour job is to find substantial patterns among the uncited findings that the existing insights do not already cover - and only those.\n\nRETURNING AN EMPTY LIST IS A CORRECT AND COMMON ANSWER. Uncited findings are often genuinely scattered: leftovers from different questions that share no claim. Do not invent an insight to mop them up, and do not group findings that merely share a topic. Padding this output is worse than leaving findings uncited, because a weak insight sitting beside well-supported ones gets read as equally real.\n\nDo not restate or lightly reword an insight that was already proposed. If uncited findings simply belong to an insight that already exists, leave them where they are - you cannot edit the existing insights, and a near-duplicate is worse than an omission.\n\nTHE BAR FOR A NEW INSIGHT, all three required:\n1. It draws on findings from at least THREE different questions. A pattern appearing under only two is usually a shared topic rather than a shared claim.\n2. It states something participants do, think or experience - NOT a demographic fact about who they are. Their roles, industries, company sizes and job titles are never insights, however many questions they appear under.\n3. It is something a researcher would be annoyed to have missed.\n\nEverything else follows the first pass. One claim per insight - if you want to join two claims with 'but' or 'and', they are two insights. No quantifier words: some, several, many, most, a few, often, generally; participant and question counts are computed exactly and separately. Name of 3 to 8 words stating the claim rather than the topic. Cite only finding_ids present in the input, copied exactly. State only what the findings support, with no recommendations and no implications."
+        }
+      },
+      "id": "4e5740c3-aa88-426d-99ac-7e2c14e26a66",
+      "name": "Propose Supplementary",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        3152,
+        2976
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const first = $('Verify Finding Refs').all().map(i => i.json);\nconst raw = $input.first().json;\nconst extra = (raw.output && raw.output.insights) || raw.insights || [];\nconst findings = $('Aggregate Findings').first().json.findings || [];\nconst byId = new Map();\nfor (const f of findings) { byId.set(String(f.finding_id), f); }\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst out = [];\nconst existingNames = new Set();\nfor (const p of first) {\n  out.push({ json: p });\n  existingNames.add(String(p.name || '').toLowerCase().trim());\n}\nfor (const ins of extra) {\n  const ids = [];\n  const seen = new Set();\n  for (const id of (ins.finding_ids || [])) {\n    const s = String(id);\n    if (!uuidRegex.test(s)) { continue; }\n    if (!byId.has(s)) { continue; }\n    if (seen.has(s)) { continue; }\n    seen.add(s);\n    ids.push(s);\n  }\n  if (ids.length === 0) { continue; }\n  const nm = String(ins.name || '').toLowerCase().trim();\n  if (existingNames.has(nm)) { continue; }\n  existingNames.add(nm);\n  const questions = new Set();\n  for (const id of ids) { questions.add(String(byId.get(id).question_id)); }\n  out.push({ json: { name: ins.name, statement: ins.statement, finding_ids: ids, findings_count: ids.length, questions_count: questions.size, refs_dropped: (ins.finding_ids || []).length - ids.length, supplementary: true } });\n}\nreturn out;"
+      },
+      "id": "b462e7b0-5f1b-405f-8c18-4d5e5c2ed5d7",
+      "name": "Combine Insights",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3504,
+        3088
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "project_insight"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('Normalize Input').first().json.project_id }}",
+            "run_id": "={{ $('Fetch Findings').first().json.run_id }}",
+            "source_run_id": "={{ $('Fetch Findings').first().json.source_run_id }}",
+            "name": "={{ $json.name }}",
+            "statement": "={{ $json.statement }}",
+            "alt_statement": "={{ $json.alt_statement }}",
+            "findings_count": "={{ $json.findings_count }}",
+            "questions_count": "={{ $json.questions_count }}",
+            "sessions_count": "={{ $json.sessions_count }}",
+            "corroboration": "={{ $json.corroboration }}",
+            "supplementary": "={{ $json.supplementary }}",
+            "raters_agreeing": "={{ $json.raters_agreeing }}",
+            "rater_models": "={{ JSON.stringify($json.rater_models) }}",
+            "agreement_jaccard": "={{ $json.agreement_jaccard }}",
+            "rater_a_proposed": "={{ $('Adjudicate').first().json._stats.analyst_a }}",
+            "rater_b_proposed": "={{ $('Adjudicate').first().json._stats.analyst_b }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "f8ac6c45-dede-48b8-84a5-7bf5ded0715b",
+      "name": "Insert Project Insight",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        6288,
+        3376
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "project_insight_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "e2",
+              "name": "quotes",
+              "value": "={{ $('Verify Selected Quotes').first().json.quotes }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c8696ebb-13d7-4e1d-9aa8-6f8e538d5b79",
+      "name": "Attach Evidence",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        6512,
+        3376
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "quotes",
+        "include": "allOtherFields",
+        "options": {
+          "destinationFieldName": "ev"
+        }
+      },
+      "id": "67c8d008-09b9-4311-bb38-b23e4a74cdc3",
+      "name": "Split Evidence",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        6736,
+        3376
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "clip"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_insight_id": "={{ $json.project_insight_id }}",
+            "session_id": "={{ $json.ev.session_id }}",
+            "start_time": "={{ $json.ev.start_time }}",
+            "end_time": "={{ $json.ev.end_time }}",
+            "text": "={{ $json.ev.quote }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "62109220-2baa-4604-a4b4-fce96863dab3",
+      "name": "Insert Insight Evidence",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        6960,
+        3376
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into project_insight_finding (project_insight_id, finding_id, attached)\nselect $1::uuid, x::uuid, (x = any(string_to_array($3, '|')))\nfrom unnest(string_to_array($2, '|')) as x\non conflict do nothing\nreturning finding_id, attached",
+        "options": {
+          "queryReplacement": "={{ $('Insert Project Insight').first().json.id }},{{ $('Verify Selected Quotes').first().json.finding_ids.join('|') }},{{ (($('Verify Selected Quotes').first().json.attached_ids) || []).concat(['none']).join('|') }}"
+        }
+      },
+      "id": "6bd6e44b-7ae7-4a28-9e25-db9355230131",
+      "name": "Insert Insight Findings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        7184,
+        3376
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## L3 - project-level synthesis\n\nReads the LATEST question_insight run for a project (L2) and writes project_insight, its finding links, and its selected verbatim quotes as clip rows. Re-running L3 is one pass over existing findings and re-analyses nothing.\n\n### Three LLM passes\n\n1. Propose Project Insights sees only findings - names, definitions, and the question each came from. It never sees quotes, so it cannot be seduced by one vivid line.\n2. Propose Supplementary is the coverage check. Coverage Check computes, in code, which MAJORITY findings the first pass left uncited, and this pass gets one attempt at them. An empty list is a correct and common answer; padding is worse than omission. Bar raised to 3+ questions on 2026-09-23 after a 2-question \"insight\" turned out to be a demographic fact.\n3. Ground And Select Quotes runs per insight, sees the real participant quotes behind the findings it cites, and may narrow the claim or reject it. Supplementary insights go through this exactly like the rest - nothing bypasses the evidence check.\n\nOn narrowing: an early version rejected 3 of 8 insights because the prompt said both to narrow toward the evidence and to reject when the evidence did not support the claim, with no precedence. It did both. The prompt now states narrowing is the normal successful outcome.\n\n### Computed in code, never by the model\n\nfindings_count, questions_count, sessions_count and corroboration (strong / moderate / thin). questions_count is load-bearing: a claim recurring under many DIFFERENT questions is corroborated in a way L2 cannot see by construction. sessions_count counts every participant behind the cited findings, not only the quotes finally shown.\n\n### FIVE THINGS THAT WILL BITE WHOEVER EDITS THIS\n\n1. THIS WORKFLOW IS ACTIVE. An update creates a DRAFT - the production webhook keeps running the previously published version until you publish. \"Updated\" and \"live\" are different states. webhook-test runs the draft, webhook runs the published version.\n2. The loop advances from BOTH branches of Insight Supported?. A rejected insight must still reach nextBatch or the run stalls silently with no error.\n3. Combine Insights, not Verify Finding Refs, feeds the loop. It always emits at least the first pass's insights, so a supplementary pass returning nothing cannot stall the run. Do not reintroduce a Merge node here.\n4. Array parameters are joined with | and split with string_to_array(..., '|'), NOT commas. n8n splits queryReplacement on commas, so a comma-joined list silently becomes several parameters.\n5. Attach Evidence and Insert Insight Findings both use executeOnce. Without it they re-run per input item and multiply rows.\n\n### Evidence goes to clip, not our own table\n\nInsert Insight Evidence writes clip rows with project_insight_id, mirroring clip.job_id and clip.opportunity_id. That inherits pidgeonhead's Mux player, timeline and clip editor, and the participant-rename propagation in sessions/[id].patch.ts which keeps clip.text in sync with the transcript. clip.start_time and end_time are NOT NULL, so Verify Selected Quotes drops any quote lacking timestamps rather than failing the insert mid-loop.\n\nFind-or-create was considered and rejected on evidence: 0 of 560 evidence rows matched an existing clip's exact timestamps, so it would never fire, and fuzzy matching would bind an insight to a clip whose text is not the verified quote.\n\nproject_insight_evidence still exists but nothing writes to it. It is kept deliberately as the evidence record for superseded runs.\n\n### Temperature\n\nAll three models run at 0.2. Previously unset, meaning the API default - the wrong choice for a reproducible analysis. Setting it took run-to-run agreement from 0.42 to 0.69 Jaccard with no loss of coverage.\n\n### Deliberately not here\n\nNo implication or recommendation field. Every column is evidence-backed; an interpretation field would be the only one that is not, and would go stale against strategy while looking equally authoritative. Research questions are not wired in either - project_insight needs no reshaping to add them, only a link table.",
+        "height": 900,
+        "width": 940,
+        "color": 5
+      },
+      "id": "f6a42af5-5ec5-47fb-8658-bf4d12172e7e",
+      "name": "Design notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        2032
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 16000,
+          "thinkingMode": "adaptive",
+          "effort": "low"
+        }
+      },
+      "id": "001d54c0-41b6-4b78-84bc-c1c0821ed838",
+      "name": "Analyst B Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        2368,
+        3712
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"insights\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"description\":\"3-8 words, states the claim itself, not the topic\"},\"statement\":{\"type\":\"string\",\"description\":\"1-3 sentences stating the project-level claim\"},\"finding_ids\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"finding_id values from the input that support this insight, copied verbatim\"}},\"required\":[\"name\",\"statement\",\"finding_ids\"]}}},\"required\":[\"insights\"]}"
+      },
+      "id": "91f6123a-b73f-4b0c-837b-dbcdb5018df1",
+      "name": "Analyst B Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2496,
+        3712
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Findings from every question in this project (JSON array of {finding_id, question, name, definition, is_minority, sessions}):\n{{ JSON.stringify($json.findings) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are given every finding from a research project's question-by-question analysis. Each finding is a claim about what participants said in answer to one specific interview question, together with that question, how many participants back it, and whether it was marked a minority observation (one or two people).\n\nYour job is to state the main insights of the project as a whole.\n\nThe interview questions are instruments, not the questions anyone wants answered. A finding lives under one question. A project insight is something no single question could show. The strongest signal available to you is recurrence across DIFFERENT questions: when the same underlying claim surfaces under many separate questions, participants kept returning to it unprompted, and that is stronger corroboration than one well-supported finding under a single question.\n\nAim for roughly 6 to 10 insights - fewer if the material genuinely does not support more, more if it clearly does. Do not pad to reach a number and do not drop real signal to fit one. Work through the whole list before you finish: a finding you do not cite is treated as belonging to no insight at all, and a substantial pattern you leave out is simply lost.\n\nEach insight must be ONE claim. If you are tempted to join two claims with 'but' or 'and', they are two insights.\n\nState each claim at the level the findings actually support. The next step checks every claim against the underlying verbatim quotes and will narrow anything overstated, so reaching too far does not strengthen an insight - it just gets rewritten smaller.\n\nDo not use quantifier words: some, several, many, most, a few, often, generally. Participant and question counts are computed exactly and separately from your output.\n\nFor each insight give a name of 3 to 8 words stating the claim rather than the topic, a statement of the claim in 1-3 sentences, and the finding_ids it is built from. Cite every finding that genuinely supports it, not only the clearest one: those citations are what the claim gets checked against next, and a finding you leave out cannot be used as evidence later.\n\nCite only finding_ids present in the input, copied exactly. Do not restate a single finding as an insight. Do not merge a broadly supported claim with a documented minority or dissenting one - those are separate insights, and collapsing them destroys the disagreement this analysis exists to surface.\n\nState only what the findings support. No recommendations, no implications, no advice about what anyone should do."
+        }
+      },
+      "id": "8f2d8091-3c25-44f5-915c-d1e3b6246a7b",
+      "name": "Propose Insights B",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2352,
+        3488
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst insights = (raw.output && raw.output.insights) || raw.insights || [];\nconst findings = $('Aggregate Findings').first().json.findings || [];\nconst byId = new Map();\nfor (const f of findings) { byId.set(String(f.finding_id), f); }\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst out = [];\nfor (const ins of insights) {\n  const ids = [];\n  const seen = new Set();\n  for (const id of (ins.finding_ids || [])) {\n    const s = String(id);\n    if (!uuidRegex.test(s)) { continue; }\n    if (!byId.has(s)) { continue; }\n    if (seen.has(s)) { continue; }\n    seen.add(s);\n    ids.push(s);\n  }\n  if (ids.length === 0) { continue; }\n  const questions = new Set();\n  for (const id of ids) { questions.add(String(byId.get(id).question_id)); }\n  out.push({ json: { name: ins.name, statement: ins.statement, finding_ids: ids, findings_count: ids.length, questions_count: questions.size, refs_dropped: (ins.finding_ids || []).length - ids.length } });\n}\nreturn out;"
+      },
+      "id": "6491b8c4-8566-49e1-a516-0e922864ffeb",
+      "name": "Verify Finding Refs B",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        3488
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const proposed = $input.all().map(i => i.json);\nconst findings = $('Aggregate Findings').first().json.findings || [];\nconst cited = new Set();\nfor (const p of proposed) { for (const id of (p.finding_ids || [])) { cited.add(String(id)); } }\nconst uncovered = [];\nfor (const f of findings) {\n  if (cited.has(String(f.finding_id))) { continue; }\n  if (f.is_minority) { continue; }\n  uncovered.push({ finding_id: f.finding_id, question: f.question, name: f.name, definition: f.definition, sessions: f.sessions });\n}\nconst existing = proposed.map(p => ({ name: p.name, statement: p.statement }));\nreturn [{ json: { uncovered: uncovered, existing: existing, uncovered_count: uncovered.length, proposed_count: proposed.length } }];"
+      },
+      "id": "f0e00125-d8c3-4b78-ab02-db5b56518d9c",
+      "name": "Coverage Check B",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        3488
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 16000,
+          "thinkingMode": "adaptive",
+          "effort": "low"
+        }
+      },
+      "id": "a5783870-7e3a-42e5-948a-ef5d5cd0b820",
+      "name": "Supplementary B Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        3168,
+        3712
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"insights\":{\"type\":\"array\",\"description\":\"Additional insights. An empty array is a correct and common answer.\",\"items\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"description\":\"3-8 words stating the claim, not the topic\"},\"statement\":{\"type\":\"string\",\"description\":\"1-3 sentences stating the claim. No quantifier words.\"},\"finding_ids\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"finding_id values from the uncited list, copied verbatim\"}},\"required\":[\"name\",\"statement\",\"finding_ids\"]}}},\"required\":[\"insights\"]}"
+      },
+      "id": "76cfd785-6478-4e5a-a440-3962a2371766",
+      "name": "Supplementary B Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        3296,
+        3712
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Findings that no proposed insight cites (JSON array of {finding_id, question, name, definition, sessions}):\n{{ JSON.stringify($json.uncovered) }}\n\nInsights already proposed - do not restate these:\n{{ JSON.stringify($json.existing) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the coverage check in a project-level research synthesis.\n\nA first pass proposed insights for this project from its question-by-question findings. You are given the findings that no proposed insight cites, plus the insights already proposed.\n\nYour job is to find substantial patterns among the uncited findings that the existing insights do not already cover - and only those.\n\nRETURNING AN EMPTY LIST IS A CORRECT AND COMMON ANSWER. Uncited findings are often genuinely scattered: leftovers from different questions that share no claim. Do not invent an insight to mop them up, and do not group findings that merely share a topic. Padding this output is worse than leaving findings uncited, because a weak insight sitting beside well-supported ones gets read as equally real.\n\nDo not restate or lightly reword an insight that was already proposed. If uncited findings simply belong to an insight that already exists, leave them where they are - you cannot edit the existing insights, and a near-duplicate is worse than an omission.\n\nTHE BAR FOR A NEW INSIGHT, all three required:\n1. It draws on findings from at least THREE different questions. A pattern appearing under only two is usually a shared topic rather than a shared claim.\n2. It states something participants do, think or experience - NOT a demographic fact about who they are. Their roles, industries, company sizes and job titles are never insights, however many questions they appear under.\n3. It is something a researcher would be annoyed to have missed.\n\nEverything else follows the first pass. One claim per insight - if you want to join two claims with 'but' or 'and', they are two insights. No quantifier words: some, several, many, most, a few, often, generally; participant and question counts are computed exactly and separately. Name of 3 to 8 words stating the claim rather than the topic. Cite only finding_ids present in the input, copied exactly. State only what the findings support, with no recommendations and no implications."
+        }
+      },
+      "id": "25677fd1-52e4-4093-a021-209c2358474b",
+      "name": "Propose Supplementary B",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        3152,
+        3488
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const first = $('Verify Finding Refs B').all().map(i => i.json);\nconst raw = $input.first().json;\nconst extra = (raw.output && raw.output.insights) || raw.insights || [];\nconst findings = $('Aggregate Findings').first().json.findings || [];\nconst byId = new Map();\nfor (const f of findings) { byId.set(String(f.finding_id), f); }\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst out = [];\nconst existingNames = new Set();\nfor (const p of first) {\n  out.push({ json: p });\n  existingNames.add(String(p.name || '').toLowerCase().trim());\n}\nfor (const ins of extra) {\n  const ids = [];\n  const seen = new Set();\n  for (const id of (ins.finding_ids || [])) {\n    const s = String(id);\n    if (!uuidRegex.test(s)) { continue; }\n    if (!byId.has(s)) { continue; }\n    if (seen.has(s)) { continue; }\n    seen.add(s);\n    ids.push(s);\n  }\n  if (ids.length === 0) { continue; }\n  const nm = String(ins.name || '').toLowerCase().trim();\n  if (existingNames.has(nm)) { continue; }\n  existingNames.add(nm);\n  const questions = new Set();\n  for (const id of ids) { questions.add(String(byId.get(id).question_id)); }\n  out.push({ json: { name: ins.name, statement: ins.statement, finding_ids: ids, findings_count: ids.length, questions_count: questions.size, refs_dropped: (ins.finding_ids || []).length - ids.length, supplementary: true } });\n}\nreturn out;"
+      },
+      "id": "e70fe5cb-faf5-4526-8853-64f2e04568bb",
+      "name": "Combine Insights B",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3504,
+        3488
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b29890ae-a514-418f-b894-55ca3c85210f",
+      "name": "Join Analysts",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3728,
+        3312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resolve the adjudicator's index groups into real insights. The model decided\n// grouping and CHOSE which existing statement to show; it did not write one.\n// Every citation, count and corroboration figure is computed here from the\n// resolved findings, so the evidence chain cannot be altered by the model.\nconst raw = $input.first().json;\nconst groups = (raw.output && raw.output.groups) || raw.groups || [];\nconst A = $('Combine Insights').all().map(i => i.json);\nconst B = $('Combine Insights B').all().map(i => i.json);\nconst findings = $('Aggregate Findings').first().json.findings || [];\nconst byId = new Map();\nfor (const f of findings) { byId.set(String(f.finding_id), f); }\n\nconst MODEL_A = 'gpt-5.4';\nconst MODEL_B = 'claude-opus-5';\n\nfunction jaccard(sx, sy) {\n  let inter = 0;\n  for (const v of sx) { if (sy.has(v)) { inter++; } }\n  const uni = sx.size + sy.size - inter;\n  return uni === 0 ? 0 : inter / uni;\n}\nfunction questionsFor(ids) {\n  const qs = new Set();\n  for (const id of ids) { const f = byId.get(String(id)); if (f) { qs.add(String(f.question_id)); } }\n  return qs.size;\n}\n\nconst seenA = new Set();\nconst seenB = new Set();\nconst out = [];\nlet fallbacks = 0;\n\nfor (const g of groups) {\n  const ai = (g.a || []).filter(i => Number.isInteger(i) && i >= 0 && i < A.length && !seenA.has(i));\n  const bi = (g.b || []).filter(i => Number.isInteger(i) && i >= 0 && i < B.length && !seenB.has(i));\n  if (ai.length === 0 && bi.length === 0) { continue; }\n  for (const i of ai) { seenA.add(i); }\n  for (const i of bi) { seenB.add(i); }\n\n  const setA = new Set();\n  for (const i of ai) { for (const id of (A[i].finding_ids || [])) { setA.add(String(id)); } }\n  const setB = new Set();\n  for (const i of bi) { for (const id of (B[i].finding_ids || [])) { setB.add(String(id)); } }\n  const idList = Array.from(new Set([...setA, ...setB]));\n  if (idList.length === 0) { continue; }\n\n  const constituents = [...ai.map(i => A[i]), ...bi.map(i => B[i])];\n\n  // The chosen statement is used VERBATIM - no synthesis, so no compression\n  // loss. If the model's choice is out of range, fall back deterministically to\n  // the longest constituent statement rather than trusting a bad index.\n  let primaryText = null;\n  const side = String(g.primary_side || '').toLowerCase();\n  const pidx = Number(g.primary_index);\n  if (side === 'a' && ai.indexOf(pidx) !== -1) { primaryText = A[pidx].statement; }\n  else if (side === 'b' && bi.indexOf(pidx) !== -1) { primaryText = B[pidx].statement; }\n  if (!primaryText) {\n    fallbacks++;\n    primaryText = constituents.map(c => String(c.statement || '')).sort((x, y) => y.length - x.length)[0];\n  }\n  const others = constituents.map(c => String(c.statement || '')).filter(s => s && s !== primaryText);\n  const altText = others.length ? others.join('\\n\\n') : null;\n\n  const models = [];\n  if (ai.length) { models.push(MODEL_A); }\n  if (bi.length) { models.push(MODEL_B); }\n\n  out.push({ json: {\n    name: g.name || constituents[0].name,\n    statement: primaryText,\n    alt_statement: altText,\n    finding_ids: idList,\n    findings_count: idList.length,\n    questions_count: questionsFor(idList),\n    supplementary: constituents.every(x => x.supplementary === true),\n    raters_agreeing: models.length,\n    rater_models: models,\n    agreement_jaccard: (ai.length && bi.length) ? Math.round(jaccard(setA, setB) * 1000) / 1000 : null,\n    merged_from_a: ai.length,\n    merged_from_b: bi.length,\n  } });\n}\n\n// Safety net: anything the adjudicator omits survives as a single-analyst entry\n// rather than disappearing.\nlet orphans = 0;\nfor (let i = 0; i < A.length; i++) {\n  if (seenA.has(i)) { continue; }\n  orphans++;\n  out.push({ json: { ...A[i], alt_statement: null, raters_agreeing: 1, rater_models: [MODEL_A], agreement_jaccard: null, merged_from_a: 1, merged_from_b: 0, orphaned: true } });\n}\nfor (let i = 0; i < B.length; i++) {\n  if (seenB.has(i)) { continue; }\n  orphans++;\n  out.push({ json: { ...B[i], alt_statement: null, raters_agreeing: 1, rater_models: [MODEL_B], agreement_jaccard: null, merged_from_a: 0, merged_from_b: 1, orphaned: true } });\n}\n\nconst stats = { analyst_a: A.length, analyst_b: B.length, groups_returned: groups.length, final: out.length, both_raters: out.filter(o => o.json.raters_agreeing === 2).length, orphans_recovered: orphans, primary_fallbacks: fallbacks };\nfor (const o of out) { o.json._stats = stats; }\nreturn out;"
+      },
+      "id": "14fb6050-5a13-4b3a-8ef8-d8ffb77b02d5",
+      "name": "Adjudicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4528,
+        3312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build INDEXED lists for the adjudicator. It never sees or emits finding_ids -\n// it refers to insights by index only. Two reasons: the evidence chain stays\n// deterministic because code resolves indices to citations, so the model cannot\n// drop or invent one; and re-emitting hundreds of UUIDs is thousands of output\n// tokens, which is exactly what exhausted Claude's budget earlier.\nconst A = $('Combine Insights').all().map(i => i.json);\nconst B = $('Combine Insights B').all().map(i => i.json);\n\nfunction jaccard(x, y) {\n  const sx = new Set((x || []).map(String));\n  const sy = new Set((y || []).map(String));\n  let inter = 0;\n  for (const v of sx) { if (sy.has(v)) { inter++; } }\n  const uni = sx.size + sy.size - inter;\n  return uni === 0 ? 0 : inter / uni;\n}\n\nconst a_list = A.map((x, i) => ({ i: i, name: x.name, statement: x.statement, cites: (x.finding_ids || []).length, questions: x.questions_count }));\nconst b_list = B.map((x, i) => ({ i: i, name: x.name, statement: x.statement, cites: (x.finding_ids || []).length, questions: x.questions_count }));\n\n// Evidence overlap offered as a HINT only. It under-reads agreement when the\n// two analysts partition at different granularity, which is the whole reason\n// this step is no longer a pure overlap match.\nconst overlap = [];\nfor (let i = 0; i < A.length; i++) {\n  const row = [];\n  for (let j = 0; j < B.length; j++) {\n    const s = jaccard(A[i].finding_ids, B[j].finding_ids);\n    if (s > 0.05) { row.push({ b: j, overlap: Math.round(s * 100) / 100 }); }\n  }\n  row.sort((p, q) => q.overlap - p.overlap);\n  overlap.push({ a: i, top: row.slice(0, 4) });\n}\n\nreturn [{ json: { a_list: a_list, b_list: b_list, overlap: overlap, a_count: A.length, b_count: B.length } }];"
+      },
+      "id": "ce90f8ef-0448-4516-bef1-fe1d21da7df4",
+      "name": "Prepare Adjudication",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3952,
+        3312
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "b1e8b5d7-2810-48f1-9a71-b7b99e343515",
+      "name": "Adjudicator Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        4192,
+        3536
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"groups\":{\"type\":\"array\",\"description\":\"One entry per final insight. Every index from both lists must appear in exactly one group.\",\"items\":{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"array\",\"items\":{\"type\":\"number\"},\"description\":\"Indices from analyst A in this group. Empty if only B found it.\"},\"b\":{\"type\":\"array\",\"items\":{\"type\":\"number\"},\"description\":\"Indices from analyst B in this group. Empty if only A found it.\"},\"name\":{\"type\":\"string\",\"description\":\"3-8 words stating the claim, not the topic. You write this.\"},\"primary_side\":{\"type\":\"string\",\"enum\":[\"a\",\"b\"],\"description\":\"Which list the chosen statement comes from. You do not write a statement - you choose an existing one.\"},\"primary_index\":{\"type\":\"number\",\"description\":\"Index of the chosen insight within that list. Must be one of the indices in this group's own a or b array. Choose the MOST SPECIFIC statement - the one naming actual tools, failures and behaviours.\"}},\"required\":[\"a\",\"b\",\"name\",\"primary_side\",\"primary_index\"]}}},\"required\":[\"groups\"]}"
+      },
+      "id": "fa05e92d-089e-4b7e-ae97-092e933a3446",
+      "name": "Adjudicator Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        4320,
+        3536
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyst A proposed {{ $json.a_count }} insights:\n{{ JSON.stringify($json.a_list) }}\n\nAnalyst B proposed {{ $json.b_count }} insights:\n{{ JSON.stringify($json.b_list) }}\n\nEvidence overlap between them, as a hint only (fraction of shared citations):\n{{ JSON.stringify($json.overlap) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Two independent analysts, running different models, each read the same question-level research findings and wrote up what they saw as the project's main insights. Reconcile their two lists into one set of DISTINCT findings.\n\nThis is inter-rater adjudication, as two human researchers comparing codings. You decide which insights are THE SAME CLAIM.\n\nA GROUP MAY CONTAIN SEVERAL INSIGHTS FROM THE SAME ANALYST. This is the most commonly missed case, so check for it deliberately. If analyst B wrote two insights making the same claim, they belong in ONE group together - even when no analyst A insight matches either. Deduplicating within one analyst's list matters as much as reconciling across the two.\n\nWork in two passes. FIRST, within each analyst's own list, find insights that restate each other. SECOND, match across the two lists. A group can mix freely: two from A and three from B is normal.\n\nGROUP whenever insights make the same underlying claim, even when worded differently, stated at different breadth, citing different evidence, or coming from the same analyst. Real duplicates from an earlier run, each of which should have been one group: 'Test and inspect before publishing' with 'Release follows stepwise testing'; 'Auditing checks against standards' with 'Auditing means compliance checking'.\n\nTHE TEST FOR A GROUP: state in one sentence the single claim the whole group makes. If you cannot - if the sentence needs an 'and' joining unrelated ideas - it is not one group. Real failures from earlier runs: findings about thin onboarding guidance were merged into an insight about pricing and seat limits; a claim about version control was merged with a claim about what the word 'auditing' means to participants. Different claims about different things, and burying one inside the other destroyed it.\n\nDO NOT group insights that merely share a topic. Two claims about AI are not the same claim: 'AI helps people build faster' and 'AI output needs checking' share a subject and are different findings.\n\nDO NOT group a broadly supported claim with a documented minority or dissenting one. Preserving disagreement is the point of the analysis.\n\nThere is NO target number of groups. Merge exactly the claims that are the same and no others. Whether that leaves 10 entries or 22 is a fact about the data, not a quota. Merging two distinct findings to shorten the list is the worst outcome available to you: a reader sees a tidy list and never learns a finding was lost inside another.\n\nThe overlap numbers are a hint, not an instruction. Decide on meaning; use overlap only to break your own ties.\n\nEVERY index from both lists must appear in exactly one group. Nothing is dropped - an insight only one analyst found is still a result and becomes a single-analyst entry.\n\nCHOOSING THE STATEMENT - READ THIS CAREFULLY. You do NOT write the statement. Every insight in front of you already has one, written by an analyst who had read all the underlying findings. You have only their summaries, so anything you compose will be blander and less specific than what they wrote. Composing a merged statement reliably makes the output worse; that is why this step now selects instead.\n\nFor each group, choose which constituent's statement becomes the primary one and report it as primary_side ('a' or 'b') plus primary_index. The index MUST be one of the indices in that group's own a or b array.\n\nChoose the MOST SPECIFIC statement: the one naming the actual tools, failures, limits and behaviours participants described. Prefer 'execution history is missing, errors are generic, users rebuild by hand' over 'debugging is difficult'. Prefer a statement that could only have been written by someone who read this research over one that could have been guessed. Length is a weak signal; specificity is the criterion.\n\nNothing is lost by choosing: every other statement in the group is kept and shown to the reviewer alongside the primary one.\n\nYou DO write the name: 3 to 8 words stating the claim rather than the topic, covering the whole group. No quantifier words anywhere: some, several, many, most, a few, often, generally - participant and question counts are computed separately and exactly."
+        }
+      },
+      "id": "f1236dc9-6997-40f8-aa4e-ed92d208404e",
+      "name": "Adjudicate Insights",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        4176,
+        3312
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "project_id"
+            }
+          ]
+        }
+      },
+      "id": "d3302165-6581-44d7-9e6d-f9014d2cc317",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1600,
+        3408
+      ]
+    }
+  ],
+  "connections": {
+    "Project Insight Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Findings": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Findings": {
+      "main": [
+        [
+          {
+            "node": "Propose Project Insights",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Propose Insights B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propose Project Insights": {
+      "main": [
+        [
+          {
+            "node": "Verify Finding Refs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proposal Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Propose Project Insights",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proposal Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Propose Project Insights",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Finding Refs": {
+      "main": [
+        [
+          {
+            "node": "Coverage Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Run": {
+      "main": [
+        [
+          {
+            "node": "Respond With Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Insight Evidence": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Insight Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Insight Evidence": {
+      "main": [
+        [
+          {
+            "node": "Ground And Select Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ground And Select Quotes": {
+      "main": [
+        [
+          {
+            "node": "Verify Selected Quotes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grounding Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Ground And Select Quotes",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grounding Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Ground And Select Quotes",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Selected Quotes": {
+      "main": [
+        [
+          {
+            "node": "Insight Supported?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insight Supported?": {
+      "main": [
+        [
+          {
+            "node": "Insert Project Insight",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Insights": {
+      "main": [
+        [
+          {
+            "node": "Summarize Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Insight Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coverage Check": {
+      "main": [
+        [
+          {
+            "node": "Propose Supplementary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supplementary Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Propose Supplementary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supplementary Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Propose Supplementary",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propose Supplementary": {
+      "main": [
+        [
+          {
+            "node": "Combine Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Project Insight": {
+      "main": [
+        [
+          {
+            "node": "Attach Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Evidence": {
+      "main": [
+        [
+          {
+            "node": "Split Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Evidence": {
+      "main": [
+        [
+          {
+            "node": "Insert Insight Evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Insight Evidence": {
+      "main": [
+        [
+          {
+            "node": "Insert Insight Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Insight Findings": {
+      "main": [
+        [
+          {
+            "node": "Loop Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyst B Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Propose Insights B",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyst B Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Propose Insights B",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propose Insights B": {
+      "main": [
+        [
+          {
+            "node": "Verify Finding Refs B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Finding Refs B": {
+      "main": [
+        [
+          {
+            "node": "Coverage Check B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coverage Check B": {
+      "main": [
+        [
+          {
+            "node": "Propose Supplementary B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supplementary B Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Propose Supplementary B",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supplementary B Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Propose Supplementary B",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propose Supplementary B": {
+      "main": [
+        [
+          {
+            "node": "Combine Insights B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Insights": {
+      "main": [
+        [
+          {
+            "node": "Join Analysts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Insights B": {
+      "main": [
+        [
+          {
+            "node": "Join Analysts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Join Analysts": {
+      "main": [
+        [
+          {
+            "node": "Prepare Adjudication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Adjudication": {
+      "main": [
+        [
+          {
+            "node": "Adjudicate Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjudicator Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Adjudicate Insights",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjudicator Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Adjudicate Insights",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjudicate Insights": {
+      "main": [
+        [
+          {
+            "node": "Adjudicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjudicate": {
+      "main": [
+        [
+          {
+            "node": "Loop Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "ea1ed20e-4983-4208-a4c5-acceb56069dc",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "2ikup33O6bj9W37l",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "6662e5d4-3d08-42bc-9977-b6903df38b50",
+      "name": "Gather L2 findings",
+      "nodeIds": [
+        "1280b719-b9d8-4103-99f3-b56410ba882a",
+        "0ba4ae25-b3df-4399-94e3-4daf171ee66f",
+        "f4e138c7-cd65-4dc9-9c60-98836268dd23"
+      ]
+    },
+    {
+      "id": "eb919a66-af83-48aa-b4ae-bcb8bf337e6a",
+      "name": "Persist",
+      "nodeIds": [
+        "f8ac6c45-dede-48b8-84a5-7bf5ded0715b",
+        "c8696ebb-13d7-4e1d-9aa8-6f8e538d5b79",
+        "67c8d008-09b9-4311-bb38-b23e4a74cdc3",
+        "62109220-2baa-4604-a4b4-fce96863dab3",
+        "6bd6e44b-7ae7-4a28-9e25-db9355230131"
+      ]
+    }
+  ]
+}

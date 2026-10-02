@@ -1,0 +1,651 @@
+{
+  "id": "gE2OHzPfpbuYMRIU",
+  "name": "ResearchQuestionAnswers",
+  "description": null,
+  "nodes": [
+    {
+      "id": "3210769a-6fe3-4061-ad94-06857482fd9a",
+      "name": "RQ Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "research-question-answers",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "webhookId": "6441b94a-ee32-4eaa-a790-61d3fc6e65ab",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "id": "5fde2b14-8131-4653-a7da-4f4f586a1c90",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "project_id",
+              "value": "={{ $json.body?.project_id ?? $json.project_id ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0943b342-e4d6-4945-bb89-8688d20b5e6e",
+      "name": "Fetch Evidence Pool",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with src as (\n  -- latest COMPLETE L2 run, same contract L3 uses\n  select qi.run_id as source_run_id\n  from question_insight qi\n  join question q on q.id = qi.question_id\n  where q.project_id = $1 and qi.completed_at is not null\n  group by qi.run_id\n  order by max(qi.created_at) desc\n  limit 1\n),\nr as materialized (select gen_random_uuid() as run_id)\nselect\n  f.id as finding_id,\n  q.id as question_id,\n  q.prompt_text as question,\n  q.section as section,\n  f.name,\n  f.definition,\n  f.is_minority,\n  count(distinct sa.session_id) as sessions,\n  r.run_id,\n  src.source_run_id\nfrom src\ncross join r\njoin question_insight qi on qi.run_id = src.source_run_id\njoin question q on q.id = qi.question_id\njoin question_insight_finding f on f.question_insight_id = qi.id\njoin question_insight_finding_evidence e on e.finding_id = f.id\njoin session_answer sa on sa.id = e.session_answer_id\ngroup by f.id, q.id, q.prompt_text, q.section, f.name, f.definition, f.is_minority, r.run_id, src.source_run_id\norder by q.id",
+        "options": {
+          "queryReplacement": "={{ $json.project_id }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "22208acb-78b2-4c33-9b24-44c678057e7f",
+      "name": "Aggregate Pool",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "findings",
+        "options": {}
+      }
+    },
+    {
+      "id": "ca7d96db-6213-4a55-af55-e9dd9c6defda",
+      "name": "Fetch Emergent Answers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Improvised interviewer questions. These feed nothing else in the\n-- pipeline, and a narrow research question is often answered here: the\n-- auditing material in Q3 sat largely in questions asked once.\nselect q.prompt_text as question, sa.summary, count(*) over (partition by lower(trim(q.prompt_text))) as asked_in_sessions\nfrom question q\njoin session_answer sa on sa.question_id = q.id\nwhere q.project_id = $1 and q.section = 'emergent_candidate' and sa.was_asked\norder by asked_in_sessions desc, q.prompt_text\nlimit 120",
+        "options": {
+          "queryReplacement": "={{ $('Normalize Input').first().json.project_id }}"
+        },
+        "alwaysOutputData": true
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "03c9353d-c531-45fd-a75c-3dca52e7d0bc",
+      "name": "Aggregate Emergent",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "emergent",
+        "options": {}
+      }
+    },
+    {
+      "id": "806298f8-324c-4c00-9c2a-eced3c8d8ce7",
+      "name": "Prepare Indexed Pool",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Index the pool once. The model sees indices only - code resolves them\n// back to finding ids, so it cannot invent or drop a citation.\nconst findings = $('Aggregate Pool').first().json.findings || [];\nconst emergentRows = $('Aggregate Emergent').first().json.emergent || [];\n\nconst findingsList = findings.map((f, i) => ({\n  i: i,\n  question: f.question,\n  section: f.section,\n  name: f.name,\n  definition: f.definition,\n  is_minority: f.is_minority,\n  sessions: Number(f.sessions) || 0,\n}));\n\n// Dedupe the improvised questions by text - L1 inserts one row per session\n// that raised it, so the same question appears many times.\nconst seen = new Map();\nfor (const e of emergentRows) {\n  const key = String(e.question || '').trim().toLowerCase();\n  if (!key) { continue; }\n  if (!seen.has(key)) { seen.set(key, { question: e.question, asked_in_sessions: Number(e.asked_in_sessions) || 1, summaries: [] }); }\n  const row = seen.get(key);\n  if (e.summary && row.summaries.length < 4) { row.summaries.push(e.summary); }\n}\nconst emergentList = Array.from(seen.values());\n\nreturn [{ json: { findings_list: findingsList, emergent_list: emergentList, findings_total: findingsList.length, emergent_total: emergentList.length } }];"
+      }
+    },
+    {
+      "id": "e902697b-8844-4764-8c00-4bc5beb14ec7",
+      "name": "Fetch Research Questions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select rq.id, rq.text\nfrom research_question rq\nwhere rq.project_id = $1 and rq.status <> 'parked'\norder by rq.created_at",
+        "options": {
+          "queryReplacement": "={{ $('Normalize Input').first().json.project_id }}"
+        },
+        "alwaysOutputData": true
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "b459f9a3-e7c1-4186-9aa2-555321c587f0",
+      "name": "Any Research Questions?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "791bbc0a-c441-4155-b993-586861347ae3",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        400
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "project_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3ed38c64-14d1-4a76-9645-024d5a336e50",
+      "name": "Loop Research Questions",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1800,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "683e3dce-d920-44b0-9e5e-d65a10e646cd",
+      "name": "RQ Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2050,
+        420
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-5.4"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "sp24DA5ZhuwP8VP6",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "id": "a78b98c9-7bd1-4772-96a7-0db0953e109a",
+      "name": "RQ Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2220,
+        420
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"status\":{\"type\":\"string\",\"enum\":[\"answered\",\"partial\",\"parked\"],\"description\":\"parked when the evidence does not answer the question - a correct and valuable result\"},\"answer\":{\"type\":\"string\",\"description\":\"2-5 sentences stating what the evidence shows. When parked, say plainly that the data does not answer it and what is missing.\"},\"finding_indexes\":{\"type\":\"array\",\"items\":{\"type\":\"number\"},\"description\":\"i values of the findings this answer rests on, copied from the input. Empty when parked.\"}},\"required\":[\"status\",\"answer\",\"finding_indexes\"]}"
+      }
+    },
+    {
+      "id": "5609ce14-e581-4fc1-b1e5-6c02aa10def0",
+      "name": "Answer Research Question",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2050,
+        200
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Research question:\n{{ $json.text }}\n\nProject findings (JSON array of {i, question, section, name, definition, is_minority, sessions}):\n{{ JSON.stringify($('Prepare Indexed Pool').first().json.findings_list) }}\n\nImprovised questions interviewers asked, with what participants answered (JSON array of {question, asked_in_sessions, summaries}):\n{{ JSON.stringify($('Prepare Indexed Pool').first().json.emergent_list) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You answer ONE declared research question from the findings of a completed research project.\n\nYou are given the project's findings, each with an index i, and separately the improvised questions interviewers asked with what participants said. Findings are the primary evidence. The improvised answers are supporting context - often the only place a narrow question is addressed - but they were asked inconsistently and sometimes as leading questions, so treat them as weaker and cite findings, not them.\n\nCite findings by index only. Never invent an index.\n\nCHOOSING THE STATUS IS THE MOST IMPORTANT THING YOU DO.\n\n'answered' - the findings directly and substantially address the question. You can state what participants do, think or experience in response to it, and several findings across more than one interview question support that.\n\n'partial' - there is real evidence bearing on the question but it does not settle it: it covers one part of the question, or rests on a couple of findings, or the findings point in different directions without resolving.\n\n'parked' - the evidence does not answer this question. Say so plainly in the answer field, and say what is missing.\n\nRETURNING 'parked' IS A CORRECT AND VALUABLE RESULT. A research question the data cannot answer tells the researcher the interview script failed to ask, which is worth knowing and will be shown to them. Never stretch loosely related findings into an answer to avoid returning parked. An answer that reads fluently while resting on almost nothing is the worst outcome available to you, because it will be presented to a team as a result.\n\nMEASUREMENT QUESTIONS MUST PARK UNLESS THE STUDY ACTUALLY MEASURED IT. If the question asks how long, how often, how much, how many, or which of two things is greater, and the interviews never captured that quantity, the answer is 'parked' - even when findings describe the same territory qualitatively. \"How long does it take to build a workflow?\" is not answered by findings saying the process feels fast, because nobody was timed. Do not silently convert a question about a quantity into a question about a perception and answer that instead: say the study did not measure it, and name what would have been needed.\n\nThe question's own phrasing will suggest the shape of an answer - resist that. Ask what the findings actually establish, not what a complete answer would sound like.\n\nWriting the answer: 2 to 5 sentences stating what the evidence shows. Name the specific things participants named - tools, checks, failures, the words they used. No recommendations, no implications, no next steps. Do not use quantifier words (some, several, many, most, a few, often, generally): counts are computed separately and exactly from your citations. If findings disagree, say so rather than averaging them.\n\nDo not restate the question as an answer, and do not describe the research process."
+        }
+      }
+    },
+    {
+      "id": "76e3c101-3833-42c4-8803-ce5f7cc96276",
+      "name": "Verify RQ Citations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Resolve indices to real finding ids and compute every count here. The model\n// states no numbers: it cites, code counts. So an answer claiming 'answered'\n// while resting on two findings from one participant is visible as such.\nconst raw = $input.first().json;\nconst out = raw.output || raw;\nconst rq = $('Loop Research Questions').first().json;\nconst findings = $('Aggregate Pool').first().json.findings || [];\n\nconst idxs = Array.isArray(out.finding_indexes) ? out.finding_indexes : [];\nconst seen = new Set();\nconst resolved = [];\nlet rejected = 0;\nfor (const rawIdx of idxs) {\n  const i = Number(rawIdx);\n  if (!Number.isInteger(i) || i < 0 || i >= findings.length) { rejected++; continue; }\n  if (seen.has(i)) { continue; }\n  seen.add(i);\n  resolved.push(findings[i]);\n}\n\nconst questions = new Set();\nlet sessions = 0;\nconst ids = [];\nfor (const f of resolved) {\n  ids.push(String(f.finding_id));\n  questions.add(String(f.question_id));\n  sessions = Math.max(sessions, Number(f.sessions) || 0);\n}\n\n// An answer that cites nothing cannot be 'answered' or 'partial', whatever the\n// model said. The citation list is the evidence.\nconst claimed = String(out.status || 'parked');\nlet status = claimed;\nif (resolved.length === 0) { status = 'parked'; }\n\n// The model sometimes embeds the raw finding indices in the prose, e.g.\n// \"...maintain trust and control [20,21,23,138]\". Those are meaningless to a\n// reader and this text goes into a presentation. Citations travel separately\n// in finding_indexes and are resolved above, so strip them here rather than\n// asking the prompt not to emit them - code can guarantee it.\nlet answer = String(out.answer || '');\nanswer = answer.replace(/\\s*\\[\\s*\\d+(\\s*,\\s*\\d+)*\\s*\\]/g, '');\nanswer = answer.replace(/\\s+([.,;:])/g, '$1').replace(/[ \\t]{2,}/g, ' ').trim();\n\nreturn [{ json: {\n  research_question_id: rq.id,\n  research_question: rq.text,\n  status: status,\n  answer: answer,\n  finding_ids: ids,\n  findings_count: ids.length,\n  questions_count: questions.size,\n  sessions_count: sessions,\n  indexes_rejected: rejected,\n  status_downgraded: status !== claimed,\n  run_id: $('Fetch Evidence Pool').first().json.run_id,\n  source_run_id: $('Fetch Evidence Pool').first().json.source_run_id\n} }];"
+      }
+    },
+    {
+      "id": "6ff2e74c-e0b5-476a-8e70-e505ba84d428",
+      "name": "Insert RQ Answer",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2620,
+        200
+      ],
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "name",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "name",
+          "value": "research_question_answer"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "research_question_id": "={{ $json.research_question_id }}",
+            "run_id": "={{ $json.run_id }}",
+            "source_run_id": "={{ $json.source_run_id }}",
+            "answer": "={{ $json.answer }}",
+            "status": "={{ $json.status }}",
+            "findings_count": "={{ $json.findings_count }}",
+            "questions_count": "={{ $json.questions_count }}",
+            "sessions_count": "={{ $json.sessions_count }}"
+          }
+        },
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "5315b338-3bf6-43db-bea6-6e0f62ac8fd0",
+      "name": "Insert RQ Answer Findings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2840,
+        200
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into research_question_answer_finding (answer_id, finding_id)\nselect $1::uuid, x::uuid\nfrom unnest(string_to_array($2, '|')) as x\nwhere x <> 'none'\non conflict do nothing\nreturning finding_id",
+        "options": {
+          "queryReplacement": "={{ $json.id }},{{ ($('Verify RQ Citations').first().json.finding_ids || []).concat(['none']).join('|') }}"
+        },
+        "alwaysOutputData": true
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "4149ff46-a8e7-401d-9217-cb53ea66ca21",
+      "name": "Summarize RQ Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2050,
+        20
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with mark as (\n  -- reached only after every answer of the run is written, so this is where\n  -- the run can honestly be called complete\n  update research_question_answer\n  set completed_at = now()\n  where run_id = $1::uuid and completed_at is null\n  returning 1\n)\nselect\n  count(*) as answers,\n  count(*) filter (where status = 'answered') as answered,\n  count(*) filter (where status = 'partial') as partial,\n  count(*) filter (where status = 'parked') as parked,\n  coalesce(sum(findings_count),0) as finding_citations,\n  (select count(*) from mark) as rows_marked_complete\nfrom research_question_answer\nwhere run_id = $1::uuid",
+        "options": {
+          "queryReplacement": "={{ $('Fetch Evidence Pool').first().json.run_id }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "73748054-74c7-423c-b6ba-e2979dec00ef",
+      "name": "Respond With Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2400,
+        20
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, run_id: $('Fetch Evidence Pool').first().json.run_id, source_run_id: $('Fetch Evidence Pool').first().json.source_run_id, findings_pool: $('Prepare Indexed Pool').first().json.findings_total, emergent_pool: $('Prepare Indexed Pool').first().json.emergent_total, answers: Number($json.answers), answered: Number($json.answered), partial: Number($json.partial), parked: Number($json.parked), finding_citations: Number($json.finding_citations), run_marked_complete: Number($json.rows_marked_complete) > 0 } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "b555fb32-b792-4d90-8c97-621764980cd6",
+      "name": "Respond Skipped",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1800,
+        460
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, skipped: true, reason: 'This project has no declared research questions. Nothing to answer; the project insights are unaffected.' } }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "RQ Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Evidence Pool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Evidence Pool": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Pool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Pool": {
+      "main": [
+        [
+          {
+            "node": "Fetch Emergent Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Emergent Answers": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Emergent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Emergent": {
+      "main": [
+        [
+          {
+            "node": "Prepare Indexed Pool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Indexed Pool": {
+      "main": [
+        [
+          {
+            "node": "Fetch Research Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Research Questions": {
+      "main": [
+        [
+          {
+            "node": "Any Research Questions?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Research Questions?": {
+      "main": [
+        [
+          {
+            "node": "Loop Research Questions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Research Questions": {
+      "main": [
+        [
+          {
+            "node": "Summarize RQ Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Answer Research Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Research Question": {
+      "main": [
+        [
+          {
+            "node": "Verify RQ Citations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify RQ Citations": {
+      "main": [
+        [
+          {
+            "node": "Insert RQ Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert RQ Answer": {
+      "main": [
+        [
+          {
+            "node": "Insert RQ Answer Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert RQ Answer Findings": {
+      "main": [
+        [
+          {
+            "node": "Loop Research Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize RQ Run": {
+      "main": [
+        [
+          {
+            "node": "Respond With Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RQ Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer Research Question",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RQ Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Answer Research Question",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "0d7451b1-1227-44b3-8cd3-9d527dd5696c",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "2ikup33O6bj9W37l",
+  "isArchived": false,
+  "nodeGroups": []
+}

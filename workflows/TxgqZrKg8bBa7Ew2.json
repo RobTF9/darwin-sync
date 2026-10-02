@@ -1,0 +1,183 @@
+{
+  "id": "TxgqZrKg8bBa7Ew2",
+  "name": "ScoreInsightStability",
+  "description": null,
+  "nodes": [
+    {
+      "id": "3d84a1d8-a3f0-41b8-86a0-b69a82b92932",
+      "name": "Score Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "score-insight-stability",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "webhookId": "6acbe9b2-44a2-47e1-a4fd-fa50e521609d",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "id": "84e6e68e-acf6-4520-9f05-b4ed4f53009c",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "primary_run_id",
+              "value": "={{ $json.body?.primary_run_id ?? $json.primary_run_id ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "compare_run_id",
+              "value": "={{ $json.body?.compare_run_id ?? $json.compare_run_id ?? \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "811152e2-bedb-4b2d-819c-2695f0a23cd7",
+      "name": "Score Stability",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with params as (\n  select $1::uuid as primary_run, $2::uuid as compare_run\n),\nguard as (\n  -- Refuse to score across different L2 inputs. Finding ids would not overlap\n  -- by construction, so every insight would read as 'did not reproduce'.\n  select p.primary_run, p.compare_run\n  from params p\n  where p.primary_run <> p.compare_run\n    and (select source_run_id from project_insight where run_id = p.primary_run limit 1) is not null\n    and (select source_run_id from project_insight where run_id = p.primary_run limit 1)\n      = (select source_run_id from project_insight where run_id = p.compare_run limit 1)\n),\npf as (\n  select pi.run_id, pi.id, array_agg(pif.finding_id order by pif.finding_id) as fset\n  from project_insight pi\n  join project_insight_finding pif on pif.project_insight_id = pi.id\n  where pi.run_id in (select primary_run from guard union all select compare_run from guard)\n  group by pi.run_id, pi.id\n),\nscored as (\n  select a.id,\n         max(cardinality(array(select unnest(a.fset) intersect select unnest(b.fset)))::numeric\n             / nullif(cardinality(array(select unnest(a.fset) union select unnest(b.fset))), 0)) as s\n  from pf a\n  join guard g on a.run_id = g.primary_run\n  join pf b on b.run_id = g.compare_run\n  group by a.id\n),\nupd as (\n  update project_insight p\n  set stability_score = round(scored.s, 3),\n      stability_compared_run_id = (select compare_run from guard)\n  from scored\n  where p.id = scored.id\n  returning p.id, scored.s as s\n)\nselect\n  (select count(*) from guard) as guard_ok,\n  (select count(*) from upd) as insights_scored,\n  (select round(avg(s), 3) from upd) as mean_stability,\n  (select count(*) from upd where s >= 0.7) as reproduced,\n  (select count(*) from upd where s >= 0.4 and s < 0.7) as partial,\n  (select count(*) from upd where s < 0.4) as did_not_reproduce",
+        "options": {
+          "queryReplacement": "={{ $json.primary_run_id }},{{ $json.compare_run_id }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "758d80f6-0a91-40dd-835d-cc7bbe99426b",
+      "name": "Respond With Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: Number($json.guard_ok) === 1, guard_ok: Number($json.guard_ok) === 1, primary_run_id: $('Normalize Input').first().json.primary_run_id, compare_run_id: $('Normalize Input').first().json.compare_run_id, insights_scored: Number($json.insights_scored), mean_stability: Number($json.mean_stability), reproduced: Number($json.reproduced), partial: Number($json.partial), did_not_reproduce: Number($json.did_not_reproduce), note: Number($json.guard_ok) === 1 ? null : \"Refused: the two runs do not share a source_run_id, so their findings cannot overlap.\" } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "9ea958eb-b5c1-404b-a01d-ea99da3d413d",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        200
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "primary_run_id",
+              "type": "string"
+            },
+            {
+              "name": "compare_run_id",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Score Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Score Stability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Stability": {
+      "main": [
+        [
+          {
+            "node": "Respond With Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "2ebadf47-b6fc-47a5-956d-8da3be29f073",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "2ikup33O6bj9W37l",
+  "isArchived": false,
+  "nodeGroups": []
+}
