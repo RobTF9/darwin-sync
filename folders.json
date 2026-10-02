@@ -159,6 +159,14 @@
       "homeProjectId": "2uAQ2XYnaFVSte2z",
       "createdAt": "2026-10-01T17:21:16.184Z",
       "updatedAt": "2026-10-01T17:21:16.184Z"
+    },
+    {
+      "id": "eHFEcCMe8Z2FBXQI",
+      "name": "Participant follow-up (mock)",
+      "parentFolderId": null,
+      "homeProjectId": "2uAQ2XYnaFVSte2z",
+      "createdAt": "2026-10-02T07:56:00.108Z",
+      "updatedAt": "2026-10-02T07:56:00.108Z"
     }
   ]
 }

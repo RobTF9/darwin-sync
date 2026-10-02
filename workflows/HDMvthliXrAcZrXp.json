@@ -87,7 +87,7 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        -1072,
+        -816,
         -720
       ]
     },
@@ -103,8 +103,8 @@
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
       "typeVersion": 1.4,
       "position": [
-        -1904,
-        -496
+        -1896,
+        -488
       ],
       "credentials": {
         "postgres": {
@@ -152,8 +152,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -624,
-        -496
+        -872,
+        -488
       ]
     },
     {
@@ -169,8 +169,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -1776,
-        -496
+        -1768,
+        -488
       ],
       "credentials": {
         "postgres": {
@@ -192,8 +192,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -1648,
-        -496
+        -1640,
+        -488
       ],
       "credentials": {
         "postgres": {
@@ -241,8 +241,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1520,
-        -496
+        -1512,
+        -488
       ]
     },
     {
@@ -284,8 +284,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1264,
-        -496
+        -1384,
+        -488
       ]
     },
     {
@@ -382,8 +382,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1008,
-        -496
+        -1256,
+        -488
       ]
     },
     {
@@ -456,8 +456,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -880,
-        -496
+        -1128,
+        -488
       ]
     },
     {
@@ -519,8 +519,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -752,
-        -496
+        -1000,
+        -488
       ]
     },
     {
@@ -560,8 +560,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -496,
-        -496
+        -744,
+        -488
       ]
     },
     {
@@ -603,8 +603,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -368,
-        -496
+        -616,
+        -488
       ]
     },
     {
@@ -723,8 +723,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -240,
-        -496
+        -488,
+        -488
       ]
     },
     {
@@ -786,8 +786,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -112,
-        -496
+        -360,
+        -488
       ]
     },
     {
@@ -846,8 +846,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        32,
-        -496
+        -232,
+        -488
       ]
     },
     {
@@ -860,7 +860,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        352,
+        864,
         -720
       ]
     },
@@ -897,7 +897,7 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        576,
+        1088,
         -720
       ],
       "credentials": {
@@ -917,7 +917,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        800,
+        1312,
         -624
       ]
     },
@@ -1002,8 +1002,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        160,
-        -496
+        -104,
+        -488
       ]
     },
     {
@@ -1034,7 +1034,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        800,
+        1312,
         -816
       ]
     },
@@ -1074,7 +1074,7 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        1024,
+        1536,
         -816
       ],
       "credentials": {
@@ -1098,8 +1098,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.5,
       "position": [
-        -2032,
-        -496
+        -2024,
+        -488
       ],
       "id": "6bfe6118-fefa-43b6-8506-81478753a5e1",
       "name": "Fallback",
@@ -1112,14 +1112,14 @@
     },
     {
       "parameters": {
-        "model": "z-ai/glm-5.2",
+        "model": "z-ai/glm-5.3",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
       "typeVersion": 1,
       "position": [
-        -2160,
-        -496
+        -2152,
+        -488
       ],
       "id": "55df5ffa-4f9d-445a-9ffe-4b35d5fea2bf",
       "name": "Main",
@@ -1143,8 +1143,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.7,
       "position": [
-        -944,
-        -288
+        24,
+        -488
       ],
       "credentials": {
         "postgres": {
@@ -1154,14 +1154,6 @@
       }
     },
     {
-      "id": "0f526a8e-d677-400e-913a-71c20e37ed4f",
-      "name": "Scrape",
-      "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
-      "typeVersion": 1,
-      "position": [
-        176,
-        -496
-      ],
       "parameters": {
         "descriptionType": "manual",
         "toolDescription": "Fetches ONE known URL and returns it as clean markdown. The cheapest and fastest way to read a specific page — prefer this whenever you already have the URL (from a search result, Map Site, or the user). Not for discovery: if you don't know which URL you need, use Web Search (unknown site) or Map Site (known site) first. If a scrape returns empty or garbage content, the page is likely JS-heavy or blocked — fall back to Web Search for the same topic rather than re-scraping.",
@@ -1170,6 +1162,14 @@
         "parsers": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Parsers', ``, 'string') }}",
         "requestOptions": {}
       },
+      "id": "0f526a8e-d677-400e-913a-71c20e37ed4f",
+      "name": "Scrape",
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
+      "typeVersion": 1,
+      "position": [
+        152,
+        -488
+      ],
       "credentials": {
         "firecrawlApi": {
           "id": "esiKcQ7aTvw37IJj",
@@ -1178,14 +1178,6 @@
       }
     },
     {
-      "id": "94f10b91-40b1-49b7-93f7-34766d5dc14b",
-      "name": "Web Search",
-      "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
-      "typeVersion": 1,
-      "position": [
-        304,
-        -496
-      ],
       "parameters": {
         "descriptionType": "manual",
         "toolDescription": "Searches the web and returns full page content as markdown for each result, not just snippets. Use when you do NOT have a URL: n8n feature questions, error messages, current documentation. Query tips: include the exact error string in quotes; add the product name and year for versioned docs. Each result carries full page content, so keep result limits low (3-5) — one focused search usually beats several vague ones. If you already know the page you need, use Scrape instead.",
@@ -1201,6 +1193,14 @@
         "customBody": "{\n  \"prompt\": \"Find the founders of Firecrawl\",\n  \"urls\": [\"https://firecrawl.dev\"],\n  \"schema\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"founders\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"name\": { \"type\": \"string\" },\n            \"role\": { \"type\": \"string\" }\n          }\n        }\n      }\n    }\n  }\n}",
         "requestOptions": {}
       },
+      "id": "94f10b91-40b1-49b7-93f7-34766d5dc14b",
+      "name": "Web Search",
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
+      "typeVersion": 1,
+      "position": [
+        280,
+        -488
+      ],
       "credentials": {
         "firecrawlApi": {
           "id": "esiKcQ7aTvw37IJj",
@@ -1209,14 +1209,6 @@
       }
     },
     {
-      "id": "d1e50730-dcd1-40db-b4b3-e8da80b1294f",
-      "name": "Map Site",
-      "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
-      "typeVersion": 1,
-      "position": [
-        432,
-        -496
-      ],
       "parameters": {
         "descriptionType": "manual",
         "toolDescription": "Lists the URLs of a site quickly and cheaply WITHOUT fetching page content. Use it to see what exists before deciding what to read: map the docs site, pick the 2-4 relevant URLs from the list, then Scrape those. Always prefer Map + targeted Scrapes over Crawl Site. Returns URLs only — never use it expecting content.",
@@ -1226,6 +1218,14 @@
         "sitemap": "only",
         "requestOptions": {}
       },
+      "id": "d1e50730-dcd1-40db-b4b3-e8da80b1294f",
+      "name": "Map Site",
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
+      "typeVersion": 1,
+      "position": [
+        408,
+        -488
+      ],
       "credentials": {
         "firecrawlApi": {
           "id": "esiKcQ7aTvw37IJj",
@@ -1234,14 +1234,6 @@
       }
     },
     {
-      "id": "7a163ae9-7a0c-4320-b109-7520a1ebbaf6",
-      "name": "Crawl Site",
-      "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
-      "typeVersion": 1,
-      "position": [
-        560,
-        -496
-      ],
       "parameters": {
         "descriptionType": "manual",
         "toolDescription": "Fetches MANY pages from one site in a single operation. Slow and credit-expensive — the last resort, not the default. Use ONLY when you genuinely need the content of many related pages (e.g. an entire docs section) and Map + selective Scrape would mean 10+ individual fetches. Always set a page limit and scope it to the narrowest path possible (e.g. /docs/api/, never the site root). If you're about to crawl to find something, stop — that's Map Site's job.",
@@ -1255,10 +1247,159 @@
         "crawlOptions": {},
         "requestOptions": {}
       },
+      "id": "7a163ae9-7a0c-4320-b109-7520a1ebbaf6",
+      "name": "Crawl Site",
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
+      "typeVersion": 1,
+      "position": [
+        536,
+        -488
+      ],
       "credentials": {
         "firecrawlApi": {
           "id": "esiKcQ7aTvw37IJj",
           "name": "New firecrawl"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Closes a research project: runs the full project analysis pipeline (per-session question extraction, per-question insights, project-level insight synthesis) and then DMs the requester a PidgeonHead review link. Long-running (10-60 min) and costly - it starts async and this tool returns immediately with a status message.\n\nUse ONLY when the user explicitly asks to close, finalise, or wrap up a research project. NEVER call it twice for the same request. If the project name is ambiguous, the tool returns the candidate list - ask the user to pick one, do not guess.\n\nParameters:\n- project_name (string): name of the project to close (exact or partial). Preferred.\n- project_id (string, optional): exact project UUID if already known.\nSlack context (requester, channel, thread) attaches automatically - never ask for it.\n\nReturns { success, message, run_id? }. Relay the message to the user in one short sentence.",
+        "workflowId": {
+          "__rl": true,
+          "value": "8Ed1uK8SZkKaXNLo",
+          "mode": "list",
+          "cachedResultName": "Darwin — ProjectClose"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $fromAI('project_id', 'Exact project UUID, only if already known. Otherwise leave empty and use project_name.', 'string') }}",
+            "project_name": "={{ $fromAI('project_name', 'Name of the research project to close (exact or partial).', 'string') }}",
+            "slack_user_id": "={{ $('Sub').item.json.user }}",
+            "slack_channel_id": "={{ $('Sub').item.json.channel }}",
+            "slack_thread_ts": "={{ $('Sub').item.json.thread_ts }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "project_name",
+              "displayName": "project_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "slack_user_id",
+              "displayName": "slack_user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "slack_channel_id",
+              "displayName": "slack_channel_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "slack_thread_ts",
+              "displayName": "slack_thread_ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        }
+      },
+      "id": "f3ab7d88-b60a-42c0-b7d0-2e98d603dadb",
+      "name": "close_project",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        664,
+        -488
+      ]
+    },
+    {
+      "id": "d2525beb-3abd-4c2c-8f26-52060282f299",
+      "name": "session_followup",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        -488
+      ],
+      "parameters": {
+        "description": "Manual path for post-session follow-up (participant attendance and rewards). Use when the user wants to send a reward for a past research session, says they forgot to answer Darwin about a session, or wants to confirm whether a participant joined a session. The Slack user attaches automatically: never ask for it.\n\nCall it first WITHOUT session_number. If it returns action \"list\", show the numbered list exactly as given and ask which one; then call it again with session_number set to the number the user picked. If it returns action \"followup\" or \"reward\", the DM has already been sent.\n\nParameters:\n- session_number (number, optional): the number from the list the tool returned. Leave empty on the first call.\n\nReturns { response, action, sessions }. Relay the response to the user in one short sentence (or the list as given). Never invent sessions.",
+        "workflowId": {
+          "__rl": true,
+          "value": "Gbnb6pVF0O783hUL",
+          "mode": "list",
+          "cachedResultName": "PF Darwin Tool: Session Follow-up"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ $('Sub').item.json.user }}",
+            "session_number": "={{ $fromAI('session_number', 'Number of the session from the list this tool returned. Leave empty on the first call.', 'number') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_number",
+              "displayName": "session_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "invitee_uri",
+              "displayName": "invitee_uri",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            }
+          ]
         }
       }
     }
@@ -1587,6 +1728,28 @@
           }
         ]
       ]
+    },
+    "close_project": {
+      "ai_tool": [
+        [
+          {
+            "node": "darwin",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "session_followup": {
+      "ai_tool": [
+        [
+          {
+            "node": "darwin",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1599,7 +1762,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "4f384590-3faf-4e10-bbb0-5701afe51a66",
+  "versionId": "cf198c2e-a4b5-43ef-aba7-bb456ee67066",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

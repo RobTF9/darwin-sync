@@ -1,0 +1,199 @@
+{
+  "id": "L3Sa3FfY5RtqeUgk",
+  "name": "MOCK - PF Sessions",
+  "columns": [
+    {
+      "id": "HPoC34xCpTfnmmnS",
+      "name": "invitee_uri",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "3F6gRlXrXqn95FA7",
+      "name": "event_uri",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "gdqn6mq545rofPw4",
+      "name": "event_type_uri",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "dpPwQRarvQmTHmpH",
+      "name": "event_name",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "TiIeC6h7v65sSYqh",
+      "name": "source_kind",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "HlVwqYOF5TzK3t9L",
+      "name": "batch_id",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "0eshsUrFaU3tVZ9N",
+      "name": "participant_name",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "6i23B9DoyNpUrb3Y",
+      "name": "participant_first_name",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "w6ORsCyOHC7dZ76Y",
+      "name": "participant_email",
+      "type": "string",
+      "index": 8
+    },
+    {
+      "id": "U2g2VuGWn0GPgARv",
+      "name": "host_name",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "X4HNLjMqXcJ7rXjq",
+      "name": "host_email",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "s45VBRl1D5Huuqwp",
+      "name": "starts_at",
+      "type": "date",
+      "index": 11
+    },
+    {
+      "id": "KeLnKmPR6z958rgk",
+      "name": "ends_at",
+      "type": "date",
+      "index": 12
+    },
+    {
+      "id": "HJ1dXsA9nl45Adp9",
+      "name": "booking_status",
+      "type": "string",
+      "index": 13
+    },
+    {
+      "id": "9sdt2uno2YNEOkmT",
+      "name": "rescheduled_from",
+      "type": "string",
+      "index": 14
+    },
+    {
+      "id": "MEZmdSmlXI0BnNoB",
+      "name": "rescheduled_to",
+      "type": "string",
+      "index": 15
+    },
+    {
+      "id": "QW85srXLL6VmjDYn",
+      "name": "canceled_at",
+      "type": "date",
+      "index": 16
+    },
+    {
+      "id": "6eAFVROept92i2tL",
+      "name": "cancel_reason",
+      "type": "string",
+      "index": 17
+    },
+    {
+      "id": "UIhU0fo4cq5Ja0wj",
+      "name": "booking_link",
+      "type": "string",
+      "index": 18
+    },
+    {
+      "id": "kJaGUUU06VGW60AA",
+      "name": "followup_status",
+      "type": "string",
+      "index": 19
+    },
+    {
+      "id": "oIOVYNe7eWu5qJnd",
+      "name": "showup_asked_at",
+      "type": "date",
+      "index": 20
+    },
+    {
+      "id": "vOqoZD6xvhjJTaOt",
+      "name": "showup_answered_at",
+      "type": "date",
+      "index": 21
+    },
+    {
+      "id": "ExNSA0geIOP9Eejo",
+      "name": "noshow_email_sent_at",
+      "type": "date",
+      "index": 22
+    },
+    {
+      "id": "dcH5cuiKRh09TxyO",
+      "name": "reward_amount",
+      "type": "number",
+      "index": 23
+    },
+    {
+      "id": "LPB1DOWTbdu6Ht4b",
+      "name": "reward_order_id",
+      "type": "string",
+      "index": 24
+    },
+    {
+      "id": "PvGJxXjsNokBAi1u",
+      "name": "rewarded_at",
+      "type": "date",
+      "index": 25
+    },
+    {
+      "id": "iC9s04Bz59w2tKCM",
+      "name": "is_mock",
+      "type": "boolean",
+      "index": 26
+    },
+    {
+      "id": "uaPwIW4RdHFCx7rx",
+      "name": "rebook_status",
+      "type": "string",
+      "index": 27
+    },
+    {
+      "id": "L183nw5R20TdO3s3",
+      "name": "session_type",
+      "type": "string",
+      "index": 28
+    },
+    {
+      "id": "VzZ1ZHPpsHqAJQK9",
+      "name": "supabase_row_preview",
+      "type": "string",
+      "index": 29
+    },
+    {
+      "id": "XUmDjmTARRMZUpoH",
+      "name": "ingested_by",
+      "type": "string",
+      "index": 30
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-10-02T08:02:46.676Z",
+  "updatedAt": "2026-10-02T10:33:08.505Z"
+}

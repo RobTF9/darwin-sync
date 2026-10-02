@@ -1,0 +1,16 @@
+{
+  "id": "uyVUVnsibxZ0NrWR",
+  "name": "Aniol-Calendly-PAT",
+  "type": "calendlyApi",
+  "data": {
+    "apiKey": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}
