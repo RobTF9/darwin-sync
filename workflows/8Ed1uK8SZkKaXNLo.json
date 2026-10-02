@@ -1,0 +1,430 @@
+{
+  "id": "8Ed1uK8SZkKaXNLo",
+  "name": "ProjectClose",
+  "description": "Darwin agent tool: closes a research project. Resolves the project, guards against duplicate runs, records a project_analysis_run row, fires ProjectAnalysisOrchestrator async, and returns immediately with a status message for the agent to relay.",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "project_id"
+            },
+            {
+              "name": "project_name"
+            },
+            {
+              "name": "slack_user_id"
+            },
+            {
+              "name": "slack_channel_id"
+            },
+            {
+              "name": "slack_thread_ts"
+            }
+          ]
+        }
+      },
+      "id": "ad2febba-04ee-407d-9a13-f5d138d4f313",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select p.id::text as project_id, p.name, p.closed_at::text as closed_at, (select count(*)::int from session s where s.project_id = p.id and s.transcript is not null) as sessions_total, (coalesce(length(p.script),0) > 0) as has_script, (select count(*)::int from question q where q.project_id = p.id and q.status = 'active' and q.section != 'emergent_candidate') as active_questions, exists(select 1 from project_analysis_run r where r.project_id = p.id and r.status = 'running') as run_in_progress from project p where (nullif($1,'') is not null and p.id::text = $1) or (nullif($1,'') is null and nullif($2,'') is not null and p.name ilike '%' || $2 || '%') limit 6",
+        "options": {
+          "queryReplacement": "={{ ($json.project_id || '').trim() }},{{ ($json.project_name || '').replace(/,/g, ' ').trim() }}"
+        }
+      },
+      "id": "286aa527-9656-4540-a9a0-58c7f2d4bbcb",
+      "name": "Find Projects",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        192
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const t = $('When Called').first().json;\nconst asked = (t.project_name || t.project_id || '').toString().trim();\nconst rows = $input.all().map(i => i.json).filter(r => r && r.project_id);\n\nfunction refuse(message) { return [{ json: { ok: false, message } }]; }\n\nif (rows.length === 0) {\n  return refuse(`No project found matching \"${asked}\". Ask the user for the exact project name.`);\n}\nlet chosen = null;\nif (rows.length === 1) {\n  chosen = rows[0];\n} else {\n  const exact = rows.filter(r => r.name.toLowerCase().trim() === (t.project_name || '').toLowerCase().trim());\n  if (exact.length === 1) {\n    chosen = exact[0];\n  } else {\n    const names = rows.map(r => r.name).join('; ');\n    return refuse(`Multiple projects match \"${asked}\": ${names}. Ask the user which one to close.`);\n  }\n}\nif (chosen.run_in_progress) {\n  return refuse(`An analysis for \"${chosen.name}\" is already running. Wait for it to finish before closing again.`);\n}\nif (!chosen.sessions_total) {\n  return refuse(`\"${chosen.name}\" has no sessions with transcripts, so there is nothing to analyse.`);\n}\nif (!chosen.active_questions && !chosen.has_script) {\n  return refuse(`\"${chosen.name}\" has no interview script and no parsed questions. Add a script to the project first.`);\n}\nreturn [{ json: { ok: true, project_id: chosen.project_id, name: chosen.name, sessions_total: chosen.sessions_total, previously_closed: !!chosen.closed_at } }];"
+      },
+      "id": "6143881f-b1dd-49a3-94ba-0b8044092fab",
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "826c021a-2ffb-4e5c-9083-787d3868e2a9",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into project_analysis_run (project_id, requested_by_slack_user_id, slack_channel_id, slack_thread_ts) values ($1::uuid, nullif($2,''), nullif($3,''), nullif($4,'')) on conflict (project_id) where status = 'running' do nothing returning id::text as run_id",
+        "options": {
+          "queryReplacement": "={{ $json.project_id }},{{ ($('When Called').first().json.slack_user_id || '').trim() }},{{ ($('When Called').first().json.slack_channel_id || '').trim() }},{{ ($('When Called').first().json.slack_thread_ts || '').trim() }}"
+        }
+      },
+      "id": "98c9495b-1992-4fc7-9586-595d2d1bd111",
+      "name": "Insert Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        96
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.run_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "856a7da9-a8d6-46ca-ba4b-e07f70a422ea",
+      "name": "Run Created?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Xq5UbkREx1TUEfIy",
+          "mode": "list",
+          "cachedResultName": "ProjectAnalysisOrchestrator"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.run_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "bde6aadd-e8e5-49b2-be0a-53b308641f4c",
+      "name": "Start Orchestrator",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "s2",
+              "name": "run_id",
+              "value": "={{ $('Insert Run').first().json.run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "s3",
+              "name": "project",
+              "value": "={{ $('Validate').first().json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "s4",
+              "name": "sessions",
+              "value": "={{ $('Validate').first().json.sessions_total }}",
+              "type": "number"
+            },
+            {
+              "id": "s5",
+              "name": "message",
+              "value": "=Analysis started for \"{{ $('Validate').first().json.name }}\" ({{ $('Validate').first().json.sessions_total }} sessions). It runs for roughly 10-60 minutes. The requester gets a Slack DM with the review link when it is ready.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ddb4fe09-93f1-4f5a-bd10-7297ff54c63d",
+      "name": "Started",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rr1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "rr2",
+              "name": "message",
+              "value": "An analysis for this project is already running. Wait for it to finish before closing again.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e02b3238-322b-40b2-b927-962684aea4f5",
+      "name": "Race Refused",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "success",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "r2",
+              "name": "message",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d67f1ef3-af37-47a9-ad98-4276c5d8d9d7",
+      "name": "Refused",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ProjectClose (Darwin tool)\n\nThin, fast tool: resolve project (id or name, ilike), refuse ambiguous/empty/running cases, insert a project_analysis_run row (the partial unique index enforces one running run per project — on conflict do nothing catches races), fire ProjectAnalysisOrchestrator async, return at once.\n\nThe heavy lifting (L0-L3, notifications) happens in the orchestrator. See darwin/plans/close-project.md.",
+        "color": 5
+      },
+      "id": "44e1d38f-98bc-4aac-9f3e-81448a3d8571",
+      "name": "Sticky Note 9decd259",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        576,
+        368
+      ]
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Find Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Projects": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Insert Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Refused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Run": {
+      "main": [
+        [
+          {
+            "node": "Run Created?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Created?": {
+      "main": [
+        [
+          {
+            "node": "Start Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Race Refused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "feb65853-5fd4-4b69-bdaa-69a6ce77905e",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,0 +1,1322 @@
+{
+  "id": "Xq5UbkREx1TUEfIy",
+  "name": "ProjectAnalysisOrchestrator",
+  "description": "Drives Aniol's L0-L3 project analysis pipeline for one close-project run, then flips the project_analysis_run row to ready_for_review and notifies the requester. Called async by the ProjectClose tool.",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            }
+          ]
+        }
+      },
+      "id": "7974c0ca-bf23-43f4-a9e3-bb8ffa86ade7",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select r.id::text as run_id, r.project_id::text as project_id, r.status, r.requested_by_slack_user_id, r.slack_channel_id, r.slack_thread_ts, p.name as project_name, (coalesce(length(p.script),0) > 0) as has_script, (select count(*)::int from session s where s.project_id = p.id and s.transcript is not null) as sessions_total from project_analysis_run r join project p on p.id = r.project_id where r.id = $1::uuid",
+        "options": {
+          "queryReplacement": "={{ $json.run_id }}"
+        }
+      },
+      "id": "236dc0d8-7d72-4cf7-9365-9a0001c08c81",
+      "name": "Load Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        560
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update project_analysis_run set sessions_analyzed = $2::int where id = $1::uuid returning id::text as run_id",
+        "options": {
+          "queryReplacement": "={{ $json.run_id }},{{ $json.sessions_total }}"
+        }
+      },
+      "id": "7d32a529-5008-42e2-a571-6ac38b7215f7",
+      "name": "Stamp Session Count",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        560
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select count(*)::int as questions from question where project_id = $1::uuid and status = 'active' and section != 'emergent_candidate'",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.project_id }}"
+        }
+      },
+      "id": "6554f150-a612-4097-8702-955a346e4cde",
+      "name": "Count Questions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        672,
+        560
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.questions }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 0
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "86fb6dcf-788a-4e9f-a612-8176f7852d4f",
+      "name": "Questions Missing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Load Run').first().json.has_script }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "955ff259-516b-4799-afe1-ef86bd677d00",
+      "name": "Has Script?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select coalesce(json_agg(s.id), '[]'::json) as pending from session s where s.project_id = $1::uuid and s.transcript is not null and not exists (select 1 from session_answer sa join question q on q.id = sa.question_id where sa.session_id = s.id and q.project_id = s.project_id)",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.project_id }}"
+        }
+      },
+      "id": "bdba3d32-8924-44d4-a867-ed3938629609",
+      "name": "Get Pending Sessions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1568,
+        368
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fr1",
+              "name": "fail_reason",
+              "value": "Project has no questions and no script to parse. Add a script to the project first.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4c0bb2c0-98c0-4b17-b6a8-c6422fd5ed93",
+      "name": "No Script Reason",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3808,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update project_analysis_run set status = 'failed', error = $2 where id = $1::uuid returning id::text as run_id, error",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.run_id }},{{ ($json.fail_reason || 'unknown').replace(/,/g, ';').slice(0, 500) }}"
+        }
+      },
+      "id": "64a84f91-1ae5-45df-90f5-352ecd9dea3a",
+      "name": "Mark Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        4032,
+        576
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.pending }}",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "61641a08-f8d1-4072-8481-c7a72f8013de",
+      "name": "Any Pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "pending",
+        "options": {}
+      },
+      "id": "0f9e1b84-a0a5-4b3a-a918-b803d6c16af7",
+      "name": "Split Pending",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "c30312be-1e4d-4048-94e2-f72a4e7d286e",
+      "name": "Loop Sessions",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2240,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update project_analysis_run set l2_run_id = $2::uuid where id = $1::uuid returning id::text as run_id",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.run_id }},{{ $json.run_id }}"
+        }
+      },
+      "id": "43cb4b44-c3d7-4b69-90ee-153cfb72e570",
+      "name": "Stamp L2 Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2912,
+        240
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.source_run_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "={{ $('Read L2 Run Id').first().json.run_id }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "69f06c88-d9d6-4798-9254-ff55f30a9fe9",
+      "name": "L3 Consumed Our L2?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3584,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update project_analysis_run set status = 'ready_for_review', l3_run_id = $2::uuid, ready_at = now() where id = $1::uuid returning id::text as run_id",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.run_id }},{{ $('Read L3 Run Ids').first().json.run_id }}"
+        }
+      },
+      "id": "f6d7875b-de3e-4de0-91b0-27f123544446",
+      "name": "Mark Ready",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3808,
+        96
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Load Run').first().json.requested_by_slack_user_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f003ac8a-146b-4774-b6cf-4f47948e93d8",
+      "name": "Requester Known?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4032,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Load Run').first().json.requested_by_slack_user_id }}"
+        },
+        "text": "=🔬 *Project analysis ready for review*\n\n*{{ $(\"Load Run\").first().json.project_name }}* — {{ $(\"Load Run\").first().json.sessions_total }} sessions analysed.\nReview and approve: https://pidgeonhead.netlify.app/projects/{{ $(\"Load Run\").first().json.project_id }}/analysis",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "5303c5d6-c110-41cd-a258-8f8eddc82e27",
+      "name": "Notify Requester (Ready)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        4256,
+        96
+      ],
+      "webhookId": "9f2458b4-a397-411c-ba5e-9066efc5b202",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fr2",
+              "name": "fail_reason",
+              "value": "L3 consumed a different L2 run (source_run_id mismatch). Another analysis interleaved — re-run the close.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e2b0caae-77f1-4b51-9f6d-5085c2e92514",
+      "name": "Mismatch Reason",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3808,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fr3",
+              "name": "fail_reason",
+              "value": "={{ (typeof $json.error === 'string' && $json.error) || ($json.error && ($json.error.message || $json.error.description)) || $json.message || 'pipeline call failed (no error detail on item)' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c417f68d-312e-47ab-bd35-2f1eaba8171d",
+      "name": "Capture Fail Reason",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3360,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "={{ $('Load Run').first().json.requested_by_slack_user_id }}",
+          "mode": "username"
+        },
+        "text": "=❌ *Project analysis failed*\n\n*{{ $(\"Load Run\").first().json.project_name }}* — {{ $json.error }}\nRun: {{ $json.run_id }}",
+        "otherOptions": {}
+      },
+      "id": "3ea72fdb-7d34-4d92-aea7-74c91ddc5e3c",
+      "name": "Notify Rob (Failed)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        4256,
+        576
+      ],
+      "webhookId": "0d079345-4095-4f30-8991-baefab39ad23",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## ProjectAnalysisOrchestrator\n\nDrives Aniol's analysis pipeline for one close-project run. Called async by the ProjectClose tool with a project_analysis_run id. See darwin/plans/close-project.md in pidgeon-head.\n\n**Stages:** L0 script-parser (only when the project has zero questions — L0 inserts blindly and a re-run duplicates the question set), L1 session-qa-analyst (only sessions with no session_answer rows — the emergent-question insert is not idempotent), L2 finalize-project-analysis (~12 min measured), L3 project-insight-synthesis.\n\n**Run-linkage guard:** L3 picks the latest L2 run itself. We verify its source_run_id equals our L2 run_id and fail the run on mismatch. One running run per project is enforced by a partial unique index in Supabase.\n\n**Timeouts:** the pipeline webhooks respond only on completion. L1/L0 15 min, L2/L3 45 min.\n\n**PROMOTION TODO:** webhook URLs are hardcoded to darwin-staging. Aniol's pipeline does not exist on production yet; switch to $vars-based base URL (or Execute-Workflow triggers) before promoting. Webhooks also have no auth yet (plan finding R3).",
+        "color": 5
+      },
+      "id": "d7bfad83-e0ab-4f54-a275-0fffee1136bc",
+      "name": "Sticky Note a0d3d6bf",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1952,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "0DTeK9YwnXu8XjZx",
+          "mode": "list",
+          "cachedResultName": "Finalize Project Analysis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('Load Run').first().json.project_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "cc09e415-6e56-4cc2-84f0-20e866c39a3f",
+      "name": "Run L2 Finalize",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2464,
+        320
+      ],
+      "executeOnce": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select qi.run_id::text as run_id from question_insight qi join question q on q.id = qi.question_id where q.project_id = $1::uuid group by qi.run_id order by max(qi.created_at) desc limit 1",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.project_id }}"
+        }
+      },
+      "id": "c6e27861-a2a2-4e54-9e04-fcd8b50cce57",
+      "name": "Read L2 Run Id",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2688,
+        240
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "UkNYDrsAeE2CkFBA",
+          "mode": "list",
+          "cachedResultName": "ProjectInsightSynthesis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('Load Run').first().json.project_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "b3e11d5e-3a43-496f-90d5-460085d96543",
+      "name": "Run L3 Synthesis",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3136,
+        240
+      ],
+      "executeOnce": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select run_id::text as run_id, source_run_id::text as source_run_id from project_insight_current where project_id = $1::uuid limit 1",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.project_id }}"
+        }
+      },
+      "id": "1947ad61-2db3-4dcb-a489-e0108c35b61b",
+      "name": "Read L3 Run Ids",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3360,
+        192
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "TJqdHcbpQ8Lhjlsx",
+          "mode": "list",
+          "cachedResultName": "Script Parser"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('Load Run').first().json.project_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "65dfae09-ba1c-482f-81f1-09ff8469d1ee",
+      "name": "Parse Script (L0)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        768
+      ],
+      "executeOnce": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "OmYJgjJ9n7eGVQCT",
+          "mode": "list",
+          "cachedResultName": "Session QA analyst"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $json.pending }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "e86f9dc5-dd04-4694-8346-dddf831f782a",
+      "name": "Analyse Session (L1)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2464,
+        624
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "ac32c100-89c9-4bbf-97df-e38c4a4575b4",
+      "name": "Run L3 Again",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3584,
+        -120
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "UkNYDrsAeE2CkFBA",
+          "mode": "list",
+          "cachedResultName": "ProjectInsightSynthesis"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('Load Run').first().json.project_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "cd30f47c-dca8-4541-97fb-61645d274098",
+      "name": "Read Compare Run Id",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3808,
+        -120
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- The newest complete insight run that is NOT the one the reviewer sees.\nselect run_id::text as compare_run_id\nfrom project_insight\nwhere project_id = $1::uuid\n  and completed_at is not null\n  and run_id <> $2::uuid\ngroup by run_id\norder by max(created_at) desc\nlimit 1",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.project_id }},{{ $('Read L3 Run Ids').first().json.run_id }}"
+        },
+        "alwaysOutputData": true
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "6045d747-4b55-4946-9de1-f7e4231af48e",
+      "name": "Score Stability",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4032,
+        -120
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "TxgqZrKg8bBa7Ew2",
+          "mode": "list",
+          "cachedResultName": "ScoreInsightStability"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "primary_run_id": "={{ $('Read L3 Run Ids').first().json.run_id }}",
+            "compare_run_id": "={{ $json.compare_run_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "primary_run_id",
+              "displayName": "primary_run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "compare_run_id",
+              "displayName": "compare_run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "d779581e-b689-4ed2-8817-17723c8e31c1",
+      "name": "Delete Compare Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        4256,
+        -120
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- The second run existed only to be compared against. The score is already\n-- stored on the run the reviewer sees, so this run is now dead weight - and\n-- leaving it would show its ~80 quotes a second time on the session timelines.\n-- Deleting the insights cascades to their clips and finding links.\n-- Guarded so it can never remove the run the reviewer sees, and a missing\n-- compare run simply matches nothing.\nwith target as (\n  select nullif($1,'')::uuid as compare_run, nullif($2,'')::uuid as primary_run\n)\ndelete from project_insight pi\nusing target t\nwhere pi.run_id = t.compare_run\n  and t.compare_run is distinct from t.primary_run\nreturning pi.id",
+        "options": {
+          "queryReplacement": "={{ $('Read Compare Run Id').first().json.compare_run_id }},{{ $('Read L3 Run Ids').first().json.run_id }}"
+        },
+        "alwaysOutputData": true
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    },
+    {
+      "id": "d38dc03d-2c44-461c-b10d-c97305e7c1fe",
+      "name": "Run Research Questions",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4480,
+        -120
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "gE2OHzPfpbuYMRIU",
+          "mode": "list",
+          "cachedResultName": "ResearchQuestionAnswers"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "project_id": "={{ $('Load Run').first().json.project_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "project_id",
+              "displayName": "project_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Load Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Run": {
+      "main": [
+        [
+          {
+            "node": "Stamp Session Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp Session Count": {
+      "main": [
+        [
+          {
+            "node": "Count Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Questions": {
+      "main": [
+        [
+          {
+            "node": "Questions Missing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Questions Missing?": {
+      "main": [
+        [
+          {
+            "node": "Has Script?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Pending Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Script?": {
+      "main": [
+        [
+          {
+            "node": "Parse Script (L0)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Script Reason",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Sessions": {
+      "main": [
+        [
+          {
+            "node": "Any Pending?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Script Reason": {
+      "main": [
+        [
+          {
+            "node": "Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Failed": {
+      "main": [
+        [
+          {
+            "node": "Notify Rob (Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Pending?": {
+      "main": [
+        [
+          {
+            "node": "Split Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run L2 Finalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Pending": {
+      "main": [
+        [
+          {
+            "node": "Loop Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Sessions": {
+      "main": [
+        [
+          {
+            "node": "Run L2 Finalize",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyse Session (L1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L3 Consumed Our L2?": {
+      "main": [
+        [
+          {
+            "node": "Run L3 Again",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mismatch Reason",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Ready": {
+      "main": [
+        [
+          {
+            "node": "Requester Known?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requester Known?": {
+      "main": [
+        [
+          {
+            "node": "Notify Requester (Ready)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mismatch Reason": {
+      "main": [
+        [
+          {
+            "node": "Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Fail Reason": {
+      "main": [
+        [
+          {
+            "node": "Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run L2 Finalize": {
+      "main": [
+        [
+          {
+            "node": "Read L2 Run Id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Capture Fail Reason",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read L2 Run Id": {
+      "main": [
+        [
+          {
+            "node": "Stamp L2 Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp L2 Run": {
+      "main": [
+        [
+          {
+            "node": "Run L3 Synthesis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run L3 Synthesis": {
+      "main": [
+        [
+          {
+            "node": "Read L3 Run Ids",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Capture Fail Reason",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read L3 Run Ids": {
+      "main": [
+        [
+          {
+            "node": "L3 Consumed Our L2?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Script (L0)": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Capture Fail Reason",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyse Session (L1)": {
+      "main": [
+        [
+          {
+            "node": "Loop Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Capture Fail Reason",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run L3 Again": {
+      "main": [
+        [
+          {
+            "node": "Read Compare Run Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Compare Run Id": {
+      "main": [
+        [
+          {
+            "node": "Score Stability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Stability": {
+      "main": [
+        [
+          {
+            "node": "Delete Compare Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Compare Run": {
+      "main": [
+        [
+          {
+            "node": "Run Research Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Research Questions": {
+      "main": [
+        [
+          {
+            "node": "Mark Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "542d20a8-c014-45ad-a52c-6b156b52743f",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}
