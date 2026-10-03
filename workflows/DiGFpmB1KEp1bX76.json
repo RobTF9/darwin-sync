@@ -1,6 +1,7 @@
 {
   "id": "DiGFpmB1KEp1bX76",
   "name": "SessionTreeBuilder",
+  "description": "Rebuilds the session side of the resource tree (projects → sessions → chunks, jobs.<theme>, opportunities) from native tables. Pure SQL — no LLM, no embeddings. Full-rebuild semantics: clears the four subtrees then re-inserts. Manual + daily 05:00 UTC hea",
   "nodes": [
     {
       "id": "7786b803-383e-4115-aa53-e01b93e5f7c3",
