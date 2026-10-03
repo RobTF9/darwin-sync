@@ -1,0 +1,284 @@
+{
+  "id": "bOtuWiSiEW8O10KI",
+  "name": "Ingestion Heartbeat",
+  "description": "DWN-39: daily heartbeat. Posts one message to the Darwin Slack channel when any non-session ingestion workflow (Slack, Forum, Plain, Gong) ran in the last 24 hours. Success runs only; failures are covered by the Error workflow.",
+  "nodes": [
+    {
+      "id": "c25dfc51-b6a4-419c-aca3-ac97e01fb908",
+      "name": "Daily 10:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 10,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "06966f8d-e765-42f8-8e97-87c3bef8df25",
+      "name": "Execs: SlackIngestion",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "execution",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 50,
+        "filters": {
+          "workflowId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "OupKSoKX2mR2B8qY"
+          },
+          "status": "success"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "632f9551-9e9e-4c9d-854f-4ca8009ed2fa",
+      "name": "Execs: ForumIngestion",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "execution",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 50,
+        "filters": {
+          "workflowId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "wUWBqDOTZ82KLR4L"
+          },
+          "status": "success"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "11f2a808-fdf5-4c98-921a-4ce81a0395e3",
+      "name": "Execs: PlainIngestion",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "resource": "execution",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 50,
+        "filters": {
+          "workflowId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "ODDGjvYcB8pXy2K8"
+          },
+          "status": "success"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4e7c4dfd-3432-4920-a73c-98267852880a",
+      "name": "Execs: GongIngestion",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "execution",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 50,
+        "filters": {
+          "workflowId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "3QspDyQqUkXFn3ow"
+          },
+          "status": "success"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b9376c99-56d9-4c29-81c2-31beefa5678f",
+      "name": "Build Heartbeat",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// DWN-39: daily heartbeat. Post one message if any non-session\n// ingestion workflow ran in the last 24 hours.\nconst workflows = [\n  { name: 'SlackIngestion', node: \"Execs: SlackIngestion\" },\n  { name: 'ForumIngestion', node: \"Execs: ForumIngestion\" },\n  { name: 'PlainIngestion', node: \"Execs: PlainIngestion\" },\n  { name: 'GongIngestion', node: \"Execs: GongIngestion\" },\n];\nconst cutoff = Date.now() - 24 * 60 * 60 * 1000;\nconst lines = [];\nfor (const w of workflows) {\n  let runs = 0;\n  try {\n    const items = $(w.node).all();\n    runs = items.filter((i) => {\n      const ts = i.json.startedAt || (i.json.data && i.json.data.startedAt);\n      return ts && new Date(ts).getTime() >= cutoff;\n    }).length;\n  } catch (e) {\n    runs = 0;\n  }\n  if (runs > 0) lines.push(w.name + ': ' + runs + ' run(s)');\n}\nif (lines.length === 0) return [];\nreturn [{ json: { text: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "e3679010-fff4-4b2d-b382-d78e854a563f",
+      "name": "Post Heartbeat",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09DRCJLQCE"
+        },
+        "text": "=🫀 Ingestion heartbeat (24h):\n{{ $json.text }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "d9c50c1d-0da6-4f5a-a262-774f0f9e0db5"
+    }
+  ],
+  "connections": {
+    "Daily 10:00": {
+      "main": [
+        [
+          {
+            "node": "Execs: SlackIngestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execs: SlackIngestion": {
+      "main": [
+        [
+          {
+            "node": "Execs: ForumIngestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execs: ForumIngestion": {
+      "main": [
+        [
+          {
+            "node": "Execs: PlainIngestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execs: PlainIngestion": {
+      "main": [
+        [
+          {
+            "node": "Execs: GongIngestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execs: GongIngestion": {
+      "main": [
+        [
+          {
+            "node": "Build Heartbeat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Heartbeat": {
+      "main": [
+        [
+          {
+            "node": "Post Heartbeat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
+  },
+  "triggerCount": 0,
+  "versionId": "932ff85e-e4a5-4da3-a523-f1b4be57d788",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "RKV5ONpbyyQkPOeH",
+  "isArchived": false,
+  "nodeGroups": []
+}

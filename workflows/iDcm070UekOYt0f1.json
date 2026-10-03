@@ -1,6 +1,7 @@
 {
   "id": "iDcm070UekOYt0f1",
   "name": "Error",
+  "description": "Ported from internal (nrCahz2I7P7MDNrR). Global error handler: Darwin failures post to the builder channel with a Builder-agent diagnosis; other failures reply in the originating Slack thread using execution custom data. URLs and workflow IDs updated for ",
   "nodes": [
     {
       "parameters": {},
@@ -165,16 +166,10 @@
         "channelId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $json.customData.channel || $json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.channel }}"
+          "value": "C09DRCJLQCE"
         },
-        "text": "=🚨 Execution failed: {{ $vars.instance_url}}workflow/{{ $json.workflowId }}/executions/{{ $json.id }}",
-        "otherOptions": {
-          "thread_ts": {
-            "replyValues": {
-              "thread_ts": "={{ $json.customData.sessionId || $json.data.resultData.runData['Chaos Input'][0].data.main[0][0].json.threadTs }}"
-            }
-          }
-        }
+        "text": "=🚨 Workflow failed: {{ $json.workflowData?.name || $json.workflowId }}\nExecution: {{ $vars.instance_url }}workflow/{{ $json.workflowId }}/executions/{{ $json.id }}\nFailed node: {{ $json.data?.resultData?.lastNodeExecuted || 'n/a' }}\nError: {{ $json.data?.resultData?.error?.message || 'n/a' }}",
+        "otherOptions": {}
       },
       "id": "f2b785ba-75d3-4e34-a666-0e7726cf5a52",
       "name": "Send a message",
@@ -257,7 +252,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "f26cc1cc-52ba-4abc-8e6f-3c4abfdc3f75",
+  "versionId": "dbe9d42c-88b4-4718-a73f-27183eea944a",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

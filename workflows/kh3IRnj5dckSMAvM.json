@@ -1,0 +1,317 @@
+{
+  "id": "kh3IRnj5dckSMAvM",
+  "name": "ProjectApprovalFlow",
+  "description": "Webhook called by pidgeon-head when a project analysis is approved. Formats the close-out draft from the run's L3 insights and DMs it to the requester in Slack (staging branch sends to Rob).",
+  "nodes": [
+    {
+      "id": "79b35fcc-79d8-45be-a978-827ced4a086d",
+      "name": "approve",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "project-approval",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "webhookId": "f0c70a66-e662-44b4-b7e1-3658a225fc8a",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tNYo3eGqheixdzIb",
+          "name": "PidgeonHead"
+        }
+      }
+    },
+    {
+      "id": "ad2d4557-e1c5-47bb-9d73-e10bb9c79522",
+      "name": "Load Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select r.id::text as run_id, r.project_id::text as project_id, r.l3_run_id::text as l3_run_id, r.sessions_analyzed, r.requested_by_slack_user_id, r.approved_by, p.name as project_name from project_analysis_run r join project p on p.id = r.project_id where r.id = $1::uuid",
+        "options": {
+          "queryReplacement": "={{ $json.body.run_id }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "1c3f03ee-6669-4f69-be2e-741aaab473a8",
+      "name": "Load Insights",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select name, statement, corroboration, sessions_count, questions_count, raters_agreeing, supplementary from project_insight where run_id = $1::uuid order by raters_agreeing desc, case corroboration when 'strong' then 0 when 'moderate' then 1 else 2 end, sessions_count desc",
+        "options": {
+          "queryReplacement": "={{ $json.l3_run_id }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "25d6d754-a5b8-4ffb-9b12-4867b8791de1",
+      "name": "Format Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "jsCode": "const run = $('Load Run').first().json;\nconst insights = $input.all().map(i => i.json);\nconst strong = insights.filter(i => i.corroboration === 'strong').length;\nconst moderate = insights.filter(i => i.corroboration === 'moderate').length;\nconst thin = insights.filter(i => i.corroboration === 'thin').length;\nconst baseUrl = 'https://pidgeonhead.netlify.app';\nconst lines = [];\nlines.push(`\\u{1F4CB} *${run.project_name} — research close-out draft*`);\nlines.push(`${run.sessions_analyzed || insights[0]?.sessions_count || '?'} sessions analysed · ${insights.length} insights (${strong} strong / ${moderate} moderate / ${thin} thin)`);\nlines.push('');\nlines.push('*Key takeaway*');\nlines.push('_Add your key takeaway here..._');\nlines.push('');\nlines.push('*Insights*');\nfor (const ins of insights) {\n  const grade = ins.corroboration + ', ' + ins.sessions_count + ' sessions, ' + ins.questions_count + ' questions' + (ins.raters_agreeing === 2 ? ', both analysts' : '');\n  lines.push(`\\u2022 *${ins.name}* — ${ins.statement} (_${grade}_)`);\n}\nlines.push('');\nlines.push(`Full analysis with playable evidence: ${baseUrl}/projects/${run.project_id}/analysis`);\nreturn [{ json: { text: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "92042421-14f3-4200-b3dc-a6d4ebf35067",
+      "name": "Staging?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $vars.env }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "staging"
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "cd680f0d-0ac9-45ee-8884-03a91d8943e3",
+      "name": "Send Draft To Rob",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "username",
+          "value": "robert"
+        },
+        "messageType": "text",
+        "text": "={{ $json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "bc7212a4-0689-4ed4-bc41-42d72acaad8b"
+    },
+    {
+      "id": "51462f17-13fc-4ef4-bfd8-d9de816893ad",
+      "name": "Requester Known?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Load Run').first().json.requested_by_slack_user_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d645c791-c01d-48af-b74f-8abd9155ba5d",
+      "name": "Send Draft To Requester",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1344,
+        192
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Load Run').first().json.requested_by_slack_user_id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "f915fd07-59b9-4401-a754-7ec94364d9db"
+    },
+    {
+      "id": "f6804bbc-8ef1-4500-91ec-5b3bc29c916a",
+      "name": "Sticky Note 0bf816fb",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        608,
+        192
+      ],
+      "parameters": {
+        "content": "## ProjectApprovalFlow\n\nCalled by pidgeon-head POST /api/projects/:id/approve (header auth, same PidgeonHead credential + NUXT_API_SECRET as the session ApprovalFlow). Body: { run_id, project_id }.\n\nLoads the approved run and its L3 insights, formats a Slack share-out draft (key-takeaway placeholder for the human, insights with corroboration grades), and DMs the requester. staging? branch sends to Rob instead.\n\nSee darwin/plans/close-project.md section E.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "approve": {
+      "main": [
+        [
+          {
+            "node": "Load Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Run": {
+      "main": [
+        [
+          {
+            "node": "Load Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Insights": {
+      "main": [
+        [
+          {
+            "node": "Format Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Draft": {
+      "main": [
+        [
+          {
+            "node": "Staging?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Staging?": {
+      "main": [
+        [
+          {
+            "node": "Send Draft To Rob",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Requester Known?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requester Known?": {
+      "main": [
+        [
+          {
+            "node": "Send Draft To Requester",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "a9628f04-938e-4c18-8073-b4f8cb089fe6",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "RKV5ONpbyyQkPOeH",
+  "isArchived": false,
+  "nodeGroups": []
+}

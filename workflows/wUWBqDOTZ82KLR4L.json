@@ -1,6 +1,7 @@
 {
   "id": "wUWBqDOTZ82KLR4L",
   "name": "ForumIngestion",
+  "description": "Ingests n8n community forum posts into the forum vector store + resource tree, with per-topic LLM summaries. Public Discourse feed, no credential. Dedupe via ingest_ledger. Rolling 3-month window with cleanup. Manual backfill ~3000 posts; daily 03:00 UTC.",
   "nodes": [
     {
       "parameters": {},
@@ -717,6 +718,46 @@
       ],
       "id": "31649619-5e73-4e4c-babc-31396c444837",
       "name": "3am"
+    },
+    {
+      "id": "9a84fb5f-599c-4c48-9c5a-3cdd79696b5e",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -646,
+        440
+      ],
+      "parameters": {
+        "jsCode": "// DWN-39: simple success message. The done output of the\n// loop carries the items that were processed in this run.\nconst count = items.length;\nif (count === 0) return [];\nreturn [{ json: { count } }];"
+      }
+    },
+    {
+      "id": "679f7884-1963-49f7-abe4-42967332a407",
+      "name": "Post Success",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -446,
+        440
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09DRCJLQCE"
+        },
+        "text": "=✅ ForumIngestion: {{ $json.count }} records added.",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "1f044d68-b5f7-402f-8405-08beee2f390e"
     }
   ],
   "connections": {
@@ -946,6 +987,11 @@
             "node": "GetUnsummarizedTopics",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
           }
         ],
         [
@@ -978,6 +1024,17 @@
           }
         ]
       ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Post Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -987,7 +1044,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "f190c961-7c93-4ac4-97c4-808b1648c0f9",
+  "versionId": "ca8842e5-7661-4129-b0e9-daf29dad95d5",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

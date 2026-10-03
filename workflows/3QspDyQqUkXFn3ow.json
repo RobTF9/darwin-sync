@@ -1,6 +1,7 @@
 {
   "id": "3QspDyQqUkXFn3ow",
   "name": "GongIngestion",
+  "description": "Syncs Gong call recordings by reading hourly sync-report tables from Slack channel C0AN85ZNGLS, deduping call_ids via a Data Table ledger, fetching full call data from BigQuery, upserting to Postgres gong_calls, and re-indexing into the Supabase gong vect",
   "nodes": [
     {
       "parameters": {
@@ -114,6 +115,7 @@
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "projectId": {
           "__rl": true,
           "mode": "id",
@@ -133,9 +135,9 @@
         960
       ],
       "credentials": {
-        "googleBigQueryOAuth2Api": {
-          "id": "92ZMRuOZEOJHwoRi",
-          "name": "Nik's Big Query"
+        "googleApi": {
+          "id": "0pCOXJXMqCYd7C37",
+          "name": "BigQuery n8n Service Account"
         }
       }
     },
@@ -480,6 +482,46 @@
       ],
       "id": "c80a2334-360a-4694-976f-5ba9f5e063f9",
       "name": "Schedule Trigger"
+    },
+    {
+      "id": "744727b5-5863-446e-b9bf-1404fbde65d1",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        154,
+        840
+      ],
+      "parameters": {
+        "jsCode": "// DWN-39: simple success message. The done output of the\n// loop carries the items that were processed in this run.\nconst count = items.length;\nif (count === 0) return [];\nreturn [{ json: { count } }];"
+      }
+    },
+    {
+      "id": "ebe4d8b4-d8f2-4ff1-90de-b8e74756b3d0",
+      "name": "Post Success",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        354,
+        840
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09DRCJLQCE"
+        },
+        "text": "=✅ GongIngestion: {{ $json.count }} records added.",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "8a2c6abc-99f1-4196-88d8-7359f0c6a55d"
     }
   ],
   "connections": {
@@ -661,7 +703,13 @@
     },
     "BatchLoop": {
       "main": [
-        null,
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Call 'GongIngestion'",
@@ -703,6 +751,17 @@
           }
         ]
       ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Post Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -712,7 +771,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
-  "versionId": "794289e1-e52f-4fb2-9fba-68e72c09e651",
+  "versionId": "c5dd2d29-f156-4ab5-823a-72993a03a58d",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

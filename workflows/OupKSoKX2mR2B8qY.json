@@ -1,6 +1,7 @@
 {
   "id": "OupKSoKX2mR2B8qY",
   "name": "SlackIngestion",
+  "description": "Ingests entire Slack threads from the last 3 months into the Supabase `slack` vector store (match_slack, OpenAI text-embedding-3-large @ 3072 dims). Idempotent per thread ts; cleans up legacy blob rows and rows older than 3 months. Daily 02:00 UTC + manua",
   "nodes": [
     {
       "parameters": {
@@ -560,6 +561,46 @@
       ],
       "id": "e08d8d0d-ce34-42b3-a545-32cd0aa17bae",
       "name": "2am"
+    },
+    {
+      "id": "5e66c14b-2d44-4530-b3b1-72738990271f",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -840,
+        160
+      ],
+      "parameters": {
+        "jsCode": "// DWN-39: simple success message. The done output of the\n// loop carries the items that were processed in this run.\nconst count = items.length;\nif (count === 0) return [];\nreturn [{ json: { count } }];"
+      }
+    },
+    {
+      "id": "ee453578-d586-4dd1-8db6-484ce22c17a4",
+      "name": "Post Success",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        -640,
+        160
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09DRCJLQCE"
+        },
+        "text": "=✅ SlackIngestion: {{ $json.count }} records added.",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "0648e389-ceef-4c2a-8be2-ee6ea24c3933"
     }
   ],
   "connections": {
@@ -791,7 +832,13 @@
     },
     "Loop Over Items": {
       "main": [
-        [],
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Call 'SlackIngestion'",
@@ -822,6 +869,17 @@
           }
         ]
       ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Post Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -831,7 +889,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
-  "versionId": "7c2db301-d239-4f71-8826-469f3e9de22c",
+  "versionId": "5992ecdd-99a3-47fe-b116-26613bf388f2",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
