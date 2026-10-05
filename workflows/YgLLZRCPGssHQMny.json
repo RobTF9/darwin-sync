@@ -1,6 +1,7 @@
 {
   "id": "YgLLZRCPGssHQMny",
   "name": "OpportunityAnalysis",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -168,6 +169,10 @@
             {
               "fieldId": "opportunity_id",
               "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "source",
+              "fieldValue": "analysis"
             }
           ]
         }
@@ -299,11 +304,12 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false,
-    "binaryMode": "separate"
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "56dbe01a-05f0-44ab-b27a-a62a2b389107",
+  "versionId": "28232ee9-422f-4ec1-b67b-5baa36c66b94",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

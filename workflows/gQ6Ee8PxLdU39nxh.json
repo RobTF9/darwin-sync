@@ -1,6 +1,7 @@
 {
   "id": "gQ6Ee8PxLdU39nxh",
   "name": "SessionAnalysis",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -338,6 +339,10 @@
             {
               "fieldId": "evidence_field",
               "fieldValue": "={{ $json.evidence_field }}"
+            },
+            {
+              "fieldId": "source",
+              "fieldValue": "analysis"
             }
           ]
         }
@@ -482,11 +487,12 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false,
-    "binaryMode": "separate"
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "33321050-a95c-4a32-827c-601a4d15ff88",
+  "versionId": "107b9425-6005-4203-b339-481dc47ccf69",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

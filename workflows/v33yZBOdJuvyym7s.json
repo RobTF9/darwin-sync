@@ -1,6 +1,7 @@
 {
   "id": "v33yZBOdJuvyym7s",
   "name": "JobAnalysis",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -250,6 +251,10 @@
             {
               "fieldId": "job_id",
               "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "source",
+              "fieldValue": "analysis"
             }
           ]
         }
@@ -372,11 +377,12 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false,
-    "binaryMode": "separate"
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "5a22264f-4c2a-49d6-9850-876429875112",
+  "versionId": "f009c612-0f0d-44e2-a3ec-0979cf4aca84",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
