@@ -7,9 +7,9 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "session-qa-analyst",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
-        "options": {},
-        "authentication": "headerAuth"
+        "options": {}
       },
       "id": "7d6d1f28-2726-4ccc-80bd-44fa84e1228f",
       "name": "Session QA Request",
@@ -23,7 +23,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "tNYo3eGqheixdzIb",
-          "name": "PidgeonHead"
+          "name": "Webhook Auth"
         }
       }
     },
@@ -128,7 +128,6 @@
         784,
         1760
       ],
-      "onError": "stopWorkflow",
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000
@@ -266,7 +265,9 @@
       "parameters": {
         "mode": "combine",
         "combineBy": "combineByPosition",
-        "options": {}
+        "options": {
+          "includeUnpaired": true
+        }
       },
       "id": "c44f9e96-8c7f-404c-ade7-9ec4a2af1bdc",
       "name": "Combine Results",
@@ -275,7 +276,8 @@
       "position": [
         2240,
         1792
-      ]
+      ],
+      "alwaysOutputData": false
     },
     {
       "parameters": {
@@ -416,38 +418,36 @@
       ]
     },
     {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "session_id"
+            }
+          ]
+        }
+      },
       "id": "af8b6ea0-cd95-4592-8057-470d9af62758",
       "name": "When Called",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.2,
       "position": [
         -320,
-        1960
-      ],
-      "parameters": {
-        "inputSource": "workflowInputs",
-        "workflowInputs": {
-          "values": [
-            {
-              "name": "session_id",
-              "type": "string"
-            }
-          ]
-        }
-      }
+        1968
+      ]
     },
     {
+      "parameters": {
+        "jsCode": "// The agent must echo back the exact question_id for every question - hundreds\n// of UUID reproductions per project - and a single garbled one breaks the\n// insert on session_answer.question_id. Validation alone would cost that\n// answer, and a dropped answer looks exactly like a question the participant\n// never addressed, which is the silent loss this pipeline exists to avoid.\n//\n// Recover only the unambiguous case: if exactly one returned id is invalid and\n// exactly one offered id is unclaimed, the malformed entry can only belong to\n// that question. With two or more, assignment would depend on the agent having\n// kept its ordering, and a misattributed answer is worse than a missing one.\nconst raw = $input.first().json;\nconst out = raw.output || raw;\nconst answers = (out.answers || []).map(a => Object.assign({}, a));\nconst offered = $('Aggregate Questions').first().json.questions || [];\nconst offeredIds = offered.map(q => String(q.id));\nconst validIds = new Set(offeredIds);\n\nconst seen = new Map();\nfor (const a of answers) {\n  const id = String(a.question_id || '');\n  if (!validIds.has(id)) { continue; }\n  seen.set(id, (seen.get(id) || 0) + 1);\n}\nlet duplicates = 0;\nfor (const n of seen.values()) { if (n > 1) { duplicates += n - 1; } }\n\nconst unclaimed = offeredIds.filter(id => !seen.has(id));\nconst bad = answers.filter(a => !validIds.has(String(a.question_id || '')));\n\nlet repaired = 0;\nif (bad.length === 1 && unclaimed.length === 1) {\n  bad[0].question_id = unclaimed[0];\n  repaired = 1;\n}\n\nconst kept = answers.filter(a => validIds.has(String(a.question_id || '')));\nconst dropped = answers.length - kept.length;\n\nreturn [{ json: {\n  output: { answers: kept, emergent_questions: out.emergent_questions || [] },\n  repair: { offered: offeredIds.length, returned: answers.length, repaired: repaired, dropped: dropped, duplicate_ids: duplicates }\n} }];"
+      },
       "id": "c6481948-8338-4a55-a20d-75b9bf7b4746",
       "name": "Repair Question Ids",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        968,
+        976,
         1760
-      ],
-      "parameters": {
-        "jsCode": "// The agent must echo back the exact question_id for every question - hundreds\n// of UUID reproductions per project - and a single garbled one breaks the\n// insert on session_answer.question_id. Validation alone would cost that\n// answer, and a dropped answer looks exactly like a question the participant\n// never addressed, which is the silent loss this pipeline exists to avoid.\n//\n// Recover only the unambiguous case: if exactly one returned id is invalid and\n// exactly one offered id is unclaimed, the malformed entry can only belong to\n// that question. With two or more, assignment would depend on the agent having\n// kept its ordering, and a misattributed answer is worse than a missing one.\nconst raw = $input.first().json;\nconst out = raw.output || raw;\nconst answers = (out.answers || []).map(a => Object.assign({}, a));\nconst offered = $('Aggregate Questions').first().json.questions || [];\nconst offeredIds = offered.map(q => String(q.id));\nconst validIds = new Set(offeredIds);\n\nconst seen = new Map();\nfor (const a of answers) {\n  const id = String(a.question_id || '');\n  if (!validIds.has(id)) { continue; }\n  seen.set(id, (seen.get(id) || 0) + 1);\n}\nlet duplicates = 0;\nfor (const n of seen.values()) { if (n > 1) { duplicates += n - 1; } }\n\nconst unclaimed = offeredIds.filter(id => !seen.has(id));\nconst bad = answers.filter(a => !validIds.has(String(a.question_id || '')));\n\nlet repaired = 0;\nif (bad.length === 1 && unclaimed.length === 1) {\n  bad[0].question_id = unclaimed[0];\n  repaired = 1;\n}\n\nconst kept = answers.filter(a => validIds.has(String(a.question_id || '')));\nconst dropped = answers.length - kept.length;\n\nreturn [{ json: {\n  output: { answers: kept, emergent_questions: out.emergent_questions || [] },\n  repair: { offered: offeredIds.length, returned: answers.length, repaired: repaired, dropped: dropped, duplicate_ids: duplicates }\n} }];"
-      }
+      ]
     }
   ],
   "connections": {
@@ -683,7 +683,7 @@
     "availableInMCP": true
   },
   "triggerCount": 1,
-  "versionId": "ae782a4f-e820-4e57-8271-27f92f936e96",
+  "versionId": "117fa2ab-8356-41de-836c-885acc4cba60",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
