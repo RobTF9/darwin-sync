@@ -4,8 +4,7 @@
   "type": "googleApi",
   "data": {
     "email": "",
-    "privateKey": "",
-    "httpNode": true
+    "privateKey": ""
   },
   "ownedBy": {
     "type": "team",
