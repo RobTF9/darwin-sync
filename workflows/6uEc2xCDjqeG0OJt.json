@@ -217,14 +217,14 @@
     },
     {
       "parameters": {
-        "jsCode": "const s = $('Collect & Check').first().json;\nconst samples = $('Sample Candidates').all().map(i => i.json).filter(x => x && !x.__empty);\nconst fetched = $input.all().map(i => i.json);\nconst cfg = $('Load Config').first().json || {};\nconst cioUrlTemplate = String(cfg.cioProfileUrlTemplate || '');\nfunction hasAttrs(resp) { return !!(resp && resp.customer && resp.customer.attributes && typeof resp.customer.attributes === 'object' && !Array.isArray(resp.customer.attributes)); }\nfunction attrsOf(resp) { return hasAttrs(resp) ? resp.customer.attributes : {}; }\nconst cooldownField = s.cooldownField || 'last_user_research_invite_date';\nconst cutoffTs = Number(s.cooldownCutoffTs) || 0;\nlet cooldownDropped = 0, fetchFailed = 0, duplicateEmailsDropped = 0, unsubscribedDropped = 0;\nconst all = samples.map((sm, idx) => {\n  const resp = fetched[idx] || {};\n  const a = attrsOf(resp);\n  if (!hasAttrs(resp)) fetchFailed++;\n  const usage_summary = [\n    a.successful_prod_exec_workflows !== undefined ? 'prod wfs: ' + a.successful_prod_exec_workflows : null,\n    a.services_count !== undefined ? 'services: ' + a.services_count : null,\n    a.ai_active_wfs !== undefined ? 'AI wfs: ' + a.ai_active_wfs : null\n  ].filter(Boolean).join(', ');\n  const lastInvite = Number(a[cooldownField]) || 0;\n  const cioId = sm.cio_id || null;\n  return {\n    email: a.email || sm.email || null,\n    id: sm.cio_id || sm.cust_id || null,\n    cio_id: cioId,\n    cio_url: (cioId && cioUrlTemplate.indexOf('{cio_id}') !== -1) ? cioUrlTemplate.replace('{cio_id}', cioId) : null,\n    first_name: a.first_name || null,\n    country: a.country || null,\n    cloud_plan: a.cloud_plan || null,\n    cloud_plan_status: a.cloud_plan_status || null,\n    role: a.job_role || a.utm_user_role || null,\n    company_size: a.company_size || null,\n    n8n_usage: a.n8n_usage || null,\n    tech_skills: a.tech_skills || null,\n    work_role: a.work_role || null,\n    linkedin: a.linkedin || null,\n    usage_summary,\n    attributes_fetched: hasAttrs(resp),\n    __recentlyInvited: lastInvite > 0 && lastInvite >= cutoffTs,\n    // CSV lists mix audiences: unsubscribed is respected, except for research-webform sign-ups (the form sets it on purpose)\n    __unsubscribed: !!s.csvMode && String(a.unsubscribed) === 'true' && a.origin !== 'user_research_webform'\n  };\n});\n// Reporting only: count distinct profiles per email before eligibility filtering.\nconst emailKey = value => String(value || '').trim().toLowerCase();\nconst profileIdsByEmail = new Map();\nfor (const r of (s.collected || [])) {\n  const key = emailKey(r.email);\n  const id = r.cio_id || r.id;\n  if (!key || !id) continue;\n  if (!profileIdsByEmail.has(key)) profileIdsByEmail.set(key, new Set());\n  profileIdsByEmail.get(key).add(String(id));\n}\nconst duplicateProfileEmails = Array.from(profileIdsByEmail, ([email, ids]) => ({ email, profileCount: ids.size })).filter(r => r.profileCount > 1);\nconst unsubscribeConflictEmails = Array.from(new Set(all.filter(c => c.__unsubscribed).map(c => emailKey(c.email)))).filter(key => all.some(c => emailKey(c.email) === key && c.attributes_fetched && !c.__unsubscribed));\n// Drop recently invited profiles (cooldown safety net), unsubscribed (CSV only) and duplicate emails\n// (the Customer.io base has distinct profiles sharing one address: one email = one invite).\nconst seenEmails = new Set();\nconst eligible = all.filter(c => {\n  if (c.__recentlyInvited) { cooldownDropped++; return false; }\n  if (c.__unsubscribed) { unsubscribedDropped++; return false; }\n  // CSV: no attributes = unsubscribed status unknown -> fail closed (counted in fetchFailed)\n  if (s.csvMode && !c.attributes_fetched) return false;\n  const key = c.email ? String(c.email).trim().toLowerCase() : null;\n  // Exactly one mailbox: a malformed 'a@x.com,b@y.com' value would reach SMTP as two recipients\n  if (!key || !/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(key)) return false;\n  if (seenEmails.has(key)) { duplicateEmailsDropped++; return false; }\n  seenEmails.add(key);\n  return true;\n});\nconst candidates = eligible.slice(0, s.sampleSize).map(c => { const { __recentlyInvited, __unsubscribed, ...rest } = c; return rest; });\nconst shardsWalked = Array.isArray(s.shardsUsed) ? s.shardsUsed.length : 0;\nconst exact = !!s.noShards || !!s.csvMode;\nconst poolEstimate = exact ? (s.collectedCount || 0) : (shardsWalked > 0 ? Math.round((s.collectedCount || 0) * (s.shardCount || 4096) / shardsWalked) : (s.collectedCount || 0));\n// CSV stats count distinct emails, not profiles (one address may have several Customer.io profiles)\nlet csvStats = null;\nif (s.csvMode) {\n  const total = (s.csvEmails || []).length;\n  const foundEmails = new Set((Array.isArray(s.collected) ? s.collected : []).map(r => String(r.email || '').trim().toLowerCase()).filter(Boolean));\n  csvStats = { total, found: foundEmails.size, notFoundOrCooldown: Math.max(0, total - foundEmails.size), unsubscribedDropped, fetchFailed, profilesMatched: s.collectedCount || 0, duplicateProfileEmails, unsubscribeConflictEmails, profilesChecked: samples.length, selected: candidates.length };\n}\nreturn [{ json: {\n  candidates, sampleSize: candidates.length, requestedSize: s.sampleSize,\n  collectedCount: s.collectedCount || 0, cooldownDropped, fetchFailed, duplicateEmailsDropped, unsubscribedDropped,\n  totalMatchingEstimate: exact && s.csvMode ? (csvStats ? csvStats.found : 0) : poolEstimate, poolIsExact: exact,\n  csvStats, csvEmails: s.csvMode ? (s.csvEmails || []) : undefined,\n  mode: s.mode, filtersApplied: s.filters, shardsUsed: s.shardsUsed || [], error: null\n} }];"
+        "jsCode": "const s = $('Collect & Check').first().json;\nconst samples = $('Sample Candidates').all().map(i => i.json).filter(x => x && !x.__empty);\nconst fetched = $('Fetch Attributes').all().map(i => i.json);\nconst cfg = $('Load Config').first().json || {};\nconst cioUrlTemplate = String(cfg.cioProfileUrlTemplate || '');\nfunction hasAttrs(resp) { return !!(resp && resp.customer && resp.customer.attributes && typeof resp.customer.attributes === 'object' && !Array.isArray(resp.customer.attributes)); }\nfunction attrsOf(resp) { return hasAttrs(resp) ? resp.customer.attributes : {}; }\nconst cooldownField = s.cooldownField || 'last_user_research_invite_date';\nconst cutoffTs = Number(s.cooldownCutoffTs) || 0;\nconst emailKey = value => String(value || '').trim().toLowerCase();\n\n// PER-PERSON RULES (Giulio, 2026-10-07). One person = one email = possibly several Customer.io profiles.\n// Cooldown: if ANY profile of the email was invited inside the window (date on the profile, or membership of the cooldown segment), skip the person.\n// Unsubscribe: the person can be invited when at least one profile is not unsubscribed, or at least one comes from the research webform.\n//   Blocked only when every profile is unsubscribed and none is a webform sign-up.\n// Unsubscribed is read from both places Customer.io reports it: the profile status and the attribute.\nfunction facts(resp) {\n  const known = hasAttrs(resp);\n  const a = attrsOf(resp);\n  const lastInvite = Number(a[cooldownField]) || 0;\n  return {\n    known,\n    unsub: known && (resp.customer.unsubscribed === true || String(a.unsubscribed) === 'true'),\n    webform: known && a.origin === 'user_research_webform',\n    recent: lastInvite > 0 && lastInvite >= cutoffTs\n  };\n}\n\n// The duplicate lookups must have worked: without them the per-person rules cannot be applied, so fail visibly instead of inviting blind.\nfunction pageProblem(p) {\n  if (!p) return 'no response';\n  if (p.error) return typeof p.error === 'string' ? p.error : (p.error.message || JSON.stringify(p.error).slice(0, 200));\n  const status = Number(p.statusCode) || 0;\n  if (status < 200 || status >= 300) return 'HTTP ' + status + ': ' + JSON.stringify(p.body || {}).slice(0, 200);\n  return null;\n}\nconst lookupPages = $('Lookup Profiles By Email').all().map(i => i.json);\nconst cooldownPages = $('Lookup Cooldown By Email').all().map(i => i.json);\nif (samples.length) {\n  const problem = lookupPages.concat(cooldownPages).map(pageProblem).find(Boolean) || (lookupPages.length && cooldownPages.length ? null : 'no response');\n  if (problem) {\n    const msg = 'Customer.io duplicate-profile check failed (' + problem + ')';\n    return [{ json: { error: msg, candidates: [], sampleSize: 0, collectedCount: 0, totalMatchingEstimate: 0, mode: s.mode, filtersApplied: s.filters, shardsUsed: s.shardsUsed || [], message: 'Search failed: ' + msg } }];\n  }\n}\n\n// Every profile we know about, grouped by email: the sampled ones plus their siblings\nconst byEmail = new Map();\nfunction addProfile(key, f, sampled) {\n  if (!key) return;\n  if (!byEmail.has(key)) byEmail.set(key, []);\n  byEmail.get(key).push({ ...f, sampled });\n}\nlet cooldownDropped = 0, fetchFailed = 0, duplicateEmailsDropped = 0, unsubscribedDropped = 0, cooldownDroppedBySibling = 0, duplicateCheckFailed = 0;\nconst all = samples.map((sm, idx) => {\n  const resp = fetched[idx] || {};\n  const a = attrsOf(resp);\n  if (!hasAttrs(resp)) fetchFailed++;\n  const usage_summary = [\n    a.successful_prod_exec_workflows !== undefined ? 'prod wfs: ' + a.successful_prod_exec_workflows : null,\n    a.services_count !== undefined ? 'services: ' + a.services_count : null,\n    a.ai_active_wfs !== undefined ? 'AI wfs: ' + a.ai_active_wfs : null\n  ].filter(Boolean).join(', ');\n  const f = facts(resp);\n  const cioId = sm.cio_id || null;\n  const email = a.email || sm.email || null;\n  addProfile(emailKey(email), f, true);\n  return {\n    email,\n    id: sm.cio_id || sm.cust_id || null,\n    cio_id: cioId,\n    cio_url: (cioId && cioUrlTemplate.indexOf('{cio_id}') !== -1) ? cioUrlTemplate.replace('{cio_id}', cioId) : null,\n    first_name: a.first_name || null,\n    country: a.country || null,\n    cloud_plan: a.cloud_plan || null,\n    cloud_plan_status: a.cloud_plan_status || null,\n    role: a.job_role || a.utm_user_role || null,\n    company_size: a.company_size || null,\n    n8n_usage: a.n8n_usage || null,\n    tech_skills: a.tech_skills || null,\n    work_role: a.work_role || null,\n    linkedin: a.linkedin || null,\n    usage_summary,\n    attributes_fetched: hasAttrs(resp),\n    __recentlyInvited: f.recent,\n    __selfBlocked: f.unsub && !f.webform\n  };\n});\nconst siblingPicks = $('Pick Siblings').all().map(i => i.json);\nconst siblingFetched = $input.all().map(i => i.json);\nsiblingPicks.forEach((p, idx) => { if (p && !p.__none && p.cio_id) addProfile(emailKey(p.email), facts(siblingFetched[idx] || {}), false); });\nconst lookupEmails = new Set();\nfor (const p of lookupPages) {\n  const ids = (p && p.body && p.body.identifiers) || [];\n  if (Array.isArray(ids)) for (const r of ids) { const k = emailKey(r && r.email); if (k) lookupEmails.add(k); }\n}\nconst cooldownEmails = new Set();\nfor (const p of cooldownPages) {\n  const ids = (p && p.body && p.body.identifiers) || [];\n  if (Array.isArray(ids)) for (const r of ids) { const k = emailKey(r && r.email); if (k) cooldownEmails.add(k); }\n}\n\nconst duplicateProfileEmails = Array.from(byEmail, ([email, ps]) => ({ email, profileCount: ps.length })).filter(r => r.profileCount > 1);\nconst unsubscribeConflictEmails = Array.from(byEmail).filter(([, ps]) => ps.some(p => p.known && p.unsub && !p.webform) && ps.some(p => p.known && !p.unsub)).map(([email]) => email);\n\n// One person can be sampled through several profiles. People keep their (random) sample order; within a person, the profile that is\n// itself invitable and carries the most details goes first: it represents the person on the card, in the email greeting and for the stamp.\nconst richness = c => ['cloud_plan', 'first_name', 'role', 'company_size', 'usage_summary', 'n8n_usage', 'tech_skills', 'country'].filter(k => c[k]).length + (c.attributes_fetched ? 1 : 0);\nconst people = new Map();\nall.forEach((c, idx) => { const k = (c.email ? emailKey(c.email) : '') || ('#' + idx); if (!people.has(k)) people.set(k, []); people.get(k).push(c); });\nconst ordered = [];\nfor (const profiles of people.values()) ordered.push(...profiles.slice().sort((a, b) => (Number(a.__selfBlocked) - Number(b.__selfBlocked)) || (richness(b) - richness(a))));\nconst seenEmails = new Set();\n// People (distinct emails) skipped, by reason, for the card\nconst cooldownPeople = new Set(), unsubscribedPeople = new Set();\nconst eligible = ordered.filter(c => {\n  const key = c.email ? emailKey(c.email) : null;\n  const ps = (key && byEmail.get(key)) || [];\n  if (c.__recentlyInvited) { cooldownDropped++; if (key) cooldownPeople.add(key); return false; }\n  if (key && (cooldownEmails.has(key) || ps.some(p => p.recent))) { cooldownDropped++; cooldownDroppedBySibling++; cooldownPeople.add(key); return false; }\n  // CSV: no attributes = unsubscribed status unknown -> fail closed (counted in fetchFailed). Other audiences passed the server-side gates.\n  if (s.csvMode && !c.attributes_fetched) return false;\n  if (c.attributes_fetched && !ps.some(p => p.known && (!p.unsub || p.webform))) { unsubscribedDropped++; if (key) unsubscribedPeople.add(key); return false; }\n  // A sibling we could not read may hide a recent invite: skip the person rather than guess\n  if (ps.some(p => !p.sampled && !p.known)) { duplicateCheckFailed++; return false; }\n  // Exactly one mailbox: a malformed 'a@x.com,b@y.com' value would reach SMTP as two recipients\n  if (!key || !/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(key)) return false;\n  if (seenEmails.has(key)) { duplicateEmailsDropped++; return false; }\n  seenEmails.add(key);\n  return true;\n});\nconst candidates = eligible.slice(0, s.sampleSize).map(c => { const { __recentlyInvited, __selfBlocked, ...rest } = c; return rest; });\nconst shardsWalked = Array.isArray(s.shardsUsed) ? s.shardsUsed.length : 0;\nconst exact = !!s.noShards || !!s.csvMode;\nconst poolEstimate = exact ? (s.collectedCount || 0) : (shardsWalked > 0 ? Math.round((s.collectedCount || 0) * (s.shardCount || 4096) / shardsWalked) : (s.collectedCount || 0));\n// CSV stats count distinct emails, not profiles (one address may have several Customer.io profiles)\nlet csvStats = null;\nif (s.csvMode) {\n  const total = (s.csvEmails || []).length;\n  const foundEmails = new Set((Array.isArray(s.collected) ? s.collected : []).map(r => emailKey(r.email)).filter(Boolean));\n  // Per-person breakdown of the uploaded emails. An email the search did not return is either in cooldown on every profile or absent from Customer.io.\n  const uploaded = (s.csvEmails || []).map(emailKey).filter(Boolean);\n  for (const e of uploaded) if (cooldownEmails.has(e)) cooldownPeople.add(e);\n  const selectedEmails = new Set(candidates.map(c => emailKey(c.email)));\n  const sampledEmails = new Set(all.map(c => emailKey(c.email)).filter(Boolean));\n  const skippedNotFound = uploaded.filter(e => !lookupEmails.has(e) && !sampledEmails.has(e)).length;\n  const overCap = Math.max(0, eligible.length - candidates.length);\n  const notExamined = uploaded.filter(e => foundEmails.has(e) && !sampledEmails.has(e) && !cooldownPeople.has(e)).length;\n  const skippedOther = Math.max(0, total - selectedEmails.size - cooldownPeople.size - unsubscribedPeople.size - skippedNotFound - overCap - notExamined);\n  csvStats = { total, found: foundEmails.size, notFoundOrCooldown: Math.max(0, total - foundEmails.size), unsubscribedDropped, fetchFailed, profilesMatched: s.collectedCount || 0, duplicateProfileEmails, unsubscribeConflictEmails, profilesChecked: samples.length, selected: candidates.length,\n    skippedCooldown: cooldownPeople.size, skippedUnsubscribed: unsubscribedPeople.size, skippedNotFound, skippedOther, overCap, notExamined };\n}\n// Researcher filters with the labels from UXR Config, for the candidate card (the raw keys are in filtersApplied)\nconst filterDefs = (s.mode === 'n8n_users' ? cfg.nUserFilters : (cfg.volunteerFilters || cfg.nonUserFilters)) || [];\nconst filterLabels = s.csvMode ? [] : Object.entries(s.filters || {}).map(([key, raw]) => {\n  const def = Array.isArray(filterDefs) ? filterDefs.find(d => d && d.id === key) : null;\n  const values = (Array.isArray(raw) ? raw : [raw]).map(v => { const o = def && (def.options || []).find(x => x.value === v); return (o && o.label) || String(v); });\n  return { label: (def && def.label) || key, values };\n});\nreturn [{ json: {\n  candidates, sampleSize: candidates.length, requestedSize: s.sampleSize,\n  collectedCount: s.collectedCount || 0, cooldownDropped, cooldownDroppedBySibling, fetchFailed, duplicateEmailsDropped, unsubscribedDropped, duplicateCheckFailed,\n  emailsWithSeveralProfiles: duplicateProfileEmails.length,\n  peopleSkippedCooldown: cooldownPeople.size, peopleSkippedUnsubscribed: unsubscribedPeople.size, unsubscribeConflictEmails,\n  totalMatchingEstimate: exact && s.csvMode ? (csvStats ? csvStats.found : 0) : poolEstimate, poolIsExact: exact,\n  csvStats, csvEmails: s.csvMode ? (s.csvEmails || []) : undefined,\n  mode: s.mode, filtersApplied: s.filters, filterLabels, shardsUsed: s.shardsUsed || [], error: null\n} }];"
       },
       "id": "73cb21b0-9cce-4018-a6ed-5b500be9c50c",
       "name": "Format Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2464,
+        3808,
         16
       ],
       "executeOnce": false
@@ -276,9 +276,9 @@
     },
     {
       "parameters": {
-        "content": "## Sample, fetch, format\n*Search Failed?* true → *Return Search Error* (error text for the wizard); false → *Sample Candidates* shuffles the collected ids and keeps 5× sampleSize, *Fetch Attributes* loads each profile, *Format Output* drops profiles invited within the cooldown window (last_user_research_invite_date ≥ cutoff), trims to sampleSize and maps to candidate objects (email, cio_id, plan, role, usage_summary…) plus metadata (totalMatchingEstimate, cooldownDropped, shardsUsed).\n\n**Credential:** \"Giulio - Customer.io - n8n-production\" (App API key for api.customer.io). Verified 200 on 2026-09-22.",
-        "height": 360,
-        "width": 300,
+        "content": "## Sample, fetch, check duplicates, format\n*Search Failed?* true → *Return Search Error* (error text for the wizard); false → *Sample Candidates* shuffles the collected ids and keeps 5× sampleSize, *Fetch Attributes* loads each profile.\n\n**Per-person check (2026-10-07).** One person can have several Customer.io profiles with the same email (about 1 in 5). *Build Email Lookups* → *Lookup Profiles By Email* finds every profile sharing a sampled email (no other filter); *Build Cooldown Lookups* → *Lookup Cooldown By Email* finds those sitting in the cooldown segment; *Pick Siblings* → *Fetch Sibling Attributes* loads the profiles the search did not return.\n\n*Format Output* then decides per email:\n- **Cooldown:** any profile invited inside the window (date on the profile, or cooldown segment) → skip the person.\n- **Unsubscribe:** invitable when at least one profile is not unsubscribed, or one comes from the research webform. Blocked only when every profile is unsubscribed and none is a webform sign-up.\n- A failed lookup returns a search error; a sibling that cannot be read skips that person.\n\nIt trims to sampleSize and returns candidates plus counters (cooldownDropped, cooldownDroppedBySibling, unsubscribedDropped, duplicateCheckFailed, emailsWithSeveralProfiles).\n\n**Credential:** \"Giulio - Customer.io - n8n-production\" (App API key for api.customer.io).",
+        "height": 560,
+        "width": 520,
         "color": 5
       },
       "id": "04f1baab-a010-4f28-aa0b-81ccc8cc8650",
@@ -286,8 +286,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1888,
-        -496
+        2464,
+        -600
       ]
     },
     {
@@ -382,6 +382,231 @@
           "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
         }
       }
+    },
+    {
+      "id": "2d604d26-9614-4b9b-a1d1-b1b902d1cd38",
+      "name": "Build Email Lookups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        16
+      ],
+      "parameters": {
+        "jsCode": "// One person can own several Customer.io profiles with the same email (about 1 in 5 in the n8n users pool, measured 2026-10-06).\n// Cooldown and unsubscribe are decided per person, so every profile sharing a sampled email is looked up here, with no other filter.\nconst samples = $('Sample Candidates').all().map(i => i.json).filter(x => x && !x.__empty);\nconst fetched = $input.all().map(i => i.json || {});\nconst seen = new Set();\nconst emails = [];\nsamples.forEach((sm, idx) => {\n  const a = (fetched[idx] && fetched[idx].customer && fetched[idx].customer.attributes) || {};\n  const e = String(a.email || sm.email || '').trim().toLowerCase();\n  if (/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e) && !seen.has(e)) { seen.add(e); emails.push(e); }\n});\n// CSV: include every uploaded email, also those the search did not return, so the card can tell \"in cooldown\" from \"not in Customer.io\"\nconst state = $('Collect & Check').first().json || {};\nif (state.csvMode) for (const raw of (state.csvEmails || [])) {\n  const e = String(raw || '').trim().toLowerCase();\n  if (/^[^@\\s,;<>]+@[^@\\s,;<>]+\\.[^@\\s,;<>]+$/.test(e) && !seen.has(e)) { seen.add(e); emails.push(e); }\n}\nconst chunks = [];\nfor (let i = 0; i < emails.length; i += 50) chunks.push(emails.slice(i, i + 50));\nif (!chunks.length) chunks.push(['nobody@invalid.invalid']); // matches nothing, keeps the chain running\nreturn chunks.map(chunk => ({ json: { emails: chunk, body: JSON.stringify({ filter: { or: chunk.map(e => ({ attribute: { field: 'email', operator: 'eq', value: e } })) } }) } }));"
+      }
+    },
+    {
+      "id": "7f80b486-f16b-4058-a87c-4213d7743e65",
+      "name": "Lookup Profiles By Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2688,
+        16
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.customer.io/v1/customers",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "customerIoApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 2,
+              "batchInterval": 500
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "start",
+                    "value": "={{ $response.body.next }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body || !$response.body.next }}",
+              "limitPagesFetched": true,
+              "maxRequests": 5
+            }
+          }
+        }
+      },
+      "credentials": {
+        "customerIoApi": {
+          "id": "qecydLSpSosOfmJw",
+          "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "77843050-4fc9-45c4-a99c-6860a879cba0",
+      "name": "Build Cooldown Lookups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        16
+      ],
+      "parameters": {
+        "jsCode": "// Same emails again, this time only the profiles sitting in the cooldown segment (invited by the wizard or by a research broadcast).\n// Read from Config, not from the search state: Prep Retry does not carry cooldownSegmentId across retries.\nconst segId = Number(($('Load Config').first().json || {}).cooldownSegmentId) || 0;\nconst chunks = $('Build Email Lookups').all().map(i => (i.json && i.json.emails) || []).filter(c => c.length);\nconst nothing = { attribute: { field: 'email', operator: 'eq', value: 'nobody@invalid.invalid' } };\nif (!chunks.length || segId <= 0) return [{ json: { emails: [], body: JSON.stringify({ filter: nothing }) } }];\nreturn chunks.map(chunk => ({ json: { emails: chunk, body: JSON.stringify({ filter: { and: [ { segment: { id: segId } }, { or: chunk.map(e => ({ attribute: { field: 'email', operator: 'eq', value: e } })) } ] } }) } }));"
+      }
+    },
+    {
+      "id": "ee0261f4-91df-4fe3-98c6-996dda256f12",
+      "name": "Lookup Cooldown By Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3136,
+        16
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.customer.io/v1/customers",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "customerIoApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 2,
+              "batchInterval": 500
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "start",
+                    "value": "={{ $response.body.next }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body || !$response.body.next }}",
+              "limitPagesFetched": true,
+              "maxRequests": 5
+            }
+          }
+        }
+      },
+      "credentials": {
+        "customerIoApi": {
+          "id": "qecydLSpSosOfmJw",
+          "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "33ee0c49-bc46-43f3-ad71-b3e9ddb7422d",
+      "name": "Pick Siblings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        16
+      ],
+      "parameters": {
+        "jsCode": "// Sibling = a profile sharing a sampled email that the search itself did not return (filtered out server-side, or simply not sampled).\n// Their attributes are needed for the per-person rules in Format Output.\nconst samples = $('Sample Candidates').all().map(i => i.json).filter(x => x && !x.__empty);\nconst sampledIds = new Set(samples.map(s => s.cio_id).filter(Boolean));\n// Only twins of sampled people are read: the lookup may also cover uploaded emails the search did not return\nconst sampledEmails = new Set(samples.map(s => String(s.email || '').trim().toLowerCase()).filter(Boolean));\n$('Fetch Attributes').all().forEach(i => { const e = i.json && i.json.customer && i.json.customer.attributes && i.json.customer.attributes.email; if (e) sampledEmails.add(String(e).trim().toLowerCase()); });\nconst pages = $('Lookup Profiles By Email').all().map(i => i.json || {});\nconst seen = new Set();\nconst out = [];\nfor (const p of pages) {\n  const ids = (p.body && p.body.identifiers) || [];\n  if (!Array.isArray(ids)) continue;\n  for (const r of ids) {\n    if (!r || !r.cio_id || sampledIds.has(r.cio_id) || seen.has(r.cio_id)) continue;\n    if (!sampledEmails.has(String(r.email || '').trim().toLowerCase())) continue;\n    seen.add(r.cio_id);\n    out.push({ json: { cio_id: r.cio_id, email: String(r.email || '').trim().toLowerCase() } });\n  }\n}\nif (!out.length) return [{ json: { __none: true } }];\nreturn out;"
+      }
+    },
+    {
+      "id": "6fbf840c-8260-4f36-a23c-217cbcdee5a1",
+      "name": "Fetch Sibling Attributes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3584,
+        16
+      ],
+      "parameters": {
+        "url": "={{ 'https://api.customer.io/v1/customers/' + ($json.cio_id || 'none') + '/attributes?id_type=cio_id' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "customerIoApi",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 600
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "customerIoApi": {
+          "id": "qecydLSpSosOfmJw",
+          "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -524,6 +749,72 @@
       "main": [
         [
           {
+            "node": "Build Email Lookups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Lookups": {
+      "main": [
+        [
+          {
+            "node": "Lookup Profiles By Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Profiles By Email": {
+      "main": [
+        [
+          {
+            "node": "Build Cooldown Lookups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Cooldown Lookups": {
+      "main": [
+        [
+          {
+            "node": "Lookup Cooldown By Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Cooldown By Email": {
+      "main": [
+        [
+          {
+            "node": "Pick Siblings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Siblings": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sibling Attributes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sibling Attributes": {
+      "main": [
+        [
+          {
             "node": "Format Output",
             "type": "main",
             "index": 0
@@ -539,7 +830,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "3d5de0e9-579a-420b-af89-e53b3e8eed9f",
+  "versionId": "c0a5ce56-66b6-4ac1-9bbc-3cd1dc174a12",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

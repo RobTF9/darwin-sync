@@ -1,7 +1,7 @@
 {
   "id": "c5PMDTtlptb5k1XY",
   "name": "UXR Tests - Run All",
-  "description": "Manual integration runner: Search and Recruiting Start invalid-input suites. Appends both reports; fails after aggregation. No email sends.",
+  "description": "Manual runner for the three UXR test suites: Search (real Customer.io reads), Recruiting Start (invalid input), Logic Regression (Handler, Search, Send code with simulated inputs). Fails if any suite fails. No email, no Slack message.",
   "nodes": [
     {
       "parameters": {},
@@ -91,8 +91,8 @@
     },
     {
       "parameters": {
-        "content": "## UXR test runner\nManual only. Search and Start call original subworkflows. Handler Regression reads current staging Handler code and tests it with synthetic contexts; does not execute the full handler or deliver Slack messages.\n\nTest calls include test_mode: true. Search reads Customer.io. Start covers invalid context only. No Send workflow is called. Handler regression only uses a GET to the staging workflow API.\n\nManual Slack UI verification remains separate.",
-        "height": 256,
+        "content": "## UXR test runner\nManual only. One click runs the three suites and fails if any of them fails; the merged result is in *All Tests Report*.\n\n- **Search**: calls the real UXR Search (reads Customer.io, no writes).\n- **Recruiting Start**: invalid Slack context only.\n- **Logic Regression (Handler, Search, Send)**: reads the current staging code of the three workflows through the n8n API and runs their Code nodes with simulated inputs. Covers the Slack cards, the BCC checkbox, the per-person cooldown and unsubscribe rules, the liveMode switch.\n\nNo email is sent, no Slack message is posted, the Send workflow is never called.\n\nNot covered here: what Slack actually renders, real sends, Calendly bookings. See the manual test plan.",
+        "height": 380,
         "width": 400,
         "color": 5
       },
@@ -301,7 +301,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "134e6683-ba1a-40d9-b136-a181fe212443",
+  "versionId": "f4a8e193-d25f-4752-a1ff-4769f1b97df9",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

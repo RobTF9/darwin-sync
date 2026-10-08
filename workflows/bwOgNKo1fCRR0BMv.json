@@ -53,7 +53,7 @@
             {
               "id": "email-body",
               "name": "emailBody",
-              "value": "Hi there, 👋\n\nWe're running quick research sessions to understand how you work and what would make your n8n experience better.\n\nWhat's involved:\n• A 30-minute video chat (recorded for internal notes)\n• Screen share to show us around your n8n instance\n• $50 gift card as a thank you\n• The interview will be conducted in English\n\nInterested?\nPick a time that works for you: {{calendly_link}}\n\nThank you!",
+              "value": "Hi {{first_name}}, 👋\n\nWe're running quick research sessions to understand how you work and what would make your n8n experience better.\n\nWhat's involved:\n• A 30-minute video chat (recorded for internal notes)\n• Screen share to show us around your n8n instance\n• $50 gift card as a thank you\n• The interview will be conducted in English\n\nInterested?\nPick a time that works for you: {{calendly_link}}\n\nThank you!",
               "type": "string"
             },
             {
@@ -83,7 +83,7 @@
             {
               "id": "audiences",
               "name": "audiences",
-              "value": "={{ [{\"id\": \"n8n_users\", \"label\": \"n8n users\", \"emoji\": \":busts_in_silhouette:\", \"description\": \"People with an n8n cloud account from Customer.io. Filter by plan status, plan, role, company size, usage.\", \"pool\": \"~11M profiles\"}, {\"id\": \"volunteers\", \"label\": \"Research volunteers\", \"emoji\": \":raising_hand:\", \"description\": \"People who signed up through the research webform to be contacted (~1,000). *Includes non-users.*\", \"pool\": \"~1,000 people\"}, {\"id\": \"csv\", \"label\": \"CSV upload\", \"emoji\": \":page_facing_up:\", \"description\": \"Upload a CSV with an *email* column. Only people found in Customer.io are invited (cooldown applies; unsubscribed skipped unless they came from the research webform). Invite everyone in the CSV or limit to max 200.\", \"pool\": \"your list\"}] }}",
+              "value": "={{ [{\"id\": \"n8n_users\", \"label\": \"n8n users\", \"emoji\": \":busts_in_silhouette:\", \"description\": \"People with an n8n cloud account from Customer.io. Filter by plan status, plan, role, company size, usage.\", \"pool\": \"~11M profiles\"}, {\"id\": \"volunteers\", \"label\": \"Research volunteers\", \"emoji\": \":raising_hand:\", \"description\": \"People who signed up through the research webform to be contacted (~1,000). *Includes non-users.*\", \"pool\": \"~1,000 people\"}, {\"id\": \"csv\", \"label\": \"CSV upload\", \"emoji\": \":page_facing_up:\", \"description\": \"Upload a CSV with an *email* column. Only people found in Customer.io are invited.\", \"pool\": \"your list\"}] }}",
               "type": "array"
             },
             {
@@ -202,7 +202,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "f8022064-6fc3-4e59-a48a-3096da1c32a8",
+  "versionId": "f52369ff-16a7-4776-ba69-8378e95326ca",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

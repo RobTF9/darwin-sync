@@ -1,7 +1,7 @@
 {
   "id": "IY48kC1cMDyvXcwg",
-  "name": "UXR Tests - Handler Regression",
-  "description": "Reads current staging Handler Code nodes and routing; runs synthetic Slack/Calendly regressions. Read-only API call, no handler execution or sends. Manual or parent runner.",
+  "name": "UXR Tests - Logic Regression (Handler, Search, Send)",
+  "description": "Reads the current staging Handler, Search and Send & Stamp definitions (read-only API calls) and runs their Code nodes with simulated inputs. No Slack, Customer.io or email. Run manually after any change to those workflows; fails if a check fails.",
   "nodes": [
     {
       "id": "b521b7de-4947-4200-ab1b-9a07f271ac42",
@@ -67,11 +67,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
+        1568,
         96
       ],
       "parameters": {
-        "jsCode": "const r=$input.first().json;let reportOnly=false;try{reportOnly=$('Called by Test Runner').first().json.returnReportOnly===true;}catch(e){}if(r.status!=='PASS'&&!reportOnly)throw new Error('Handler regressions failed: open Handler Regression Report');return $input.all();"
+        "jsCode": "const r=$input.first().json;let reportOnly=false;try{reportOnly=$('Called by Test Runner').first().json.returnReportOnly===true;}catch(e){}if(r.status!=='PASS'&&!reportOnly){const failed=(r.results||[]).filter(x=>x.status!=='PASS').map(x=>x.name).slice(0,8).join('; ');throw new Error('UXR logic regressions failed: '+failed+'. Open the output of Search and Send Rules Checks for the full report.');}return $input.all();"
       }
     },
     {
@@ -85,6 +85,100 @@
       ],
       "parameters": {
         "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "e8cd1d25-abd3-4e3e-80d0-fa8e4d3e7e76",
+      "name": "Handler Checks: BCC and Candidate Card",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "jsCode": "// Handler regression, part 2 (added 2026-10-08): BCC checkbox, candidate card texts, edited candidate list.\n// Same method as part 1: runs the Code nodes of the current staging Handler with simulated Slack payloads. No Slack call, no send.\nconst report = $input.first().json;\nconst workflow = $('Read Current Staging Handler').first().json;\nconst nodes = Object.fromEntries(workflow.nodes.map(n => [n.name, n]));\nconst results = [];\nfunction run(name, ctx, input = {}) {\n  const dollar = n => {\n    if (!(n in ctx)) throw new Error('Unexecuted node: ' + n);\n    const data = Array.isArray(ctx[n]) ? ctx[n] : [ctx[n]];\n    return { first: () => ({ json: data[0] }), all: () => data.map(json => ({ json })) };\n  };\n  const values = Array.isArray(input) ? input : [input];\n  return new Function('$', '$input', nodes[name].parameters.jsCode)(dollar, { first: () => ({ json: values[0] }), all: () => values.map(json => ({ json })) });\n}\nfunction check(name, fn) {\n  const checks = [];\n  const assert = (label, ok) => checks.push({ name: label, status: ok ? 'PASS' : 'FAIL' });\n  try { fn(assert); } catch (e) { assert('No exception: ' + e.message, false); }\n  results.push({ name, checks, status: checks.every(c => c.status === 'PASS') ? 'PASS' : 'FAIL' });\n}\n\nconst researcher = 'researcher@example.com';\nconst row = { session_key: 'test-only', slack_user_email: researcher, batch_id: 'batch_test', email_subject: 'S', email_body: 'Hi {{first_name}},\\n{{calendly_link}}', requested_count: 3, calendly_options_json: JSON.stringify([{ label: 'Event', url: 'https://calendly.com/test/event' }]), calendly_link: 'https://calendly.com/test/event', audience: 'n8n_users' };\nconst cfg = { liveMode: false, calendlyUtmSource: 'uxr_recruiting' };\nconst base = { 'Load Session': row, 'Load Config (Send)': cfg, 'Load Config (Email)': cfg, 'Load Config (Approve)': cfg, 'Calendly Membership': {}, 'Calendly Event Types': {} };\nconst click = extra => ({ channel_id: 'TEST', thread_ts: '1.000001', message_ts: '1.000002', user_id: 'UTEST', trigger_id: 'trigger', ...extra });\nconst state = ticked => ({ values: { calendly_block: { uxr_email_calendly_select: { selected_option: { value: 'opt_0' } } }, bcc_block: { uxr_email_calendly_bcc: { type: 'checkboxes', selected_options: ticked ? [{ value: 'bcc' }] : [] } } } });\nconst parse = blocks => (typeof blocks === 'string' ? JSON.parse(blocks) : blocks);\nconst bccBox = out => { const b = parse(out[0].json.blocks).find(x => x.block_id === 'bcc_block'); return b ? { present: true, ticked: !!b.elements[0].initial_options, text: JSON.stringify(b) } : { present: false, ticked: false, text: '' }; };\nconst texts = blocks => parse(blocks).filter(b => b.type === 'section').map(b => b.text.text).join('\\n---\\n');\n\n// ---- BCC checkbox\ncheck('BCC: the tick is read when Approve & Send is clicked', assert => {\n  const send = (ticked, session = row, st) => run('Prepare Send', { ...base, 'Load Session': session, 'Parse Payload': click({ action_id: 'uxr_send_approve', full_payload: { state: st || state(ticked) } }) })[0].json;\n  const on = send(true);\n  assert('Ticked: ready', on.ready === true);\n  assert('Ticked: bcc_email is the researcher', on.bcc_me === true && on.bcc_email === researcher);\n  assert('Booking link keeps its tracking', on.calendly_url.includes('utm_campaign=batch_test'));\n  assert('Unticked: no bcc', send(false).bcc_email === '' && send(false).bcc_me === false);\n  assert('Card without the checkbox: no bcc', send(false, row, { values: {} }).bcc_email === '');\n  assert('No Slack email: no bcc even when ticked', send(true, { ...row, slack_user_email: '' }).bcc_email === '');\n});\ncheck('BCC: checkbox on the email preview', assert => {\n  const shown = bccBox(run('Build Email Preview', { ...base, 'Parse Payload': click({}) }));\n  assert('Shown when the session has the Slack email', shown.present);\n  assert('Unticked by default', shown.ticked === false);\n  assert('Says where the copies go', shown.text.includes(researcher));\n  assert('Hidden without a Slack email', !bccBox(run('Build Email Preview', { ...base, 'Load Session': { ...row, slack_user_email: '' }, 'Parse Payload': click({}) })).present);\n});\ncheck('BCC: ticking the checkbox changes nothing by itself', assert => {\n  const out = run('Save Calendly Selection', { ...base, 'Parse Payload': click({ action_id: 'uxr_email_calendly_bcc', action_value: ['bcc'], full_payload: { state: state(true) } }) });\n  assert('No save, no redraw', out.length === 0);\n});\ncheck('BCC: the tick survives a booking-link change', assert => {\n  const out = run('Save Calendly Selection', { ...base, 'Parse Payload': click({ action_id: 'uxr_email_calendly_select', action_value: 'custom', full_payload: { state: state(true) } }) });\n  assert('Card redrawn', out.length === 1);\n  assert('Still ticked', bccBox(out).ticked);\n  const off = run('Save Calendly Selection', { ...base, 'Parse Payload': click({ action_id: 'uxr_email_calendly_select', action_value: 'custom', full_payload: { state: state(false) } }) });\n  assert('Unticked stays unticked', bccBox(off).present && !bccBox(off).ticked);\n});\ncheck('BCC: the tick survives Edit Email', assert => {\n  for (const ticked of [true, false]) {\n    const modal = run('Build Edit Modal', { ...base, 'Parse Payload': click({ action_id: 'uxr_email_edit', full_payload: { state: state(ticked) } }) })[0].json;\n    const meta = JSON.parse(modal.view).private_metadata;\n    assert('Modal carries the tick (' + ticked + ')', JSON.parse(meta).bcc === ticked);\n    const edited = run('Apply Email Edit', { ...base, 'Parse Payload': click({ action_id: 'uxr_email_modal_submit', action_value: { values: { subject_block: { uxr_email_subject: { value: 'New subject' } }, body_block: { uxr_email_body: { value: 'Hi {{first_name}} {{calendly_link}}' } } } }, full_payload: { view: { private_metadata: meta } } }) });\n    assert('Preview after Save keeps it (' + ticked + ')', bccBox(edited).present && bccBox(edited).ticked === ticked);\n  }\n});\ncheck('BCC: re-post and recap', assert => {\n  const prep = run('Prepare Send', { ...base, 'Parse Payload': click({ action_id: 'uxr_send_approve', full_payload: { state: state(true) } }) })[0].json;\n  const notReady = run('Complete Send', { ...base, 'Prepare Send': { ...prep, ready: false, reason: 'no_calendly' } }, {});\n  assert('Calendly-missing re-post keeps the tick', bccBox(notReady).ticked);\n  const result = { success: true, sent: 1, failed: 0, test_mode: true, test_recipient: 'test@example.com', details: [{ email: 'a@example.com', status: 'test_sent' }] };\n  assert('Recap names the BCC address', texts(run('Complete Send', { ...base, 'Prepare Send': prep }, result)[0].json.blocks).includes('*BCC:* a copy of every invite went to ' + researcher));\n  assert('No BCC line when not requested', !texts(run('Complete Send', { ...base, 'Prepare Send': { ...prep, bcc_me: false, bcc_email: '' } }, result)[0].json.blocks).includes('*BCC:*'));\n  assert('Send & Stamp receives bcc_email', String(nodes['Run Send & Stamp'].parameters.workflowInputs.value.bcc_email || '').includes(\"$('Prepare Send').first().json.bcc_email\"));\n});\ncheck('Default email greets by first name', assert => {\n  const modal = run('Build Edit Modal', { ...base, 'Load Session': { ...row, email_body: '' }, 'Parse Payload': click({ action_id: 'uxr_email_edit', full_payload: {} }) })[0].json;\n  assert('Fallback body starts with Hi {{first_name}}', JSON.stringify(JSON.parse(modal.view).blocks).includes('Hi {{first_name}}'));\n  const preview = run('Build Email Preview', { ...base, 'Load Session': { ...row, email_body: '' }, 'Parse Payload': click({}) })[0].json;\n  assert('Preview fallback too', preview.sess.email_body.startsWith('Hi {{first_name}}'));\n});\n\n// ---- Candidate card\nconst person = (email, extra = {}) => ({ email, cio_id: 'cio_' + email, cloud_plan: 'Cloud Starter', cloud_plan_status: 'active', attributes_fetched: true, ...extra });\nconst csvPrep = { channel_id: 'TEST', thread_ts: '1.000001', session_key: 'test-only', filters: {}, mode: 'csv', audience: 'csv', sampleSize: 200, csv_file_name: 'people.csv' };\nconst csvResult = extra => ({ candidates: [person('a@example.com'), person('b@example.com')], requestedSize: 200, poolIsExact: true, totalMatchingEstimate: 11,\n  csvStats: { total: 12, found: 11, notFoundOrCooldown: 1, duplicateProfileEmails: [{ email: 'a@example.com', profileCount: 3 }], unsubscribeConflictEmails: ['a@example.com', 'gone1@example.com', 'gone2@example.com'], skippedCooldown: 3, skippedUnsubscribed: 2, skippedNotFound: 1, skippedOther: 0, overCap: 0, ...extra } });\nconst usersPrep = { channel_id: 'TEST', thread_ts: '1.000001', session_key: 'test-only', filters: { cloud_plan_status: ['active'], wf_bucket: ['100+'] }, mode: 'n8n_users', audience: 'n8n_users', sampleSize: 3 };\nconst usersResult = extra => ({ candidates: [person('a@example.com'), person('b@example.com'), person('c@example.com')], requestedSize: 3, poolIsExact: false, totalMatchingEstimate: 1843, peopleSkippedCooldown: 2, unsubscribeConflictEmails: ['a@example.com', 'c@example.com'],\n  filterLabels: [{ label: 'Plan status', values: ['Active (paying)'] }, { label: 'Production workflows', values: ['100+ (~18k)'] }], ...extra });\nconst card = (prep, result) => run('Build Candidates', { 'Prepare Search': prep }, result)[0].json;\n\ncheck('Candidate card (CSV): skipped people, one count per reason', assert => {\n  const t = texts(card(csvPrep, csvResult()).blocks);\n  assert('Total skipped', t.includes('*Skipped:* 6'));\n  assert('Reasons', t.includes('3 contacted in the last 60 days') && t.includes('2 unsubscribed') && t.includes('1 not in Customer.io'));\n  assert('Invitable out of uploaded', t.includes('*Can be invited:* 2 of 12 emails'));\n  assert('No New Sample hint', !t.includes('Try New Sample'));\n  assert('Note counts only people in the list', t.includes('1 person has another Customer.io profile that is unsubscribed'));\n  assert('Note is not a warning', !t.includes('does not establish permission'));\n  assert('Row marker', t.includes('one profile unsubscribed') && !t.includes('different unsubscribe statuses'));\n  assert('Cap line only when capped', !t.includes('capped at') && texts(card(csvPrep, csvResult({ overCap: 5 })).blocks).includes('5 more could be invited, but the list is capped at 200'));\n});\ncheck('Candidate card (n8n users): labelled filters, no unsubscribe note', assert => {\n  const t = texts(card(usersPrep, usersResult()).blocks);\n  assert('Filters with labels', t.includes('*Plan status:* Active (paying)') && t.includes('*Production workflows:* 100+ (~18k)'));\n  assert('No raw filter keys', !t.includes('cloud_plan_status='));\n  assert('No unsubscribe note', !t.includes('another Customer.io profile'));\n  assert('Cooldown counted in people', t.includes('2 people skipped: contacted in the last 60 days'));\n  assert('Raw filters when labels are missing', texts(card(usersPrep, usersResult({ filterLabels: undefined })).blocks).includes('cloud_plan_status=active'));\n  assert('Flag still stored on the rows', card(usersPrep, usersResult()).candidates[0].unsubscribe_conflict === true && card(usersPrep, usersResult()).candidates[1].unsubscribe_conflict === false);\n});\n\n// ---- Edited list after \"Remove candidates\"\nfunction editFlow(prep, result, audience, keep) {\n  const first = card(prep, result);\n  const rows = first.candidates.map((c, i) => ({ id: 100 + i, batch_id: first.batch_id, status: 'staged', email: c.email, summary: c.summary, attributes_json: JSON.stringify(c) }));\n  const session = { session_key: 'test-only', batch_id: first.batch_id, audience };\n  const open = blocks => run('Build Remove Modal', { 'Parse Payload': click({ full_payload: { message: { blocks } } }), 'Load Session': session }, rows)[0].json.view.private_metadata;\n  const render = (meta, n) => run('Render Edited Candidates', { 'Parse Payload': { channel_id: 'TEST', full_payload: { view: { private_metadata: meta } } }, 'Load Session': session }, rows.slice(0, n))[0].json;\n  const meta = open(parse(first.blocks));\n  const edited = render(meta, keep);\n  return { meta, edited, text: texts(edited.blocks), again: open(edited.blocks), render };\n}\ncheck('Edited list (CSV): summary kept, note recomputed', assert => {\n  const f = editFlow(csvPrep, csvResult(), 'csv', 1);\n  assert('Title shows what is left', f.text.includes('(1 selected)'));\n  assert('Search summary kept', f.text.includes('*Skipped:* 6') && f.text.includes('*Can be invited:* 2 of 12 emails'));\n  assert('Note recomputed on the remaining rows', f.text.includes('1 person has another Customer.io profile'));\n  assert('Row marker kept', f.text.includes('one profile unsubscribed'));\n  assert('A second removal still carries the summary', typeof JSON.parse(f.again).summary === 'string');\n  assert('Note disappears when nobody left has such a twin', !texts(f.render(f.meta, 0).blocks).includes('another Customer.io profile'));\n});\ncheck('Edited list (n8n users): summary kept, no note, no row markers', assert => {\n  const f = editFlow(usersPrep, usersResult(), 'n8n_users', 2);\n  assert('Filters and pool kept', f.text.includes('*Plan status:* Active (paying)') && f.text.includes('*Pool:*'));\n  assert('Only one title', f.text.split('*Candidate List*').length === 2);\n  assert('No unsubscribe note', !f.text.includes('another Customer.io profile'));\n  assert('No row markers', !f.text.includes('one profile unsubscribed'));\n});\ncheck('Edited list: a long list never breaks the modal', assert => {\n  const many = Array.from({ length: 250 }, (_, i) => person('person' + i + '@example.com'));\n  const f = editFlow(csvPrep, { ...csvResult(), candidates: many }, 'csv', 250);\n  assert('private_metadata within the Slack limit', f.meta.length <= 3000);\n  assert('Candidate ids all carried', JSON.parse(f.meta).candidate_ids.length === 250);\n});\n\nconst all = (Array.isArray(report.results) ? report.results : []).concat(results);\nreturn [{ json: { ...report, results: all, status: all.every(r => r.status === 'PASS') ? 'PASS' : 'FAIL' } }];"
+      }
+    },
+    {
+      "id": "fefc6127-6763-4402-b379-184cb21c6d3d",
+      "name": "Read Current Staging Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        96
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://darwin-staging.app.n8n.cloud/api/v1/workflows/6uEc2xCDjqeG0OJt",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "n8nApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          }
+        }
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "id": "b876dd08-3e0e-465b-afed-c995c98e7a72",
+      "name": "Read Current Staging Send & Stamp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        96
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://darwin-staging.app.n8n.cloud/api/v1/workflows/pTYT5A34Hv5CplJX",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "n8nApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          }
+        }
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "id": "578991f3-032d-4601-b2c5-c5060f86d8d6",
+      "name": "Search and Send Rules Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        96
+      ],
+      "parameters": {
+        "jsCode": "// Rules of UXR Search and UXR Send & Stamp, checked on the code currently on staging (added 2026-10-08, replaces the local test files).\n// Runs their Code nodes with fixtures and a fixed clock. No Customer.io call, no email, no table write.\nconst report = $('Handler Checks: BCC and Candidate Card').first().json;\nconst searchWf = $('Read Current Staging Search').first().json;\nconst sendWf = $input.first().json;\nif (searchWf.id !== '6uEc2xCDjqeG0OJt' || sendWf.id !== 'pTYT5A34Hv5CplJX') throw new Error('Expected the staging UXR Search and UXR Send & Stamp definitions');\nconst code = { search: Object.fromEntries(searchWf.nodes.map(n => [n.name, n.parameters.jsCode])), send: Object.fromEntries(sendWf.nodes.map(n => [n.name, n.parameters.jsCode])) };\nconst NOW = Date.parse('2026-09-24T10:00:00Z');\nconst RealDate = Date;\nclass Clock extends RealDate { constructor(...args) { super(...(args.length ? args : [NOW])); } static now() { return NOW; } }\nconst clone = v => JSON.parse(JSON.stringify(v === undefined ? null : v));\nfunction run(wf, node, { input = [], refs = {} } = {}) {\n  if (!code[wf][node]) throw new Error('Missing node: ' + wf + '/' + node);\n  const acc = values => ({ first: () => ({ json: clone(values[0]) }), all: () => values.map(json => ({ json: clone(json) })) });\n  const dollar = name => { if (!(name in refs)) throw new Error('Missing fixture for node ' + name); return acc(refs[name]); };\n  const out = new Function('$', '$input', 'Date', code[wf][node])(dollar, acc(input), Clock);\n  return clone(out).map(item => item.json);\n}\nconst results = [];\nfunction check(name, fn) {\n  const checks = [];\n  const assert = (label, ok) => checks.push({ name: label, status: ok ? 'PASS' : 'FAIL' });\n  try { fn(assert); } catch (e) { assert('No exception: ' + e.message, false); }\n  results.push({ name, checks, status: checks.every(c => c.status === 'PASS') ? 'PASS' : 'FAIL' });\n}\nconst same = (a, b) => JSON.stringify(a) === JSON.stringify(b);\n\n// Search fixture. Profiles are plain attribute objects; switches: sibling (in Customer.io but not returned by the search), uploaded (a sibling\n// whose email was in the CSV), inCooldownSegment, fetchError, topLevelUnsubscribed. The four per-person nodes run in their real order.\nfunction format(profiles, { mode = 'csv', lookupStatus = 200, sampleSize = 10, extraUploaded = [], filters = {}, extraConfig = {} } = {}) {\n  const key = e => String(e || '').trim().toLowerCase();\n  const all = profiles.map((p, i) => ({ ...p, cio_id: 'fixture-' + i }));\n  const strip = ({ sibling, uploaded, inCooldownSegment, fetchError, topLevelUnsubscribed, cio_id, ...attrs }) => attrs;\n  const response = p => p.fetchError ? { error: 'fixture failure' } : { customer: { attributes: strip(p), unsubscribed: p.topLevelUnsubscribed === undefined ? false : p.topLevelUnsubscribed } };\n  const sampled = all.filter(p => !p.sibling);\n  const samples = sampled.map(p => ({ cio_id: p.cio_id, email: p.email }));\n  const fetchedAttrs = sampled.map(response);\n  const config = [{ cooldownSegmentId: '260', ...extraConfig }];\n  const uploadedEmails = Array.from(new Set(all.filter(p => !p.sibling || p.uploaded).map(p => key(p.email)).concat(extraUploaded.map(key))));\n  const state = { mode, csvMode: mode === 'csv', sampleSize, filters, cooldownCutoffTs: NOW / 1000 - 60 * 86400, collected: samples, collectedCount: samples.length, csvEmails: mode === 'csv' ? uploadedEmails : undefined };\n  const lookups = run('search', 'Build Email Lookups', { input: fetchedAttrs, refs: { 'Sample Candidates': samples, 'Collect & Check': [state] } });\n  const asked = new Set(lookups.flatMap(l => l.emails));\n  const page = list => [{ statusCode: lookupStatus, body: { identifiers: list.map(p => ({ cio_id: p.cio_id, id: p.cio_id, email: p.email })) } }];\n  const lookupPages = page(all.filter(p => asked.has(key(p.email))));\n  const cooldownLookups = run('search', 'Build Cooldown Lookups', { refs: { 'Load Config': config, 'Build Email Lookups': lookups } });\n  const cooldownPages = page(cooldownLookups.some(l => l.emails.length) ? all.filter(p => p.inCooldownSegment && asked.has(key(p.email))) : []);\n  const picks = run('search', 'Pick Siblings', { refs: { 'Sample Candidates': samples, 'Fetch Attributes': fetchedAttrs, 'Lookup Profiles By Email': lookupPages } });\n  const byId = new Map(all.map(p => [p.cio_id, p]));\n  return run('search', 'Format Output', { input: picks.map(p => p.__none ? {} : response(byId.get(p.cio_id))), refs: {\n    'Collect & Check': [state], 'Sample Candidates': samples, 'Fetch Attributes': fetchedAttrs, 'Load Config': config,\n    'Lookup Profiles By Email': lookupPages, 'Lookup Cooldown By Email': cooldownPages, 'Pick Siblings': picks } })[0];\n}\nconst count = (profiles, opts) => format(profiles, opts).candidates.length;\nconst email = 'same-person@example.test';\nconst recent = NOW / 1000 - 3600;\n\n// ---- Send & Stamp\nfunction validate(config = {}, caller = {}) {\n  return run('send', 'Validate Send', { refs: { 'When Called': [{ batch_id: 'fixture-batch', email_body: 'Hello', ...caller }], 'Load Config': [{ testRecipient: 'test@example.test', ...config }] } })[0];\n}\nfunction recipients(staged, recentRows = [], config = {}) {\n  return run('send', 'Prepare Recipients', { input: [], refs: { 'Validate Send': [{ ...validate({ liveMode: true }), ...config }], 'Get Staged Candidates': staged.map((r, i) => ({ id: i + 1, ...r })), 'Get Recently Sent': recentRows } });\n}\ncheck('Send: only liveMode true (boolean) allows real sends', assert => {\n  for (const liveMode of [false, undefined, 'true', 1]) assert('liveMode ' + JSON.stringify(liveMode) + ' forces test mode', validate({ liveMode }).test_mode === true);\n  assert('Boolean true permits live mode', validate({ liveMode: true }).test_mode === false);\n  assert('Caller can force test mode when config is live', validate({ liveMode: true }, { test_mode: true }).test_mode === true);\n});\ncheck('Send: refuses incomplete input', assert => {\n  assert('Missing batch', validate({}, { batch_id: '' }).valid === false);\n  assert('Calendly placeholder without URL', validate({}, { email_body: 'Book: {{calendly_link}}' }).valid === false);\n});\ncheck('Send: one mailbox per row, cooldown from the Candidates table', assert => {\n  assert('Two mailboxes in one row are skipped', recipients([{ email: 'a@example.test,b@example.test' }])[0].skip === true);\n  for (const status of ['sent', 'booked']) assert('Recent ' + status + ' row blocks', recipients([{ email }], [{ email, status, [status === 'booked' ? 'booked_at' : 'sent_at']: new RealDate(NOW - 3600000).toISOString() }])[0].skip === true);\n  assert('Old send does not block', recipients([{ email }], [{ email, status: 'sent', sent_at: new RealDate(NOW - 61 * 86400000).toISOString() }])[0].skip === false);\n});\ncheck('Send: test mode redirects and caps', assert => {\n  const rows = recipients([1, 2, 3, 4].map(i => ({ email: 'person' + i + '@example.test' })), [], { test_mode: true, test_max: 3, test_recipient: 'test@example.test' });\n  assert('Capped at 3', rows.length === 3);\n  assert('All redirected and labelled', rows.every(r => r.recipient === 'test@example.test' && r.subject.startsWith('[TEST for ')));\n});\ncheck('Send: result recorded truthfully', assert => {\n  const stamp = run('send', 'Record Result', { input: [{ statusCode: 500 }], refs: { 'Send Loop': [{ email, row_id: 1 }], 'Check Send OK': [{ email, row_id: 1, send_ok: true, test_mode: false, stamp_skipped: false }] } })[0];\n  assert('Failed stamp keeps sent status and is reported', stamp.final_status === 'sent' && stamp.stamp_failed === true);\n  const smtp = run('send', 'Record Result', { input: [{}], refs: { 'Send Loop': [{ email, row_id: 1 }], 'Check Send OK': [{ email, row_id: 1, send_ok: false, error: 'SMTP rejected' }] } })[0];\n  assert('Failed SMTP stays failed with no timestamp', smtp.final_status === 'failed' && smtp.sent_at === '');\n});\ncheck('Send: BCC and first-name greeting', assert => {\n  for (const v of [null, undefined, '', '   ']) { const r = validate({}, { bcc_email: v }); assert('bcc ' + JSON.stringify(v) + ' means no BCC', r.valid === true && r.bcc_email === ''); }\n  const ok = validate({}, { bcc_email: ' me@n8n.io ' });\n  assert('Valid bcc passes through trimmed', ok.valid === true && ok.bcc_email === 'me@n8n.io');\n  for (const v of ['a@x.io,b@y.io', 'not-an-email', 'a@x.io; b@y.io', 'Name <a@x.io>']) assert('Malformed bcc refuses the run: ' + v, validate({}, { bcc_email: v }).valid === false);\n  const v = { batch_id: 'b', email_subject: 'S', email_body: 'Hi {{first_name}},', calendly_url: '', test_mode: true, test_recipient: 't@example.test', test_max: 3, cooldown_days: 60 };\n  const prep = (bcc, rows) => run('send', 'Prepare Recipients', { input: [], refs: { 'Validate Send': [{ ...v, bcc_email: bcc }], 'Get Staged Candidates': rows, 'Get Recently Sent': [] } });\n  const out = prep('me@n8n.io', [{ id: 1, email: 'a@x.io', first_name: ' Ada ' }, { id: 2, email: 'b@x.io', first_name: '  ' }, { id: 3, email: 'c@x.io' }]);\n  assert('BCC on every item', same(out.map(o => o.bcc), ['me@n8n.io', 'me@n8n.io', 'me@n8n.io']));\n  assert('Name trimmed', out[0].body.endsWith('Hi Ada,'));\n  assert('Blank or missing name falls back to there', out[1].body.endsWith('Hi there,') && out[2].body.endsWith('Hi there,'));\n  assert('No bcc gives an empty value', same(prep('', [{ id: 1, email: 'a@x.io', first_name: 'Ada' }]).map(o => o.bcc), ['']));\n});\n\n// ---- Search\ncheck('Search: cooldown window falls back to Config', assert => {\n  for (const excludeRecentDays of [null, '', 0, -1, false]) assert('Invalid value ' + JSON.stringify(excludeRecentDays) + ' gives 60', run('search', 'Normalize Input', { refs: { 'When Called': [{ excludeRecentDays }], 'Load Config': [{ cooldownDays: 60 }] } })[0].excludeRecentDays === 60);\n});\ncheck('Search: single profile', assert => {\n  assert('Unsubscribed is skipped', count([{ email, unsubscribed: 'true' }]) === 0);\n  assert('Profile-level unsubscribed is respected when the attribute is absent', count([{ email, topLevelUnsubscribed: true }]) === 0);\n  assert('Webform sign-up stays invitable', count([{ email, unsubscribed: true, origin: 'user_research_webform' }]) === 1);\n  assert('Failed attribute fetch is skipped (CSV)', count([{ email, fetchError: true }]) === 0);\n  assert('Recently contacted is skipped', count([{ email, last_user_research_invite_date: recent }]) === 0);\n  assert('Same address once, ignoring case and spaces', count([{ email }, { email: ' ' + email.toUpperCase() + ' ' }]) === 1);\n});\ncheck('Search, per person: unsubscribe (rules 3 and 4)', assert => {\n  for (const reverse of [false, true]) {\n    const profiles = [{ email, unsubscribed: true }, { email, unsubscribed: false }];\n    const out = format(reverse ? profiles.reverse() : profiles);\n    assert('One subscribed profile is enough (reverse=' + reverse + ')', out.candidates.length === 1 && same(out.csvStats.unsubscribeConflictEmails, [email]));\n  }\n  const all = format([{ email, unsubscribed: true }, { email, unsubscribed: 'true', sibling: true }]);\n  assert('Every profile unsubscribed, no webform: blocked', all.candidates.length === 0 && all.unsubscribedDropped === 1);\n  assert('Subscribed twin outside the search: invitable', count([{ email, unsubscribed: true }, { email, sibling: true }]) === 1);\n  assert('Webform twin outside the search: invitable', count([{ email, unsubscribed: true }, { email, unsubscribed: true, origin: 'user_research_webform', sibling: true }]) === 1);\n  assert('n8n users: an unsubscribed twin does not block', count([{ email }, { email, unsubscribed: true, sibling: true }], { mode: 'n8n_users' }) === 1);\n});\ncheck('Search, per person: cooldown (rule 2)', assert => {\n  assert('Recently contacted duplicate blocks', count([{ email, last_user_research_invite_date: recent }, { email }]) === 0);\n  const twin = format([{ email }, { email, last_user_research_invite_date: recent, sibling: true }]);\n  assert('Recently contacted twin outside the search blocks', twin.candidates.length === 0 && twin.cooldownDroppedBySibling === 1);\n  assert('Twin in the cooldown segment blocks', count([{ email }, { email, sibling: true, inCooldownSegment: true }]) === 0);\n  assert('n8n users: twin in cooldown blocks', count([{ email }, { email, sibling: true, inCooldownSegment: true }], { mode: 'n8n_users' }) === 0);\n  assert('Old invite on a twin does not block', count([{ email }, { email, last_user_research_invite_date: NOW / 1000 - 90 * 86400, sibling: true }]) === 1);\n  assert('Other people in the sample are untouched', same(format([{ email }, { email, sibling: true, inCooldownSegment: true }, { email: 'other@example.test' }]).candidates.map(c => c.email), ['other@example.test']));\n});\ncheck('Search: fails safe when the duplicate check cannot run', assert => {\n  const unread = format([{ email }, { email, sibling: true, fetchError: true }]);\n  assert('Unreadable twin skips the person', unread.candidates.length === 0 && unread.duplicateCheckFailed === 1);\n  const failed = format([{ email }], { lookupStatus: 500 });\n  assert('Failed lookup fails the search', failed.candidates.length === 0 && /duplicate-profile check failed/.test(failed.error || ''));\n  const gone = format([{ email: 'ok@example.test' }, { email: 'gone@example.test', sibling: true, uploaded: true, fetchError: true, inCooldownSegment: true }]);\n  assert('Twins of emails the search did not return are not read', gone.candidates.length === 1 && gone.duplicateCheckFailed === 0);\n});\ncheck('Search: who represents a person with several profiles', assert => {\n  assert('The subscribed profile, not the unsubscribed one', format([{ email, unsubscribed: true, first_name: 'Unsub' }, { email, first_name: 'Good' }]).candidates[0].first_name === 'Good');\n  const empty = { email }, rich = { email, first_name: 'Basile', cloud_plan: 'Cloud Starter' };\n  for (const profiles of [[empty, rich], [rich, empty]]) assert('The profile with the most details, whatever the order', format(profiles).candidates[0].first_name === 'Basile');\n  assert('Subscribed still wins over a richer unsubscribed one', format([{ email, unsubscribed: true, first_name: 'Rich', cloud_plan: 'Cloud Pro-1' }, { email }]).candidates[0].first_name === null);\n  assert('People keep their sample order', same(format([{ email: 'b@example.test' }, { email: 'a@example.test', first_name: 'A', cloud_plan: 'Cloud Pro-1' }]).candidates.map(c => c.email), ['b@example.test', 'a@example.test']));\n});\ncheck('Search: numbers reported for the card', assert => {\n  assert('Profiles per email', same(format([{ email }, { email, sibling: true }, { email, sibling: true }]).csvStats.duplicateProfileEmails, [{ email, profileCount: 3 }]));\n  const out = format([{ email: 'ok@example.test' }, { email: 'twin-cooldown@example.test' }, { email: 'twin-cooldown@example.test', sibling: true, inCooldownSegment: true }, { email: 'unsub@example.test', unsubscribed: true }, { email: 'all-cooldown@example.test', sibling: true, uploaded: true, inCooldownSegment: true }], { extraUploaded: ['nobody@example.test'] });\n  const cs = out.csvStats;\n  assert('CSV breakdown adds up', same([cs.total, out.candidates.length, cs.skippedCooldown, cs.skippedUnsubscribed, cs.skippedNotFound, cs.skippedOther, cs.overCap], [5, 1, 2, 1, 1, 0, 0]));\n  const capped = format([{ email: 'a@example.test' }, { email: 'b@example.test' }, { email: 'c@example.test' }], { sampleSize: 2 });\n  assert('People over the cap are not counted as skipped', same([capped.candidates.length, capped.csvStats.overCap, capped.csvStats.skippedOther], [2, 1, 0]));\n  const users = format([{ email: 'a@example.test' }, { email: 'a@example.test', unsubscribed: true, sibling: true }, { email: 'b@example.test' }, { email: 'b@example.test', sibling: true, inCooldownSegment: true }], { mode: 'n8n_users' });\n  assert('n8n users: people counts and mixed-status list', same([users.peopleSkippedCooldown, users.peopleSkippedUnsubscribed, users.unsubscribeConflictEmails], [1, 0, ['a@example.test']]));\n  const labelled = format([{ email }], { mode: 'n8n_users', filters: { wf_bucket: ['100+', 'unknown'], other: 'x' }, extraConfig: { nUserFilters: [{ id: 'wf_bucket', label: 'Production workflows', options: [{ value: '100+', label: '100+ (~18k)' }] }] } });\n  assert('Filters come back with their Config labels', same(labelled.filterLabels, [{ label: 'Production workflows', values: ['100+ (~18k)', 'unknown'] }, { label: 'other', values: ['x'] }]));\n});\n\nconst all = (Array.isArray(report.results) ? report.results : []).concat(results);\nreturn [{ json: { ...report, suite: 'UXR logic regression (Handler, Search, Send & Stamp)', coverage: 'Current Code node logic of the three workflows with simulated inputs and a fixed clock; no Slack, Customer.io or SMTP call', searchVersionId: searchWf.versionId, sendVersionId: sendWf.versionId, results: all, status: all.every(r => r.status === 'PASS') ? 'PASS' : 'FAIL' } }];"
       }
     }
   ],
@@ -111,22 +205,66 @@
         ]
       ]
     },
-    "Handler Regression Report": {
+    "Called by Test Runner": {
       "main": [
         [
           {
-            "node": "Fail If Tests Failed",
+            "node": "Read Current Staging Handler",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Called by Test Runner": {
+    "Handler Regression Report": {
       "main": [
         [
           {
-            "node": "Read Current Staging Handler",
+            "node": "Handler Checks: BCC and Candidate Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handler Checks: BCC and Candidate Card": {
+      "main": [
+        [
+          {
+            "node": "Read Current Staging Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Current Staging Search": {
+      "main": [
+        [
+          {
+            "node": "Read Current Staging Send & Stamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Current Staging Send & Stamp": {
+      "main": [
+        [
+          {
+            "node": "Search and Send Rules Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search and Send Rules Checks": {
+      "main": [
+        [
+          {
+            "node": "Fail If Tests Failed",
             "type": "main",
             "index": 0
           }
@@ -139,7 +277,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "51ee4557-f7e6-476a-8700-3d61d573ed91",
+  "versionId": "120ef463-00de-490b-8910-65c9073bdf54",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
