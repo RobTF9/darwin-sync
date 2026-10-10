@@ -1,6 +1,7 @@
 {
   "id": "NvhOFdV4H4z3xN9t",
   "name": "PlainBackfill",
+  "description": "One-off harness: runs PlainIngestion with no input (lastSync defaults to 2020 = full backfill with per-thread dedupe + enrichment). Safe to delete after use.",
   "nodes": [
     {
       "id": "3319d0de-39b9-4185-ab83-6fa12ca9fc20",

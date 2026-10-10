@@ -34,9 +34,9 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "chatInput": "Search recent user research sessions, Slack discussions in #mission-user-research, sales calls, support tickets, and forum posts from the past day for anything related to n8n's Agents feature (the built-in AI Agent product). Summarize the key new insights, findings, or feedback. If nothing new was found, say so briefly.",
+            "chatInput": "Step 1 (mandatory, run this as its own separate search call before anything else): call search with sources=slack only, scoped specifically to channel #mission-user-research, for the past day. Do not blend this with other sources in the same call. Read every result returned in full, regardless of length or phrasing.\n\nStep 2 (separate call): search sessions, sales calls (Gong), support tickets (Plain), and forum posts from the past day for anything related to n8n's Agents feature (the built-in AI Agent product).\n\nSummarize the key new insights, findings, or feedback from both steps, giving special importance to posts by Martina Perez with key takeaways about Agents (posts in #mission-user-research are from anyone, but hers take priority when present). If nothing new was found, say so briefly, and confirm that Step 1 (the direct #mission-user-research channel search) was actually run.",
             "sessionId": "={{ $now.toISO() }}",
-            "channel": "C0BRV586LQZ",
+            "channel": "C035KDLD6MP",
             "env": "schedule",
             "user": "scheduled-digest"
           },
@@ -194,7 +194,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "feecdb79-bfa4-4a4b-80d1-17511d83b758",
+  "versionId": "d2a90157-d776-46be-89e1-f30faaefdb66",
   "owner": {
     "type": "personal",
     "projectId": "LmJG224lgqtgbrOT",

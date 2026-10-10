@@ -1,6 +1,7 @@
 {
   "id": "grPqzVKXq92Z7gD6",
   "name": "TEMP - Slack Channel Research Call Share Distribution",
+  "description": "Temporary analysis workflow: fetches C035KDLD6MP Slack history (2025-08-18 to 2026-08-18), filters research-call-sharing messages, groups by poster, resolves names, and posts a percentage distribution table.",
   "nodes": [
     {
       "id": "0090eb8e-1332-42d9-a7dc-8d5401e7c7b2",

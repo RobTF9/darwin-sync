@@ -1,0 +1,243 @@
+{
+  "id": "wNJp6yE4ZBKmtpfe",
+  "name": "EvalPerfReport",
+  "description": "Posts one performance/latency table per eval run to C09DRCJLQCE, clearly labelled agent or workflow. Inputs: run_id, label, results_table, cases_table. Metrics: pass rate, duration median/mean/p90/max, total compute, wall clock, tokens; per-case rows sort",
+  "nodes": [
+    {
+      "id": "774d6b70-fb33-4f5b-9bfb-320b78e4c1b3",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "label"
+            },
+            {
+              "name": "results_table"
+            },
+            {
+              "name": "cases_table"
+            },
+            {
+              "name": "expected_slugs"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cab7d2a2-6327-4d90-890e-e5709d50fa92",
+      "name": "Load Case Names",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "={{ $('Input').item.json.cases_table }}",
+        "returnAll": true,
+        "filterType": "none"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "05e33aa3-9956-4cea-8f73-927dcdd98d2b",
+      "name": "Load Rows",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "={{ $('Input').item.json.results_table }}",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Input').item.json.run_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "6e0c05e9-45bf-445c-ae06-37de950d70bf",
+      "name": "Build Table",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Per-run performance table: everything about latency and outcomes in tables.\nconst inp = $('Input').item.json;\nconst slugs = {};\nfor (const c of $('Load Case Names').all()) { const j = c.json; if (j && j.id) slugs[j.id] = j.slug; }\nconst rows = $input.all().map(i => i.json).filter(r => r && r.run_id === inp.run_id);\nconst seen = new Set();\nconst cases = [];\nfor (const r of rows) { if (!r.case_id || seen.has(r.case_id)) continue; seen.add(r.case_id); cases.push(r); }\nconst cell = t => String(t).replace(/\\|/g, '\\\\|').replace(/\\n+/g, ' ');\nconst durs = cases.map(c => (typeof c.duration_ms === 'number' ? c.duration_ms : null)).filter(v => v !== null).sort((a, b) => a - b);\nconst q = p => durs.length ? Math.round(durs[Math.min(durs.length - 1, Math.round(p * (durs.length - 1)))] / 1000) : null;\nconst sum = arr => arr.reduce((a, b) => a + b, 0);\nconst passed = cases.filter(c => c.status === 'pass').length;\nconst failed = cases.filter(c => c.status === 'fail').length;\nconst errored = cases.filter(c => c.status === 'error').length;\nconst tokTotal = sum(cases.map(c => (c.usage && typeof c.usage.totalTokens === 'number') ? c.usage.totalTokens : 0));\nconst times = cases.map(c => new Date(c.created_at).getTime()).sort((a, b) => a - b);\nlet wallS = null;\nif (times.length > 1) {\n  const firstLanded = cases.reduce((best, c) => (new Date(c.created_at).getTime() < new Date(best.created_at).getTime() ? c : best), cases[0]);\n  const firstStart = new Date(firstLanded.created_at).getTime() - (typeof firstLanded.duration_ms === 'number' ? firstLanded.duration_ms : 0);\n  wallS = Math.round((times[times.length - 1] - firstStart) / 1000);\n}\n// Expected vs landed: the runner passes the dispatched slug list so a\n// timed-out run names exactly which cases never landed.\nconst expected = String(inp.expected_slugs ?? '').split(',').map(s => s.trim()).filter(Boolean);\nconst landedSlugs = new Set(cases.map(c => c.case_slug || slugs[c.case_id] || c.case_id));\nconst missing = expected.filter(s => !landedSlugs.has(s));\nconst fmtS = v => (v == null ? '\\u2014' : v + 's');\nconst lines = [];\nlines.push('## \\ud83d\\udcca ' + inp.label + ' \\u2014 ' + inp.run_id, '');\nlines.push('| Metric | Value |');\nlines.push('| --- | --- |');\nif (expected.length) {\n  lines.push('| Run status | ' + (missing.length === 0 ? '\\u2705 complete \\u2014 ' + cases.length + '/' + expected.length + ' landed' : '\\u26a0\\ufe0f INCOMPLETE \\u2014 ' + cases.length + '/' + expected.length + ' landed') + ' |');\n}\nlines.push('| Cases landed | ' + cases.length + ' |');\nlines.push('| \\u2705 Pass / \\u274c Fail / \\ud83d\\udca5 Error | ' + passed + ' / ' + failed + ' / ' + errored + ' |');\nlines.push('| Pass rate | ' + (cases.length ? ((passed / cases.length) * 100).toFixed(1) + '%' : '\\u2014') + ' |');\nif (durs.length) {\n  lines.push('| Case duration \\u2014 median | ' + fmtS(q(0.5)) + ' |');\n  lines.push('| Case duration \\u2014 mean | ' + Math.round(sum(durs) / durs.length / 1000) + 's |');\n  lines.push('| Case duration \\u2014 p90 | ' + fmtS(q(0.9)) + ' |');\n  lines.push('| Case duration \\u2014 max | ' + fmtS(q(1)) + ' |');\n  lines.push('| Total compute | ' + Math.round(sum(durs) / 1000) + 's |');\n}\nif (wallS) lines.push('| Wall clock (first start \\u2192 last landed) | ' + wallS + 's |');\nif (tokTotal) lines.push('| Total tokens | ' + tokTotal.toLocaleString() + ' |');\nif (missing.length) {\n  lines.push('| \\u23f3 Never landed (timed out / still running) | ' + missing.map(s => '`' + s + '`').join(', ') + ' |');\n}\nlines.push('', '### Cases by duration', '');\nlines.push('| Case | Status | Duration | Tokens | Tools |');\nlines.push('| --- | --- | --- | --- | --- |');\nconst sorted = cases.slice().sort((a, b) => (b.duration_ms || 0) - (a.duration_ms || 0));\nfor (const c of sorted) {\n  const slug = c.case_slug || slugs[c.case_id] || c.case_id;\n  const st = c.status === 'pass' ? '\\u2705 pass' : (c.status === 'fail' ? '\\u274c fail' : '\\ud83d\\udca5 ' + c.status);\n  const dur = typeof c.duration_ms === 'number' ? Math.round(c.duration_ms / 1000) + 's' : '\\u2014';\n  const tok = (c.usage && c.usage.totalTokens) ? Number(c.usage.totalTokens).toLocaleString() : '\\u2014';\n  let tools = c.called_tools;\n  if (typeof tools === 'string') { try { tools = JSON.parse(tools); } catch (e) { tools = [tools]; } }\n  const toolsStr = Array.isArray(tools) ? tools.join(', ') : '\\u2014';\n  lines.push('| `' + cell(slug) + '` | ' + st + ' | ' + dur + ' | ' + tok + ' | ' + cell(toolsStr) + ' |');\n}\nlines.push('', '_Generated ' + new Date().toISOString() + '_');\nreturn [{ json: { markdown: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "33711eb1-8cd3-4192-a629-9b702eea6f33",
+      "name": "format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Build Slack Block Kit markdown blocks from the Summary node's markdown output.\n// Splits long text across multiple mrkdwn blocks (3,000-char limit each),\n// up to ~90KB total serialized JSON payload to stay within Slack API limits.\n// Splits on newlines where possible. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\n\nconst PER_BLOCK = 2900;  // leave margin under Slack's 3000-char limit\nconst MAX_BLOCKS = 50;   // hard cap: Slack max 50 blocks\nconst MAX_PAYLOAD_BYTES = 90000;  // ~90KB budget for serialized { blocks: [...] }\nconst TRUNCATION_NOTE = '\\n\\n_… (truncated: response too long for a single Slack message)_';\n\nlet text = $json.markdown ?? '';\nconst fullText = text;  // preserve original for downstream use\n\n// --- Helper: estimate serialized size of a blocks array ---\nfunction estimatePayloadSize(blocksArr) {\n  // Serialize just the blocks array; the outer { \"blocks\": [...] } wrapper adds ~15 chars\n  return JSON.stringify(blocksArr).length + 20;\n}\n\n// --- Split text into chunks ---\nfunction splitIntoChunks(str, chunkSize, maxBlocks, maxBytes) {\n  const chunks = [];\n  const trialBlocks = [];\n\n  while (str.length > 0 && chunks.length < maxBlocks) {\n    if (str.length <= chunkSize) {\n      chunks.push(str);\n      trialBlocks.push({ type: 'markdown', text: str });\n      if (estimatePayloadSize(trialBlocks) > maxBytes) {\n        const removed = chunks.pop();\n        trialBlocks.pop();\n        const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n        const maxTextLen = Math.max(0, remaining - 60);\n        if (maxTextLen > 50) {\n          chunks.push(removed.slice(0, maxTextLen) + TRUNCATION_NOTE);\n        }\n      }\n      break;\n    }\n\n    // Try to find last newline within the chunk boundary\n    const sliceTarget = str.slice(0, chunkSize);\n    const lastNewline = sliceTarget.lastIndexOf('\\n');\n    let chunk;\n    if (lastNewline > chunkSize - 500) {\n      chunk = str.slice(0, lastNewline);\n      str = str.slice(lastNewline + 1);\n    } else {\n      chunk = sliceTarget;\n      str = str.slice(chunkSize);\n    }\n\n    const tentativeBlocks = [...trialBlocks, { type: 'markdown', text: chunk }];\n    if (estimatePayloadSize(tentativeBlocks) > maxBytes) {\n      const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n      const maxTextLen = Math.max(0, remaining - 60);\n      if (maxTextLen > 50) {\n        chunks.push(chunk.slice(0, maxTextLen) + TRUNCATION_NOTE);\n      }\n      break;\n    }\n\n    chunks.push(chunk);\n    trialBlocks.push({ type: 'markdown', text: chunk });\n  }\n\n  if (str.length > 0 && chunks.length === maxBlocks) {\n    chunks[chunks.length - 1] = chunks[chunks.length - 1].replace(/\\n*$/, '') + TRUNCATION_NOTE;\n  }\n\n  return chunks;\n}\n\nconst chunks = splitIntoChunks(text, PER_BLOCK, MAX_BLOCKS, MAX_PAYLOAD_BYTES);\nconst blocks = chunks.map(t => ({ type: 'markdown', text: t }));\nconst content = { blocks };\n\nreturn [{ json: { blocksJson: JSON.stringify(content), output: fullText } }];"
+      }
+    },
+    {
+      "id": "f336b25f-f9dc-4f6f-89fb-2f6dbe4100a8",
+      "name": "ChunkBlocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Group the formatted blocks into message-sized chunks so no single Slack\n// message exceeds Slack's cumulative block-text limit (~13k chars, undocumented —\n// see slackapi/bolt-js#2509). Emits one item per message; Send a message then posts\n// one message per item. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\nconst MSG_BUDGET = 8000; // chars of block text per message, safe margin under ~13k\n\nconst blocksJson = $('format').first().json.blocksJson;\n\nlet blocks;\ntry {\n  blocks = JSON.parse(blocksJson).blocks;\n  if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('no blocks');\n} catch (e) {\n  // Fall back to previous single-message behaviour if parsing fails\n  return [{ json: { blocksJson, part: 1, totalParts: 1 } }];\n}\n\nconst messages = [];\nlet current = [];\nlet currentLen = 0;\n\nfor (const block of blocks) {\n  const len = (block.text || '').length;\n  if (current.length > 0 && currentLen + len > MSG_BUDGET) {\n    messages.push(current);\n    current = [];\n    currentLen = 0;\n  }\n  current.push(block);\n  currentLen += len;\n}\nif (current.length > 0) messages.push(current);\n\nreturn messages.map((msgBlocks, i) => ({\n  json: {\n    blocksJson: JSON.stringify({ blocks: msgBlocks }),\n    part: i + 1,\n    totalParts: messages.length,\n  },\n}));"
+      }
+    },
+    {
+      "id": "426cdab8-b283-4e07-a87d-d9914226ecbe",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09DRCJLQCE",
+          "mode": "id"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ $json.blocksJson }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "69bca9f5-2992-4475-abcc-61a7257ff02e"
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Load Case Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Case Names": {
+      "main": [
+        [
+          {
+            "node": "Load Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Rows": {
+      "main": [
+        [
+          {
+            "node": "Build Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Table": {
+      "main": [
+        [
+          {
+            "node": "format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format": {
+      "main": [
+        [
+          {
+            "node": "ChunkBlocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChunkBlocks": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "eb45ee66-4b03-4c35-ab81-dd89151b6bfd",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "U1hoqp33rsBJ5M2X",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,6 +1,7 @@
 {
   "id": "5rf4hJ2DjrgIAped",
   "name": "EvalRun",
+  "description": "Eval suite orchestrator: callable as sub-workflow (no independent schedule). Loads all Eval cases, dispatches each to EvalDispatch in parallel, returns run_id and case_count.",
   "nodes": [
     {
       "parameters": {

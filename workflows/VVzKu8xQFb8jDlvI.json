@@ -1,0 +1,106 @@
+{
+  "id": "VVzKu8xQFb8jDlvI",
+  "name": "PF Capture Test Runner",
+  "description": "Sends 14 fake Calendly events to PF Calendly Capture in order. Manual only. DWN-6.",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "043f71d9-336c-4627-a192-3d94db6dd3ed",
+      "name": "Run Capture Tests",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fake Calendly webhook bodies, sent in this order to PF Calendly Capture.\n// Same cases as darwin/tools/participant-follow-up/fixtures/calendly-events.json in pidgeon-head.\nconst RR = 'https://api.calendly.com/event_types/ebd64db8-7c09-4e31-bc2e-339065fbb930';\nconst FAKE_ET = 'https://api.calendly.com/event_types/MOCK-ET-DOES-NOT-EXIST';\nconst inv = (c) => `https://api.calendly.com/scheduled_events/MOCK-EVT-${c}/invitees/MOCK-INV-${c}`;\nconst evt = (c) => `https://api.calendly.com/scheduled_events/MOCK-EVT-${c}`;\nconst UXR = { utm_source: 'uxr_recruiting', utm_medium: 'email', utm_campaign: 'batch_mock-001' };\nconst cx = (reason) => ({ canceled_by: 'Mock Participant', canceler_type: 'invitee', reason, created_at: '2026-10-02T08:00:00Z' });\nconst S = ['2026-10-05T09:00:00.000000Z', '2026-10-05T09:30:00.000000Z'];\nconst S2 = ['2026-10-06T09:00:00.000000Z', '2026-10-06T09:30:00.000000Z'];\n\nfunction payload(c, first, [start, end], o = {}) {\n  return {\n    uri: inv(c), email: o.email ?? `aniol.moner+${c.toLowerCase()}@n8n.io`,\n    name: `${first} Mock`, first_name: first, last_name: 'Mock',\n    status: o.cancel ? 'canceled' : 'active', timezone: 'Europe/Madrid',\n    rescheduled: o.rescheduled ?? false, old_invitee: o.old ?? null, new_invitee: o.new ?? null,\n    reschedule_url: `https://calendly.com/reschedulings/MOCK-${c}`,\n    cancel_url: `https://calendly.com/cancellations/MOCK-${c}`,\n    cancellation: o.cancel ?? null, no_show: null, tracking: o.tracking ?? {},\n    scheduled_event: {\n      uri: evt(c), name: o.name ?? 'Research with n8n', event_type: o.et ?? RR,\n      start_time: start, end_time: end, status: o.cancel ? 'canceled' : 'active',\n      event_memberships: [{ user: 'https://api.calendly.com/users/MOCK-HOST', user_email: 'aniol.moner@n8n.io', user_name: 'Aniol Moner' }],\n    },\n  };\n}\nconst created = (p, label) => ({ _label: label, event: 'invitee.created', payload: p });\nconst canceled = (p, label) => ({ _label: label, event: 'invitee.canceled', payload: p });\n\nconst fixtures = [\n  created(payload('R1', 'Rita', S, { tracking: UXR }), 'F1 recruiting create: uxr_recruiting, batch_mock-001, link with utm'),\n  created(payload('C1', 'Carl', S), 'F2 CD create: continuous_discovery'),\n  created(payload('X1', 'Xena', S, { et: FAKE_ET, name: 'Other research' }), 'F3 research create, lookup fails: link = reschedule_url'),\n  canceled(payload('C1', 'Carl', S, { cancel: cx('Cannot make it') }), 'F4 cancel C1: canceled, reason saved'),\n  created(payload('S1', 'Sara', S), 'F5a reschedule in order: original S1'),\n  canceled(payload('S1', 'Sara', S, { rescheduled: true, new: inv('S2'), cancel: cx('Rescheduled') }), 'F5b S1 canceled, rescheduled=true'),\n  created(payload('S2', 'Sara', S2, { old: inv('S1') }), 'F5c new S2: S1 rescheduled to S2, S2 active'),\n  created(payload('T1', 'Tom', S), 'F6a reschedule out of order: original T1'),\n  created(payload('T2', 'Tom', S2, { old: inv('T1') }), 'F6b new T2 before the cancel: T1 rescheduled'),\n  canceled(payload('T1', 'Tom', S, { rescheduled: true, new: inv('T2'), cancel: cx('Rescheduled') }), 'F6c T1 cancel last: T1 still rescheduled'),\n  canceled(payload('U1', 'Uma', S, { cancel: cx('Changed my mind') }), 'F7a cancel before create: U1 canceled'),\n  created(payload('U1', 'Uma', S), 'F7b late create for U1: still canceled'),\n  created(payload('R1', 'Rita', S, { tracking: UXR }), 'F9 duplicate delivery of F1: still one R1 row'),\n  created(payload('Z1', 'Zoe', S, { email: 'zoe.real.person@example.com' }), 'F8 non-mock email: dropped, no row'),\n];\nreturn fixtures.map((f) => ({ json: f }));\n"
+      },
+      "id": "ec3cc5a7-09d6-4cfb-8bc7-3fbcebfe9a4e",
+      "name": "Load Fake Calendly Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "OTRuMi0PTM6NYO97",
+          "cachedResultName": "PF Calendly Capture"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "b0f12150-28a2-4234-b02c-12f627503079",
+      "name": "Send Each To Capture",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## PF Capture Test Runner\nSends 14 fake Calendly events to **PF Calendly Capture**, one at a time, in order. Run **PF Reset Mock Data** first. Then check **MOCK - PF Sessions** against the expected state in each `_label`.",
+        "color": 5
+      },
+      "id": "6b35b1e2-6691-4070-8ac8-0357f3dca815",
+      "name": "Sticky Note 118acd2c",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Run Capture Tests": {
+      "main": [
+        [
+          {
+            "node": "Load Fake Calendly Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Fake Calendly Events": {
+      "main": [
+        [
+          {
+            "node": "Send Each To Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "5ae3fa98-0123-4e3d-8c58-8fd347420608",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,6 +1,7 @@
 {
   "id": "d9SjmZQUykfIA7gC",
   "name": "AnalysisReprocess",
+  "description": "Staging test harness: manually re-runs the Darwin analysis sub-workflows (SessionAnalysis, JobAnalysis, OpportunityAnalysis) sequentially for a fixed session ID to generate real executions with token usage for CostDigest testing.",
   "nodes": [
     {
       "id": "99bbd1e0-f949-4080-aa44-e76823a850be",
@@ -213,7 +214,8 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
   "versionId": "47ee13b7-d439-40ac-a48d-e5f7f7ab574d",

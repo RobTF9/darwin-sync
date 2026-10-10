@@ -695,7 +695,8 @@
           "__rl": true,
           "value": "OmYJgjJ9n7eGVQCT",
           "mode": "list",
-          "cachedResultName": "Session QA analyst"
+          "cachedResultUrl": "/workflow/OmYJgjJ9n7eGVQCT",
+          "cachedResultName": "Darwin — Session QA analyst"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -731,14 +732,6 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "ac32c100-89c9-4bbf-97df-e38c4a4575b4",
-      "name": "Run L3 Again",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        3584,
-        -120
-      ],
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -769,44 +762,43 @@
           "waitForSubWorkflow": true
         }
       },
-      "onError": "continueRegularOutput",
-      "executeOnce": true
+      "id": "ac32c100-89c9-4bbf-97df-e38c4a4575b4",
+      "name": "Run L3 Again",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3584,
+        -128
+      ],
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
     },
     {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- The newest complete insight run that is NOT the one the reviewer sees.\nselect run_id::text as compare_run_id\nfrom project_insight\nwhere project_id = $1::uuid\n  and completed_at is not null\n  and run_id <> $2::uuid\ngroup by run_id\norder by max(created_at) desc\nlimit 1",
+        "options": {
+          "queryReplacement": "={{ $('Load Run').first().json.project_id }},{{ $('Read L3 Run Ids').first().json.run_id }}"
+        }
+      },
       "id": "cd30f47c-dca8-4541-97fb-61645d274098",
       "name": "Read Compare Run Id",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
         3808,
-        -120
+        -128
       ],
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "-- The newest complete insight run that is NOT the one the reviewer sees.\nselect run_id::text as compare_run_id\nfrom project_insight\nwhere project_id = $1::uuid\n  and completed_at is not null\n  and run_id <> $2::uuid\ngroup by run_id\norder by max(created_at) desc\nlimit 1",
-        "options": {
-          "queryReplacement": "={{ $('Load Run').first().json.project_id }},{{ $('Read L3 Run Ids').first().json.run_id }}"
-        },
-        "alwaysOutputData": true
-      },
+      "executeOnce": true,
       "credentials": {
         "postgres": {
           "id": "Av2ehn3RdLrlzohO",
           "name": "Supabase Postgres"
         }
       },
-      "onError": "continueRegularOutput",
-      "executeOnce": true
+      "onError": "continueRegularOutput"
     },
     {
-      "id": "6045d747-4b55-4946-9de1-f7e4231af48e",
-      "name": "Score Stability",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        4032,
-        -120
-      ],
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -848,44 +840,43 @@
           "waitForSubWorkflow": true
         }
       },
-      "onError": "continueRegularOutput",
-      "executeOnce": true
+      "id": "6045d747-4b55-4946-9de1-f7e4231af48e",
+      "name": "Score Stability",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4032,
+        -128
+      ],
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
     },
     {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- The second run existed only to be compared against. The score is already\n-- stored on the run the reviewer sees, so this run is now dead weight - and\n-- leaving it would show its ~80 quotes a second time on the session timelines.\n-- Deleting the insights cascades to their clips and finding links.\n-- Guarded so it can never remove the run the reviewer sees, and a missing\n-- compare run simply matches nothing.\nwith target as (\n  select nullif($1,'')::uuid as compare_run, nullif($2,'')::uuid as primary_run\n)\ndelete from project_insight pi\nusing target t\nwhere pi.run_id = t.compare_run\n  and t.compare_run is distinct from t.primary_run\nreturning pi.id",
+        "options": {
+          "queryReplacement": "={{ $('Read Compare Run Id').first().json.compare_run_id }},{{ $('Read L3 Run Ids').first().json.run_id }}"
+        }
+      },
       "id": "d779581e-b689-4ed2-8817-17723c8e31c1",
       "name": "Delete Compare Run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
         4256,
-        -120
+        -128
       ],
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "-- The second run existed only to be compared against. The score is already\n-- stored on the run the reviewer sees, so this run is now dead weight - and\n-- leaving it would show its ~80 quotes a second time on the session timelines.\n-- Deleting the insights cascades to their clips and finding links.\n-- Guarded so it can never remove the run the reviewer sees, and a missing\n-- compare run simply matches nothing.\nwith target as (\n  select nullif($1,'')::uuid as compare_run, nullif($2,'')::uuid as primary_run\n)\ndelete from project_insight pi\nusing target t\nwhere pi.run_id = t.compare_run\n  and t.compare_run is distinct from t.primary_run\nreturning pi.id",
-        "options": {
-          "queryReplacement": "={{ $('Read Compare Run Id').first().json.compare_run_id }},{{ $('Read L3 Run Ids').first().json.run_id }}"
-        },
-        "alwaysOutputData": true
-      },
+      "executeOnce": true,
       "credentials": {
         "postgres": {
           "id": "Av2ehn3RdLrlzohO",
           "name": "Supabase Postgres"
         }
       },
-      "onError": "continueRegularOutput",
-      "executeOnce": true
+      "onError": "continueRegularOutput"
     },
     {
-      "id": "d38dc03d-2c44-461c-b10d-c97305e7c1fe",
-      "name": "Run Research Questions",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        4480,
-        -120
-      ],
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -916,8 +907,17 @@
           "waitForSubWorkflow": true
         }
       },
+      "id": "d38dc03d-2c44-461c-b10d-c97305e7c1fe",
+      "name": "Run Research Questions",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4480,
+        -128
+      ],
+      "executeOnce": true,
       "onError": "continueRegularOutput",
-      "executeOnce": true
+      "alwaysOutputData": true
     }
   ],
   "connections": {
@@ -1310,7 +1310,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "542d20a8-c014-45ad-a52c-6b156b52743f",
+  "versionId": "0d88e0bb-93a5-4999-9888-f7efc094b0e1",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

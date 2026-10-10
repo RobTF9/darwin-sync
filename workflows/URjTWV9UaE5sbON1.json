@@ -64,7 +64,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const c = $input.first().json;\nconst runId = $('Case Input').item.json.run_id;\nconst caseId = $('Case Input').item.json.case_id;\nlet ctx = c.context_messages;\nif (typeof ctx === 'string') { try { ctx = JSON.parse(ctx); } catch (e) { ctx = []; } }\nif (!Array.isArray(ctx)) ctx = [];\nconst sessionId = 'retrieval-' + runId + '-' + caseId;\n// Multi-turn cases: fold prior turns into ONE prompt. Replaying turns as separate\n// agent calls accumulates tool outputs in session memory and overflows the context\n// window (observed: 3M tokens by turn 3 on a transcript-heavy case).\nlet chatInput = c.prompt;\nif (ctx.length) {\n  const numbered = ctx.map((m, i) => (i + 1) + '. ' + String(m)).join('\\n');\n  chatInput = 'Earlier in this conversation, the user said:\\n' + numbered + '\\n\\nCurrent question: ' + c.prompt;\n}\nreturn [{ json: { chatInput: chatInput, is_final: true, sessionId: sessionId, slug: c.slug } }];"
+        "jsCode": "const c = $input.first().json;\nconst runId = $('Case Input').item.json.run_id;\nconst caseId = $('Case Input').item.json.case_id;\nlet ctx = c.context_messages;\nif (typeof ctx === 'string') { try { ctx = JSON.parse(ctx); } catch (e) { ctx = []; } }\nif (!Array.isArray(ctx)) ctx = [];\nconst sessionId = 'retrieval-' + runId + '-' + caseId;\n// Multi-turn cases: fold prior turns into ONE prompt. Replaying turns as separate\n// agent calls accumulates tool outputs in session memory and overflows the context\n// window (observed: 3M tokens by turn 3 on a transcript-heavy case).\nlet chatInput = c.prompt;\nif (ctx.length) {\n  const numbered = ctx.map((m, i) => (i + 1) + '. ' + String(m)).join('\\n');\n  chatInput = 'Earlier in this conversation, the user said:\\n' + numbered + '\\n\\nCurrent question: ' + c.prompt;\n}\n// started_at_ms feeds duration_ms in Save Result (case wall-clock incl. the agent call).\nreturn [{ json: { chatInput: chatInput, is_final: true, sessionId: sessionId, slug: c.slug, started_at_ms: Date.now() } }];"
       },
       "id": "449d64ef-4a60-4a16-b663-4211065301ea",
       "name": "Build Turns",
@@ -126,7 +126,6 @@
     },
     {
       "parameters": {
-        "tableId": "retrieval_results",
         "fieldsUi": {
           "fieldValues": [
             {
@@ -172,9 +171,18 @@
             {
               "fieldId": "execution_url",
               "fieldValue": "={{ $json.execution_url }}"
+            },
+            {
+              "fieldId": "agent",
+              "fieldValue": "darwin-workflow"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "={{ Date.now() - $('Build Turns').item.json.started_at_ms }}"
             }
           ]
-        }
+        },
+        "tableId": "retrieval_results"
       },
       "id": "0a31ec5b-5bce-438d-8559-26eeb0ed3d15",
       "name": "Save Result",
@@ -279,7 +287,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "6302c351-8f6c-40b7-b6a7-7967650eb343",
+  "versionId": "5210dd0a-e110-48c9-b399-268136068be1",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

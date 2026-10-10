@@ -1,0 +1,110 @@
+{
+  "id": "cik0FOMjok6xhZDq",
+  "name": "Qontext API Probe",
+  "description": "Qontext PoC: API probe. Documents the real response shapes of the file endpoints.",
+  "nodes": [
+    {
+      "id": "e956eff1-965a-48c4-9969-2bbeac04b017",
+      "name": "Start Probe",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "12e53d88-d80b-4cb2-ba18-7e0d60619371",
+      "name": "List Topic Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.qontext.ai/v1/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qontextApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "path_prefix",
+              "value": "/Product-Design/Topics"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "qontextApi": {
+          "id": "hzNNio0zP5yj4Cg5",
+          "name": "Qontext account"
+        }
+      }
+    },
+    {
+      "id": "134866d4-4131-49ac-88f6-3e9741e9be33",
+      "name": "Get First File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.qontext.ai/v1/files/{{ $json.data[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qontextApi"
+      },
+      "credentials": {
+        "qontextApi": {
+          "id": "hzNNio0zP5yj4Cg5",
+          "name": "Qontext account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Probe": {
+      "main": [
+        [
+          {
+            "node": "List Topic Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Topic Files": {
+      "main": [
+        [
+          {
+            "node": "Get First File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "22e54c09-c259-4b46-b4a9-16b57a670593",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

@@ -1,6 +1,7 @@
 {
   "id": "65ec7cDouoYwobRG",
   "name": "TEMP - Slack Research Call Distribution",
+  "description": "Temporary analysis workflow: fetches ~1 year of Slack messages from channel C035KDLD6MP with pagination, filters for research-call references (gong.io, pidgeonhead, research call, session), counts matches per user, resolves user IDs to names, and outputs ",
   "nodes": [
     {
       "id": "0a16ee80-a89d-4c4a-9e11-54b092e97085",

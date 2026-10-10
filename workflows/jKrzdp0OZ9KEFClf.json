@@ -1,0 +1,108 @@
+{
+  "id": "jKrzdp0OZ9KEFClf",
+  "name": "PF Sessions Ingest Test Runner",
+  "description": "Test helper. Sends 13 fake Calendly events to Darwin Sessions Ingest (Calendly). DWN-6.",
+  "nodes": [
+    {
+      "id": "4ab3d1bc-1a21-4aa9-bfc9-f833fcb93e0f",
+      "name": "Run Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "645783d5-9b8b-4178-a799-2be9a53ea57e",
+      "name": "Fake Calendly Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Fake Calendly events for Darwin Sessions Ingest, sent in order. Sessions are tomorrow,\n// so PF Show-up Check never picks them up.\nconst run = $now.toFormat('HHmmss');\nconst CD = 'https://api.calendly.com/event_types/ebd64db8-7c09-4e31-bc2e-339065fbb930';\nconst OTHER = 'https://api.calendly.com/event_types/MOCK-ET-RESEARCH-OTHER';\nconst inv = (c) => `https://api.calendly.com/scheduled_events/MOCK-EVT-SI-${c}-${run}/invitees/MOCK-INV-SI-${c}-${run}`;\nconst evt = (c) => `https://api.calendly.com/scheduled_events/MOCK-EVT-SI-${c}-${run}`;\nconst start = $now.plus({ days: 1 }).set({ hour: 10, minute: 0, second: 0, millisecond: 0 });\nconst end = start.plus({ minutes: 30 });\nconst UXR = { utm_source: 'uxr_recruiting', utm_medium: 'email', utm_campaign: `batch_mock-si-${run}` };\nconst QA = [{ question: 'What do you use n8n for?', answer: 'Mock answer' }, { question: 'Company size', answer: '11-50' }];\n\nfunction payload(c, first, tag, o = {}) {\n  return {\n    uri: inv(c), email: o.email ?? `aniol.moner+${tag}@n8n.io`, name: `${first} Mock`, first_name: first, last_name: 'Mock',\n    status: o.cancel ? 'canceled' : 'active', timezone: 'Europe/Madrid',\n    rescheduled: o.rescheduled ?? false, old_invitee: o.old ?? null, new_invitee: o.new ?? null,\n    reschedule_url: `https://calendly.com/reschedulings/MOCK-SI-${c}`, cancel_url: `https://calendly.com/cancellations/MOCK-SI-${c}`,\n    cancellation: o.cancel ? { canceled_by: `${first} Mock`, canceler_type: 'invitee', reason: o.cancel, created_at: $now.toISO() } : null,\n    no_show: null, tracking: o.tracking ?? {}, questions_and_answers: QA,\n    scheduled_event: {\n      uri: evt(c), name: o.name ?? 'Research with n8n', event_type: o.et ?? CD,\n      start_time: start.toUTC().toISO(), end_time: end.toUTC().toISO(), status: o.cancel ? 'canceled' : 'active',\n      event_memberships: [{ user: 'https://api.calendly.com/users/MOCK-HOST', user_email: 'aniol.moner@n8n.io', user_name: 'Aniol Moner' }],\n    },\n  };\n}\nconst created = (p, label) => ({ json: { _label: label, event: 'invitee.created', payload: p } });\nconst canceled = (p, label) => ({ json: { _label: label, event: 'invitee.canceled', payload: p } });\nconst R = { et: OTHER, name: 'Aniol research interview' };\n\nreturn [\n  created(payload('A', 'Ada', 'si-a'), 'A: CD event, no utm -> continuous_discovery / continuous_discovery'),\n  created(payload('B', 'Ben', 'si-b', { tracking: UXR }), 'B: CD event WITH recruiting utm -> still continuous_discovery, source uxr_recruiting'),\n  created(payload('C', 'Cleo', 'si-c', { ...R, tracking: UXR }), 'C: other event, recruiting utm -> research / uxr_recruiting'),\n  created(payload('D', 'Dev', 'si-d', R), 'D: other event, no utm -> research / research'),\n  canceled(payload('D', 'Dev', 'si-d', { ...R, cancel: 'Cannot make it' }), 'E: cancel D -> canceled, canceled_at, reason'),\n  created(payload('F1', 'Fay', 'si-f'), 'F1: CD original'),\n  canceled(payload('F1', 'Fay', 'si-f', { cancel: 'Rescheduled', rescheduled: true, new: inv('F2') }), 'F1 canceled as rescheduled'),\n  created(payload('F2', 'Fay', 'si-f', { old: inv('F1') }), 'F2: new booking -> F1 rescheduled + canceled_at, F2 active'),\n  created(payload('G1', 'Gus', 'si-g'), 'G1: CD original (out of order test)'),\n  created(payload('G2', 'Gus', 'si-g', { old: inv('G1') }), 'G2 arrives before the cancel -> G1 rescheduled + canceled_at'),\n  canceled(payload('G1', 'Gus', 'si-g', { cancel: 'Rescheduled', rescheduled: true, new: inv('G2') }), 'G1 cancel last -> still rescheduled'),\n  created(payload('A', 'Ada', 'si-a'), 'I: duplicate of A -> still one row'),\n  created(payload('H', 'Hal', 'si-h', { email: 'hal.real.person@example.com' }), 'H: non-mock email -> dropped'),\n];\n"
+      }
+    },
+    {
+      "id": "f4ea28c2-a580-48b4-8f95-57b2cfbd5959",
+      "name": "Call Sessions Ingest (one by one)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BroGfMZ821FTfWSE",
+          "cachedResultName": "Darwin Sessions Ingest (Calendly)"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "6be09af5-869c-4c0e-bb73-7346484b11f1",
+      "name": "Sticky Note 35eedf88",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ],
+      "parameters": {
+        "content": "## PF Sessions Ingest Test Runner\nSends 13 fake Calendly events, in order, to Darwin Sessions Ingest (Calendly). All sessions are tomorrow, so the show-up check does not pick them up. Each run uses new URIs. Clean up with PF Reset Mock Data.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Run Test": {
+      "main": [
+        [
+          {
+            "node": "Fake Calendly Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fake Calendly Events": {
+      "main": [
+        [
+          {
+            "node": "Call Sessions Ingest (one by one)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "a4b0cc40-9f93-4450-aaa2-a1cbd863109f",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

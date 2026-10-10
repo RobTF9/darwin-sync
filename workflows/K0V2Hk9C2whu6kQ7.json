@@ -1,0 +1,110 @@
+{
+  "id": "K0V2Hk9C2whu6kQ7",
+  "name": "FanOutResults",
+  "description": "fan_out_results tool: fetches the current state of a fan-out run by run_id and returns { done, total_items, completed, errors, pending, results[] } instantly. Agents poll this (with wait between calls) instead of holding a long tool call open.",
+  "nodes": [
+    {
+      "id": "6b32e3c5-6c7e-4c24-9662-4b01b1c8a1c2",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0106b8ab-e493-4fbf-8412-a8ef81af395c",
+      "name": "Fetch Rows",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "fan_out_item",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Input').first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "88f6c75f-9173-4669-b40c-1d44b87cf896",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const runId = $('Input').first().json.run_id;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.run_id === runId);\n\nif (!rows.length) {\n  return [{ json: { run_id: runId, error: 'No fan-out run found with this run_id. Check the run_id returned by fan_out.' } }];\n}\n\nconst completed = rows.filter(r => r.status === 'complete');\nconst errors = rows.filter(r => r.status === 'error');\nconst pending = rows.filter(r => r.status === 'pending');\nconst done = pending.length === 0;\n\nreturn [{\n  json: {\n    run_id: runId,\n    done,\n    total_items: rows.length,\n    completed: completed.length,\n    errors: errors.length,\n    pending: pending.length,\n    hint: done ? undefined : ('Not finished — ' + pending.length + ' item(s) still processing. Call wait for 60 seconds, then call fan_out_results again with the same run_id.'),\n    results: rows\n      .filter(r => r.status !== 'pending')\n      .sort((a, b) => (a.item_index ?? 0) - (b.item_index ?? 0))\n      .map(r => {\n        let item = r.item;\n        if (typeof item === 'string') { try { item = JSON.parse(item); } catch (e) {} }\n        return { item_index: r.item_index, item, status: r.status, response: r.response };\n      })\n  }\n}];"
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Rows": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "00fc0968-86dc-4175-b1b9-d63203f74c17",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "NCt4R7psjj0OsNSk",
+  "isArchived": false,
+  "nodeGroups": []
+}

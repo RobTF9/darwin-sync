@@ -1,0 +1,1970 @@
+{
+  "id": "YKTgyYkJwppQZXGT",
+  "name": "PF Reward",
+  "description": "Reward flow for one session: $50 / other amount (form, 1-100) / no reward, confirm, duplicate check, stub balance, Tremendous stub. Sub-workflow. DWN-6.",
+  "nodes": [
+    {
+      "id": "6b5a9f7e-557a-4fec-9b77-4b3ed29c7bac",
+      "name": "When Called By Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        272
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "316ad3d7-f0da-40c5-8732-bf94a19ed5f0",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        272,
+        384
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HfYVjOSLtPqfeYJb",
+          "cachedResultName": "PF Config"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "5225840c-c9e8-471a-81b8-3074c20aa8f2",
+      "name": "Get Session Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        384
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('When Called By Another Workflow').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a0d4a6a5-6c43-470a-a57f-c7128e62cd1d",
+      "name": "Prepare Reward",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        384
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Checks the session can get a reward, then builds all texts for the reward DMs.\nconst input = $('When Called By Another Workflow').first().json;\nconst cfg = $('Load Config').first().json;\nconst row = $('Get Session Row').first().json ?? {};\n\nlet blockNote = null;\nif (!row.id) blockNote = 'no_row';\nelse if (row.reward_order_id) blockNote = 'already_rewarded';\nelse if (!['showed_up', 'reward_blocked', 'asked', 'reminded', 'unanswered'].includes(row.followup_status)) blockNote = 'wrong_status';\nelse if (cfg.mockMode && !cfg.allowedHostEmails.includes((row.host_email || '').toLowerCase())) blockNote = 'host_guard';\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst who = row.participant_name || row.participant_email || 'the participant';\nconst first = row.participant_first_name || who;\nconst max = cfg.rewardMaxUsd;\nconst dflt = cfg.rewardDefaultUsd;\n\nreturn [{\n  json: {\n    ok: blockNote === null,\n    block_note: blockNote,\n    invitee_uri: row.invitee_uri ?? input.invitee_uri,\n    invitee_id: (row.invitee_uri || input.invitee_uri || '').split('/').pop(),\n    host_email: row.host_email,\n    participant_name: who,\n    participant_first_name: first,\n    participant_email: (row.participant_email || '').toLowerCase(),\n    recipient_allowed: !cfg.mockMode || new RegExp(cfg.allowedParticipantEmailPattern).test((row.participant_email || '').toLowerCase()),\n    default_amount: dflt,\n    max_amount: max,\n    timeout_minutes: cfg.finalTimeoutMinutes,\n    tremendous_mode: cfg.tremendousMode,\n    campaign_id: cfg.tremendousCampaignId,\n    funding_source_id: cfg.tremendousFundingSourceId,\n    currency: cfg.currency,\n    mock_balance: cfg.mockBalanceUsd,\n    reward_text: `${tag}Your session with ${who} has ended. Do you want to send ${first} a reward?`,\n    choice_50_note: `:moneybag: You chose $${dflt}. Please confirm below.`,\n    choice_other_note: ':pencil2: You chose another amount. Use the link below to enter it.',\n    choice_none_note: `:no_entry_sign: OK, no reward for ${first}.`,\n    choice_timeout_note: ':zzz: No answer. You can still tell Darwin later: \"I want to send the reward for my last session\".',\n    amount_text: `${tag}How much do you want to send ${first}? Whole dollars, from 1 to ${max}.`,\n    amount_retry_text: `${tag}That amount is not valid. Please enter a whole number from 1 to ${max}.`,\n    amount_done_note: ':white_check_mark: Amount received. Please confirm below.',\n    amount_timeout_note: ':zzz: No amount received, so nothing was sent.',\n    amount_failed_note: `:no_entry_sign: No valid amount received, so nothing was sent to ${first}. You can try again through Darwin.`,\n    confirm_cancel_note: ':no_entry_sign: Canceled. Nothing was sent.',\n    confirm_timeout_note: ':zzz: No answer, so nothing was sent.',\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "a250d992-5b0d-4552-a0bf-79d3cc41b33f",
+      "name": "Allowed To Reward?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        272
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "baba2dee-7a89-484b-bf09-d0b323e6f967",
+      "name": "Find Host In Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1024,
+        384
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.lookupByEmail",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $('Prepare Reward').first().json.host_email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "3fb6712d-b31d-4030-821d-41e2128eba6f",
+      "name": "Post Reward Question",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1248,
+        384
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $('Prepare Reward').first().json.reward_text }}\n\n<{{ $execution.resumeUrl.split('?')[0] }}/reward?{{ $execution.resumeUrl.split('?')[1] }}&answer=50|Send ${{ $('Prepare Reward').first().json.default_amount }}>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/reward?{{ $execution.resumeUrl.split('?')[1] }}&answer=other|Other amount>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/reward?{{ $execution.resumeUrl.split('?')[1] }}&answer=none|No reward>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "1abcc879-6af9-4cf4-a7d6-f13704f2927a"
+    },
+    {
+      "id": "f83b5798-3af2-4368-893e-645fc9bc87f3",
+      "name": "Wait For Reward Choice",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1472,
+        384
+      ],
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "responseMode": "onReceived",
+        "responseCode": 302,
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": "={{ $('Prepare Reward').first().json.timeout_minutes }}",
+        "resumeUnit": "minutes",
+        "options": {
+          "webhookSuffix": "reward",
+          "ignoreBots": true,
+          "responseData": "Answer saved. Back to Slack.",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Location",
+                "value": "slack://open?team=TG9695PUK"
+              }
+            ]
+          }
+        }
+      },
+      "webhookId": "d01ed6af-6a8b-4f91-a8a8-adb990a1fb61"
+    },
+    {
+      "id": "34a8cd57-7a72-419e-915d-849aeeaf9aa6",
+      "name": "Update Reward Question",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1696,
+        384
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Reward Question').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Reward Question').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Reward').first().json.reward_text }}\n\n{{ $json.query?.answer === '50' ? $('Prepare Reward').first().json.choice_50_note : ($json.query?.answer === 'other' ? $('Prepare Reward').first().json.choice_other_note : ($json.query?.answer === 'none' ? $('Prepare Reward').first().json.choice_none_note : $('Prepare Reward').first().json.choice_timeout_note)) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "cc1c397c-7879-4ea0-93eb-fb9ea4569eac"
+    },
+    {
+      "id": "0017319f-dd74-43a4-a1c8-96c1313610f0",
+      "name": "Route Reward Choice",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1504,
+        256
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "50",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Reward Choice').first().json.query?.answer ?? '' }}",
+                    "rightValue": "50",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "other",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Reward Choice').first().json.query?.answer ?? '' }}",
+                    "rightValue": "other",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "none",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Reward Choice').first().json.query?.answer ?? '' }}",
+                    "rightValue": "none",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No answer"
+        }
+      }
+    },
+    {
+      "id": "b8d9ea43-fbeb-4e40-b242-7ccd357d7143",
+      "name": "Default Amount",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3456,
+        128
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "da",
+              "name": "amount",
+              "value": "={{ $('Prepare Reward').first().json.default_amount }}",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7e076ef2-031d-4875-9512-f233b2a0a450",
+      "name": "Prepare Confirm",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3728,
+        464
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// The chosen amount comes from the $50 link or from a valid form entry.\nconst p = $('Prepare Reward').first().json;\nconst cfg = $('Load Config').first().json;\nconst amount = $json.amount;\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nreturn [{ json: { amount, confirm_text: `${tag}Send $${amount} to ${p.participant_name} (${p.participant_email})?` } }];\n"
+      }
+    },
+    {
+      "id": "d3f91c02-2876-4528-8c0a-facf8924fb1d",
+      "name": "Post Amount Form",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1776,
+        576
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $('Prepare Reward').first().json.amount_text }}\n\n<{{ $execution.resumeFormUrl }}|Enter the amount>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "c782d2d7-f4af-41ff-8cb0-d9f2cd08dd1b"
+    },
+    {
+      "id": "29ad9c88-c9fc-4496-a239-8ac1c89bb15a",
+      "name": "Wait For Amount",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        576
+      ],
+      "parameters": {
+        "resume": "form",
+        "formTitle": "Reward amount",
+        "formDescription": "={{ $('Prepare Reward').first().json.amount_text }}",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Amount in USD",
+              "fieldType": "number",
+              "placeholder": "e.g. 75",
+              "requiredField": true
+            }
+          ]
+        },
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": "={{ $('Prepare Reward').first().json.timeout_minutes }}",
+        "resumeUnit": "minutes",
+        "options": {
+          "appendAttribution": false,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "redirect",
+              "redirectUrl": "slack://open?team=TG9695PUK"
+            }
+          }
+        }
+      },
+      "webhookId": "962b5f52-5103-44d8-b078-14acf947fdf1"
+    },
+    {
+      "id": "1195e583-7e39-4003-82bc-743b7af2ca24",
+      "name": "Update Amount Form",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2224,
+        576
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Amount Form').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Amount Form').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Reward').first().json.amount_text }}\n\n{{ $json['Amount in USD'] !== undefined ? $('Prepare Reward').first().json.amount_done_note : $('Prepare Reward').first().json.amount_timeout_note }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "7a4198c0-e6d9-44db-b803-863fd7d8e502"
+    },
+    {
+      "id": "35db28ff-633b-457e-9d89-10ef0d2802fb",
+      "name": "Amount Received?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2256,
+        464
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Wait For Amount').first().json['Amount in USD'] !== undefined }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "3a765529-5cfd-4c90-91bb-b5f455908846",
+      "name": "Check Amount",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        464
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Validates the amount from the form: whole dollars, from 1 to the cap.\nconst p = $('Prepare Reward').first().json;\nconst raw = $('Wait For Amount').first().json['Amount in USD'];\nconst n = Number(String(raw ?? '').replace(/[$\\s]/g, ''));\nconst valid = Number.isInteger(n) && n >= 1 && n <= p.max_amount;\nreturn [{ json: { valid, amount: valid ? n : null, raw: raw ?? null } }];\n"
+      }
+    },
+    {
+      "id": "095e417d-0aff-466e-bc35-78dd1b2f7dec",
+      "name": "Amount Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2704,
+        464
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "ea1cbeb3-8c56-44ef-b162-34e22c693f62",
+      "name": "Post Amount Retry",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2976,
+        576
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $('Prepare Reward').first().json.amount_retry_text }}\n\n<{{ $execution.resumeFormUrl }}|Enter the amount>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "3b12b4e8-7d3a-4fc4-b779-13d2cd09f9ac"
+    },
+    {
+      "id": "e663c123-478d-4f2b-899a-ff5b6b26c4c2",
+      "name": "Wait For Amount Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3200,
+        576
+      ],
+      "parameters": {
+        "resume": "form",
+        "formTitle": "Reward amount",
+        "formDescription": "={{ $('Prepare Reward').first().json.amount_text }}",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Amount in USD",
+              "fieldType": "number",
+              "placeholder": "e.g. 75",
+              "requiredField": true
+            }
+          ]
+        },
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": "={{ $('Prepare Reward').first().json.timeout_minutes }}",
+        "resumeUnit": "minutes",
+        "options": {
+          "appendAttribution": false,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "redirect",
+              "redirectUrl": "slack://open?team=TG9695PUK"
+            }
+          }
+        }
+      },
+      "webhookId": "de1144ea-6e2e-40c0-a13c-df809aa16e26"
+    },
+    {
+      "id": "41a260ec-487e-4154-b7ee-353bf4360c09",
+      "name": "Check Amount Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3424,
+        576
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Validates the amount from the form: whole dollars, from 1 to the cap.\nconst p = $('Prepare Reward').first().json;\nconst raw = $json['Amount in USD'];\nconst n = Number(String(raw ?? '').replace(/[$\\s]/g, ''));\nconst valid = Number.isInteger(n) && n >= 1 && n <= p.max_amount;\nreturn [{ json: { valid, amount: valid ? n : null, raw: raw ?? null } }];\n"
+      }
+    },
+    {
+      "id": "ce271970-af02-40a2-8135-a55f1ae0fe29",
+      "name": "Retry Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3456,
+        464
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "307f1f2f-23a0-42d0-8d56-2f701533bb34",
+      "name": "Report Amount Failed",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        3840,
+        560
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Amount Retry').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Amount Retry').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Reward').first().json.amount_retry_text }}\n\n{{ $('Prepare Reward').first().json.amount_failed_note }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "8c6c502d-dd28-4446-9ad4-f164d15adeca"
+    },
+    {
+      "id": "1c89604f-63bc-4a5f-b3f2-d98935fd7b74",
+      "name": "Mark Declined (Bad Amount)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4208,
+        560
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Reward').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "reward_declined"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a5883fc6-4723-404f-9039-fcd8d919d1b2",
+      "name": "Mark Declined (No Reward)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1888,
+        272
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Reward').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "reward_declined"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "35dbc88f-235b-43b7-a245-90946ffda3c9",
+      "name": "Post Confirm",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        3952,
+        464
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $('Prepare Confirm').first().json.confirm_text }}\n\n<{{ $execution.resumeUrl.split('?')[0] }}/confirm?{{ $execution.resumeUrl.split('?')[1] }}&answer=confirm|Confirm>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/confirm?{{ $execution.resumeUrl.split('?')[1] }}&answer=cancel|Cancel>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "8e20cce3-c5f7-4275-9325-af8d00b561f7"
+    },
+    {
+      "id": "c11b2532-59b1-4e1f-a126-cc2774c46808",
+      "name": "Wait For Confirm",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4176,
+        464
+      ],
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "responseMode": "onReceived",
+        "responseCode": 302,
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": "={{ $('Prepare Reward').first().json.timeout_minutes }}",
+        "resumeUnit": "minutes",
+        "options": {
+          "webhookSuffix": "confirm",
+          "ignoreBots": true,
+          "responseData": "Answer saved. Back to Slack.",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Location",
+                "value": "slack://open?team=TG9695PUK"
+              }
+            ]
+          }
+        }
+      },
+      "webhookId": "937138d8-727d-4f37-a471-e80c007afb8e"
+    },
+    {
+      "id": "e3a86457-89b5-4f24-937d-9d825bead613",
+      "name": "Update Confirm",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        4400,
+        464
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Confirm').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Confirm').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Confirm').first().json.confirm_text }}\n\n{{ $json.query?.answer === 'confirm' ? ':hourglass_flowing_sand: Sending...' : ($json.query?.answer === 'cancel' ? $('Prepare Reward').first().json.confirm_cancel_note : $('Prepare Reward').first().json.confirm_timeout_note) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "ea6de06c-bc59-4fbe-9cd0-06ffa7cedf03"
+    },
+    {
+      "id": "5f3714f7-b313-4cc9-bdfa-b85dbe2e4e52",
+      "name": "Route Confirm",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        4208,
+        336
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "confirm",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Confirm').first().json.query?.answer ?? '' }}",
+                    "rightValue": "confirm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "cancel",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Confirm').first().json.query?.answer ?? '' }}",
+                    "rightValue": "cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No answer"
+        }
+      }
+    },
+    {
+      "id": "cde9e4d6-d1af-4d09-abbc-3d930466b1ec",
+      "name": "Re-read Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4432,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Reward').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2a1ef2ef-f6ab-4938-9d8d-2643aa54856e",
+      "name": "Not Rewarded Yet?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4656,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reward_order_id ?? \"\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "66c0d5f7-aa1d-4d1c-8d44-5ee8b8f53222",
+      "name": "Balance Enough?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5104,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.enough }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d88a9175-2368-4c54-bed5-fb6541522277",
+      "name": "Tremendous Order (stub)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5376,
+        128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Builds the Tremendous order body (same shape as the live /reward order) and\n// returns a fake order while tremendousMode is 'stub'. Nothing is paid.\nconst p = $('Prepare Reward').first().json;\nconst amount = $('Prepare Confirm').first().json.amount;\n\nconst body = {\n  external_id: p.invitee_id,\n  payment: { funding_source_id: p.funding_source_id },\n  rewards: [{\n    campaign_id: p.campaign_id,\n    value: { denomination: amount, currency_code: p.currency },\n    delivery: { method: 'EMAIL' },\n    recipient: { name: p.participant_name, email: p.participant_email },\n  }],\n};\n\nif (p.tremendous_mode !== 'stub') {\n  throw new Error(`Tremendous mode \"${p.tremendous_mode}\" is not built yet. Only \"stub\" works in this build.`);\n}\n\nconst orderId = `MOCK-${$now.toFormat('yyyyLLddHHmmss')}-${p.invitee_id.slice(-6)}`;\nreturn [{\n  json: {\n    request: body,\n    order: { id: orderId, external_id: body.external_id, status: 'EXECUTED', payment: { total: amount } },\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "ef841149-1f79-4008-bab8-623e4ab3d9ed",
+      "name": "Mark Rewarded",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5600,
+        128
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Reward').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "rewarded",
+            "reward_amount": "={{ $('Prepare Confirm').first().json.amount }}",
+            "reward_order_id": "={{ $('Tremendous Order (stub)').first().json.order.id }}",
+            "rewarded_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reward_amount",
+              "displayName": "reward_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reward_order_id",
+              "displayName": "reward_order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rewarded_at",
+              "displayName": "rewarded_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a19166ca-9f12-416a-93be-f40ecc1ef172",
+      "name": "Report Reward Sent",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        5824,
+        128
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Confirm').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Confirm').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Confirm').first().json.confirm_text }}\n\n:white_check_mark: Done. ${{ $('Prepare Confirm').first().json.amount }} sent to {{ $('Prepare Reward').first().json.participant_first_name }}. Order {{ $('Tremendous Order (stub)').first().json.order.id }}{{ $('Load Config').first().json.tremendousMode === 'stub' ? ' (stub, nothing was paid)' : '' }}.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "3d422c9a-ceea-4603-a294-62f1a455c9b8"
+    },
+    {
+      "id": "a5303c82-bf18-4471-a6f4-23504b949397",
+      "name": "Mark Reward Blocked",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5376,
+        320
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Reward').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "reward_blocked",
+            "reward_amount": "={{ $('Prepare Confirm').first().json.amount }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reward_amount",
+              "displayName": "reward_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0ead3f94-5bcd-4a2a-9fb6-81eb28a5a255",
+      "name": "Report Balance Too Low",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        5600,
+        320
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Confirm').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Confirm').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Confirm').first().json.confirm_text }}\n\n:warning: The Tremendous balance is too low (${{ $('Check Balance').first().json.balance }}), so nothing was sent. The admin was told. You can try again later through Darwin.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "7f0b0d5b-ff5a-4645-ab6a-f9fb3a1d9604"
+    },
+    {
+      "id": "bcc8f207-2fe6-4965-801f-676f6301ffc6",
+      "name": "Report Already Rewarded",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        4880,
+        288
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Confirm').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Confirm').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Confirm').first().json.confirm_text }}\n\n:information_source: This session already has a reward (order {{ $json.reward_order_id }}). Nothing new was sent.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "87f186ec-fc4a-40ef-b282-91aa4bf43ddd"
+    },
+    {
+      "id": "2dd1b270-18b5-45bf-9bfc-dfda31a9fd0e",
+      "name": "Mark Declined (Canceled)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4432,
+        384
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Reward').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "reward_declined"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d348bae1-024f-46a3-8949-e44b828f7ad1",
+      "name": "Sticky Note 95052596",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2848,
+        576
+      ],
+      "parameters": {
+        "content": "## PF Reward\nInput: `{ invitee_uri }`. Called by PF Session Follow-up after the session ends, and later by the Darwin tool (manual path).\n\n1. Choice: Send $50 / Other amount / No reward (links, back to Slack after the click).\n2. Other: form link, whole dollars 1 to 100, one retry.\n3. Confirm / Cancel.\n4. Re-read the row (no second order), stub balance check (step 6b replaces it), Tremendous stub with `external_id` = invitee id.\n\nNo answer leaves the row as it is, so the manual path can pick it up.",
+        "color": 5
+      }
+    },
+    {
+      "id": "2063daa8-b9c1-4d33-8b56-6d3473d55b50",
+      "name": "Balance Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3000,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bi-src",
+              "name": "source",
+              "value": "order",
+              "type": "string"
+            },
+            {
+              "id": "bi-amt",
+              "name": "amount",
+              "value": "={{ $('Prepare Confirm').first().json.amount }}",
+              "type": "number"
+            },
+            {
+              "id": "bi-name",
+              "name": "participant_name",
+              "value": "={{ $('Prepare Reward').first().json.participant_name }}",
+              "type": "string"
+            },
+            {
+              "id": "bi-host",
+              "name": "host_name",
+              "value": "={{ $('Get Session Row').first().json.host_name }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6e0ff558-2d85-4d17-aeec-20c15d558523",
+      "name": "Check Balance",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        3220,
+        300
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "OpaOdeTTXH6thDSM",
+          "cachedResultName": "PF Tremendous Balance"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Called By Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Get Session Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Session Row": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reward",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reward": {
+      "main": [
+        [
+          {
+            "node": "Allowed To Reward?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Allowed To Reward?": {
+      "main": [
+        [
+          {
+            "node": "Find Host In Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Host In Slack": {
+      "main": [
+        [
+          {
+            "node": "Post Reward Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Reward Question": {
+      "main": [
+        [
+          {
+            "node": "Wait For Reward Choice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Reward Choice": {
+      "main": [
+        [
+          {
+            "node": "Update Reward Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reward Question": {
+      "main": [
+        [
+          {
+            "node": "Route Reward Choice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Reward Choice": {
+      "main": [
+        [
+          {
+            "node": "Default Amount",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Amount Form",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Declined (No Reward)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Amount": {
+      "main": [
+        [
+          {
+            "node": "Prepare Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Confirm": {
+      "main": [
+        [
+          {
+            "node": "Post Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Amount Form": {
+      "main": [
+        [
+          {
+            "node": "Wait For Amount",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Amount": {
+      "main": [
+        [
+          {
+            "node": "Update Amount Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Amount Form": {
+      "main": [
+        [
+          {
+            "node": "Amount Received?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amount Received?": {
+      "main": [
+        [
+          {
+            "node": "Check Amount",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Amount": {
+      "main": [
+        [
+          {
+            "node": "Amount Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amount Valid?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Amount Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Amount Retry": {
+      "main": [
+        [
+          {
+            "node": "Wait For Amount Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Amount Retry": {
+      "main": [
+        [
+          {
+            "node": "Check Amount Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Amount Retry": {
+      "main": [
+        [
+          {
+            "node": "Retry Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Valid?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Amount Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Amount Failed": {
+      "main": [
+        [
+          {
+            "node": "Mark Declined (Bad Amount)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Confirm": {
+      "main": [
+        [
+          {
+            "node": "Wait For Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Confirm": {
+      "main": [
+        [
+          {
+            "node": "Update Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Confirm": {
+      "main": [
+        [
+          {
+            "node": "Route Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Confirm": {
+      "main": [
+        [
+          {
+            "node": "Re-read Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Declined (Canceled)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-read Row": {
+      "main": [
+        [
+          {
+            "node": "Not Rewarded Yet?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not Rewarded Yet?": {
+      "main": [
+        [
+          {
+            "node": "Balance Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Already Rewarded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Balance Enough?": {
+      "main": [
+        [
+          {
+            "node": "Tremendous Order (stub)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Reward Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tremendous Order (stub)": {
+      "main": [
+        [
+          {
+            "node": "Mark Rewarded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Rewarded": {
+      "main": [
+        [
+          {
+            "node": "Report Reward Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Reward Blocked": {
+      "main": [
+        [
+          {
+            "node": "Report Balance Too Low",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Balance Input": {
+      "main": [
+        [
+          {
+            "node": "Check Balance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Balance": {
+      "main": [
+        [
+          {
+            "node": "Balance Enough?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "b3cab5bc-a12e-4cdd-b6b8-a9eee1c0b9d8",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "e45c27b0-c2c7-42fc-9206-e9109e65b446",
+      "name": "Check session",
+      "nodeIds": [
+        "316ad3d7-f0da-40c5-8732-bf94a19ed5f0",
+        "5225840c-c9e8-471a-81b8-3074c20aa8f2",
+        "a0d4a6a5-6c43-470a-a57f-c7128e62cd1d"
+      ],
+      "description": "Loads config and the row, stops if already rewarded or the host fails the mock guard, builds all texts."
+    },
+    {
+      "id": "2eb68110-25cc-49be-a6bd-d360effbc1b7",
+      "name": "Ask reward",
+      "nodeIds": [
+        "baba2dee-7a89-484b-bf09-d0b323e6f967",
+        "3fb6712d-b31d-4030-821d-41e2128eba6f",
+        "f83b5798-3af2-4368-893e-645fc9bc87f3",
+        "34a8cd57-7a72-419e-915d-849aeeaf9aa6"
+      ],
+      "description": "DMs Send $50 / Other amount / No reward, waits, edits the message with the choice."
+    },
+    {
+      "id": "5844da4b-ccfb-433f-adf6-fdc4944529ef",
+      "name": "Other amount",
+      "nodeIds": [
+        "d3f91c02-2876-4528-8c0a-facf8924fb1d",
+        "29ad9c88-c9fc-4496-a239-8ac1c89bb15a",
+        "1195e583-7e39-4003-82bc-743b7af2ca24"
+      ],
+      "description": "DMs a form link for whole dollars 1 to 100 and waits for the form."
+    },
+    {
+      "id": "aea2f4c2-1588-42bf-884b-a49f06026e1d",
+      "name": "Amount retry",
+      "nodeIds": [
+        "ea1cbeb3-8c56-44ef-b162-34e22c693f62",
+        "e663c123-478d-4f2b-899a-ff5b6b26c4c2",
+        "41a260ec-487e-4154-b7ee-353bf4360c09"
+      ],
+      "description": "One retry when the amount is not valid."
+    },
+    {
+      "id": "b4eea88b-9e14-4afc-b291-50743547dec1",
+      "name": "Confirm",
+      "nodeIds": [
+        "7e076ef2-031d-4875-9512-f233b2a0a450",
+        "35dbc88f-235b-43b7-a245-90946ffda3c9",
+        "c11b2532-59b1-4e1f-a126-cc2774c46808",
+        "e3a86457-89b5-4f24-937d-9d825bead613"
+      ],
+      "description": "Asks Send $X to name (email)? with Confirm / Cancel, edits the message."
+    },
+    {
+      "id": "bf549732-2827-4984-b2c5-89e4f6fee8a5",
+      "name": "Send reward",
+      "nodeIds": [
+        "d88a9175-2368-4c54-bed5-fb6541522277",
+        "ef841149-1f79-4008-bab8-623e4ab3d9ed",
+        "a19166ca-9f12-416a-93be-f40ecc1ef172"
+      ],
+      "description": "Tremendous order (stub today), marks the row rewarded, shows the order id in the DM."
+    },
+    {
+      "id": "2f88140e-f963-40e3-ab8f-ef4bd84f7364",
+      "name": "Balance too low",
+      "nodeIds": [
+        "a5303c82-bf18-4471-a6f4-23504b949397",
+        "0ead3f94-5bcd-4a2a-9fb6-81eb28a5a255"
+      ],
+      "description": "No order: row reward_blocked, DM explains. Admin DM comes in step 6b."
+    }
+  ]
+}

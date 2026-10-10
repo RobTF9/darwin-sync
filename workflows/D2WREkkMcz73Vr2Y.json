@@ -1,7 +1,7 @@
 {
   "id": "D2WREkkMcz73Vr2Y",
   "name": "UXR CIO Probe [scratch]",
-  "description": "Temporary probe: checks the Customer.io credential works and whether uxr_shard is stamped. Safe to delete.",
+  "description": "Temporary read-only probe: samples profiles whose unsubscribed attribute is missing or true and compares it with the profile-level unsubscribed status. Safe to delete.",
   "nodes": [
     {
       "id": "571c39fd-651b-493d-8972-ad6faf1dee81",
@@ -39,7 +39,7 @@
           "parameters": [
             {
               "name": "limit",
-              "value": "1"
+              "value": "100"
             }
           ]
         },
@@ -56,8 +56,14 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "{\"filter\":{\"and\":[{\"attribute\":{\"field\":\"email\",\"operator\":\"exists\"}}]}}",
+        "jsonBody": "={{ $json.body }}",
         "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 2,
+              "batchInterval": 500
+            }
+          },
           "response": {
             "response": {
               "neverError": true,
@@ -73,7 +79,7 @@
           "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
         }
       },
-      "executeOnce": true,
+      "executeOnce": false,
       "onError": "continueRegularOutput"
     },
     {
@@ -113,8 +119,14 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "{\"filter\":{\"and\":[{\"attribute\":{\"field\":\"created_n8n_account\",\"operator\":\"eq\",\"value\":\"true\"}},{\"or\":[{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Enterprise\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Enterprise\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"n8n cloud Enterprise\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Enterprise Yearly\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Enterprise Yearly\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Business\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Business\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Business Yearly\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"n8n cloud Business\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"n8n cloud Power\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Power\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Power\"}}]}]}}",
+        "jsonBody": "={{ $json.body }}",
         "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 400
+            }
+          },
           "response": {
             "response": {
               "neverError": true,
@@ -130,7 +142,7 @@
           "name": "Giulio - Customer.io - n8n-production ⚠️ - ✅ Ok to use"
         }
       },
-      "executeOnce": true,
+      "executeOnce": false,
       "onError": "continueRegularOutput"
     },
     {
@@ -144,7 +156,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const a = $('CIO Email Exists').first().json; const b = $('CIO Shard Exists').first().json; const d = $('CIO Shard Exists (dev)').first().json; const pick = r => ({ status: r.statusCode, count_in_first_page: ((r.body && r.body.identifiers) || []).length, has_more: !!(r.body && r.body.next), sample: JSON.stringify(((r.body && r.body.identifiers) || []).slice(0, 5)) }); return [{ json: { prod_emailExists: pick(a), enterprise_like_plans: pick(b), plans_outside_known_list: pick(d) } }];"
+        "jsCode": "const meta = ($('Split Profiles').first().json || {}).meta || { candidates: [] };\nconst candidateIds = new Set(meta.candidates.map(c => c.cio_id));\nconst candidateEmails = new Set(meta.candidates.map(c => c.email));\nconst picked = $('Pick Duplicates').all().map(i => i.json);\nconst fetched = $input.all().map(i => i.json || {});\nconst cutoff = Math.floor(Date.now() / 1000) - 60 * 86400;\nconst groups = new Map();\nlet fetchFailed = 0;\npicked.forEach((p, idx) => {\n  if (p.__none) return;\n  const c = (fetched[idx] || {}).customer;\n  if (!c || !c.attributes) { fetchFailed++; return; }\n  const a = c.attributes;\n  if (!groups.has(p.email)) groups.set(p.email, []);\n  groups.get(p.email).push({\n    isCandidate: candidateIds.has(p.cio_id),\n    unsub: c.unsubscribed === true || String(a.unsubscribed) === 'true',\n    webform: a.origin === 'user_research_webform',\n    recent: Number(a.last_user_research_invite_date) >= cutoff,\n    idFormat: /^\\d+$/.test(p.id) ? 'numeric' : (/@/.test(p.id) ? 'email as id' : (/^mailchimpid_/.test(p.id) ? 'mailchimp' : 'other'))\n  });\n});\nconst size = {};\nconst formats = {};\nlet withSiblingUnsub = 0, rule1Blocked = 0, rule1AllowedByWebform = 0, rule2Blocked = 0, anyRuleBlocked = 0;\nfor (const profiles of groups.values()) {\n  size[profiles.length] = (size[profiles.length] || 0) + 1;\n  const key = profiles.map(p => p.idFormat).sort().join(' + ');\n  formats[key] = (formats[key] || 0) + 1;\n  const anyUnsub = profiles.some(p => p.unsub);\n  const anyWebform = profiles.some(p => p.webform);\n  const anyRecent = profiles.some(p => p.recent);\n  if (anyUnsub) withSiblingUnsub++;\n  const r1 = anyUnsub && !anyWebform;\n  if (r1) rule1Blocked++;\n  if (anyUnsub && anyWebform) rule1AllowedByWebform++;\n  if (anyRecent) rule2Blocked++;\n  if (r1 || anyRecent) anyRuleBlocked++;\n}\nconst total = candidateEmails.size;\nconst pct = n => total ? Math.round(n * 1000 / total) / 10 : 0;\nreturn [{ json: {\n  shards_queried: meta.shardsQueried, shard_statuses: meta.shardStatuses, shard_pages_truncated: meta.shardPagesTruncated,\n  candidate_emails: total,\n  emails_with_more_than_one_profile: groups.size, pct_duplicated: pct(groups.size),\n  profiles_per_duplicated_email: size, id_formats: formats,\n  duplicated_with_an_unsubscribed_profile: withSiblingUnsub,\n  rule1_should_be_blocked_unsubscribed_no_webform: rule1Blocked, pct_rule1: pct(rule1Blocked),\n  rule1_allowed_because_webform: rule1AllowedByWebform,\n  rule2_should_be_blocked_recent_invite_on_a_sibling: rule2Blocked, pct_rule2: pct(rule2Blocked),\n  candidates_breaking_a_rule_today: anyRuleBlocked, pct_breaking_a_rule: pct(anyRuleBlocked),\n  attribute_fetch_failed: fetchFailed, lookup_pages_truncated: (picked[0] || {}).lookupTruncated || 0\n} }];"
       }
     },
     {
@@ -161,48 +173,67 @@
       }
     },
     {
-      "id": "3004a641-703b-438b-85b1-96a0d7237f57",
-      "name": "CIO Shard Exists (dev)",
+      "id": "86348f87-32d6-49a1-977e-46d92d3f8778",
+      "name": "Split Profiles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        160
+      ],
+      "parameters": {
+        "jsCode": "const pages = $input.all().map(i => i.json || {});\nconst candidates = [];\nlet truncated = 0;\nconst statuses = {};\nfor (const p of pages) {\n  statuses[p.statusCode] = (statuses[p.statusCode] || 0) + 1;\n  const body = p.body || {};\n  if (body.next) truncated++;\n  for (const r of (body.identifiers || [])) if (r.email && r.cio_id) candidates.push({ cio_id: r.cio_id, email: String(r.email).trim().toLowerCase() });\n}\nconst emails = Array.from(new Set(candidates.map(c => c.email)));\nconst out = [];\nfor (let i = 0; i < emails.length; i += 50) {\n  const chunk = emails.slice(i, i + 50);\n  out.push({ json: { emails: chunk, body: JSON.stringify({ filter: { or: chunk.map(e => ({ attribute: { field: 'email', operator: 'eq', value: e } })) } }) } });\n}\nif (!out.length) out.push({ json: { emails: [], body: JSON.stringify({ filter: { attribute: { field: 'email', operator: 'eq', value: 'nobody@invalid.invalid' } } }) } });\nout[0].json.meta = { candidates, shardPagesTruncated: truncated, shardStatuses: statuses, shardsQueried: pages.length };\nreturn out;"
+      }
+    },
+    {
+      "id": "fa4fbebf-40d6-469b-8976-97e8a16f77ff",
+      "name": "Pick Shards",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        160
+      ],
+      "parameters": {
+        "jsCode": "// Same gates as UXR Search for the n8n users audience, one random shard per query (first page of each shard)\nconst n = 20;\nconst set = new Set();\nwhile (set.size < n) set.add(Math.floor(Math.random() * 4096));\nreturn Array.from(set).map(s => ({ json: { shard: s, body: JSON.stringify({ filter: { and: [\n  { attribute: { field: 'uxr_shard', operator: 'eq', value: String(s) } },\n  { attribute: { field: 'email', operator: 'exists' } },\n  { not: { attribute: { field: 'unsubscribed', operator: 'eq', value: 'true' } } },\n  { attribute: { field: 'created_n8n_account', operator: 'eq', value: 'true' } },\n  { attribute: { field: 'confirmed', operator: 'eq', value: 'true' } },\n  { not: { attribute: { field: 'cloud_plan_status', operator: 'eq', value: 'deleted' } } },\n  { not: { segment: { id: 260 } } }\n] } }) } }));"
+      }
+    },
+    {
+      "id": "bd196ca8-908c-457d-8bf3-a92f5523ba61",
+      "name": "Pick Duplicates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        160
+      ],
+      "parameters": {
+        "jsCode": "const pages = $input.all().map(i => i.json || {});\nconst byEmail = new Map();\nlet truncated = 0;\nfor (const p of pages) {\n  const body = p.body || {};\n  if (body.next) truncated++;\n  for (const r of (body.identifiers || [])) {\n    const k = String(r.email || '').trim().toLowerCase();\n    if (!k || !r.cio_id) continue;\n    if (!byEmail.has(k)) byEmail.set(k, []);\n    byEmail.get(k).push({ cio_id: r.cio_id, id: String(r.id == null ? '' : r.id) });\n  }\n}\nconst out = [];\nfor (const [email, profiles] of byEmail) {\n  if (profiles.length < 2) continue;\n  for (const p of profiles) out.push({ json: { email, cio_id: p.cio_id, id: p.id, lookupTruncated: truncated } });\n}\nif (!out.length) return [{ json: { __none: true, lookupTruncated: truncated } }];\nreturn out.slice(0, 900);"
+      }
+    },
+    {
+      "id": "6626610e-d74f-4ede-b04d-70d2272298a9",
+      "name": "Fetch Sibling Attributes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        600,
-        200
+        784,
+        160
       ],
       "parameters": {
-        "method": "POST",
-        "url": "https://api.customer.io/v1/customers",
+        "url": "={{ 'https://api.customer.io/v1/customers/' + ($json.cio_id || 'none') + '/attributes?id_type=cio_id' }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "customerIoApi",
-        "sendQuery": true,
-        "specifyQuery": "keypair",
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "limit",
-              "value": "100"
-            }
-          ]
-        },
-        "sendHeaders": true,
-        "specifyHeaders": "keypair",
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "json",
-        "specifyBody": "json",
-        "jsonBody": "{\"filter\":{\"and\":[{\"attribute\":{\"field\":\"created_n8n_account\",\"operator\":\"eq\",\"value\":\"true\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"exists\"}},{\"not\":{\"or\":[{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Trial\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Free\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Starter\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Start Yearly\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"n8n cloud Start\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Pro-1\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Pro-2\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Pro-1 Yearly\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"Cloud Pro-2 Yearly\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"n8n cloud Pro\"}},{\"attribute\":{\"field\":\"cloud_plan\",\"operator\":\"eq\",\"value\":\"n8n cloud Power\"}}]}}]}}",
         "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 5,
+              "batchInterval": 600
+            }
+          },
           "response": {
             "response": {
               "neverError": true,
-              "fullResponse": true,
               "responseFormat": "json"
             }
           }
@@ -217,28 +248,6 @@
     }
   ],
   "connections": {
-    "Probe Webhook": {
-      "main": [
-        [
-          {
-            "node": "CIO Email Exists",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "CIO Email Exists": {
-      "main": [
-        [
-          {
-            "node": "CIO Shard Exists",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Combine": {
       "main": [
         [
@@ -250,18 +259,73 @@
         ]
       ]
     },
-    "CIO Shard Exists": {
+    "CIO Email Exists": {
       "main": [
         [
           {
-            "node": "CIO Shard Exists (dev)",
+            "node": "Split Profiles",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "CIO Shard Exists (dev)": {
+    "Split Profiles": {
+      "main": [
+        [
+          {
+            "node": "CIO Shard Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe Webhook": {
+      "main": [
+        [
+          {
+            "node": "Pick Shards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Shards": {
+      "main": [
+        [
+          {
+            "node": "CIO Email Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CIO Shard Exists": {
+      "main": [
+        [
+          {
+            "node": "Pick Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sibling Attributes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sibling Attributes": {
       "main": [
         [
           {
@@ -278,7 +342,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "e8ea0698-3f45-4b3a-aadb-f4019b511130",
+  "versionId": "450a4b80-2c8e-43a3-a4a1-2b418e41314f",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

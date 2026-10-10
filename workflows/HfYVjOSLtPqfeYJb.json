@@ -1,0 +1,98 @@
+{
+  "id": "HfYVjOSLtPqfeYJb",
+  "name": "PF Config",
+  "description": "Settings for the Participant follow-up (mock) workflows. mockMode keeps the safety guard on. DWN-6.",
+  "nodes": [
+    {
+      "id": "f8c7babb-875c-4a7d-aa2f-6132d4af6e58",
+      "name": "When Called By Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "5fd79ada-1c6f-4131-9f1c-e26924c427bf",
+      "name": "Build Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// PF Config: the one place for all settings of the Participant follow-up workflows.\n// Change values here only.\n\nconst mockMode = true;\n\nconst base = {\n  // Safety guard. While mockMode is true, sends go only to these addresses.\n  allowedParticipantEmailPattern: '^aniol\\\\.moner\\\\+[^@]+@n8n\\\\.io$',\n  allowedHostEmails: ['aniol.moner@n8n.io'],\n\n  // Person who gets the Tremendous refill DM.\n  adminEmail: 'aniol.moner@n8n.io',\n\n  // Store\n  dataTableName: 'MOCK - PF Sessions',\n  dataTableId: 'L3Sa3FfY5RtqeUgk',\n\n  // Calendly\n  // Continuous discovery = bookings for this one event type, and nothing else:\n  // https://calendly.com/d/dz6d-wr6-6bf/research-with-n8n\n  cdEventTypeUuid: 'ebd64db8-7c09-4e31-bc2e-339065fbb930',\n  roundRobinEventTypeUuid: 'ebd64db8-7c09-4e31-bc2e-339065fbb930', // old name, used by PF Calendly Capture\n  uxrUtmSource: 'uxr_recruiting',\n\n  // Timing\n  timezone: 'Europe/Madrid',\n  askDelayMinutes: 15,\n  showupWindowHours: 6,\n  finalTimeoutMinutes: 24 * 60,\n  manualLookbackDays: 30,\n\n  // Reward\n  rewardDefaultUsd: 50,\n  rewardMaxUsd: 100,\n  currency: 'USD',\n  tremendousMode: 'stub', // stub | sandbox | live\n  tremendousCampaignId: 'NRF2R8ZSE9XK',\n  tremendousFundingSourceId: 'balance',\n  tremendousSandboxBaseUrl: 'https://testflight.tremendous.com/api/v2/',\n  balanceThresholdUsd: 500,\n  mockBalanceUsd: 900,\n\n  // Email\n  emailFrom: 'n8n Research <noreply@info.n8n.io>',\n  emailReplyTo: 'design@n8n.io',\n};\n\n// Short delays so a full test takes minutes, not hours.\nconst mockOverrides = {\n  askDelayMinutes: 1,\n  finalTimeoutMinutes: 3,\n};\n\nconst config = mockMode ? { ...base, ...mockOverrides } : { ...base };\nconfig.mockMode = mockMode;\n\n// Mock mode never pays real money.\nif (mockMode && config.tremendousMode === 'live') {\n  config.tremendousMode = 'stub';\n}\n\nreturn [{ json: config }];\n"
+      }
+    },
+    {
+      "id": "7d20bca5-6a56-422e-9d76-4ade682b264a",
+      "name": "Manual Test Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "f58a1989-1575-4bff-903f-319fbb79c0ff",
+      "name": "Sticky Note 72156def",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        48,
+        192
+      ],
+      "parameters": {
+        "content": "## PF Config\nAll settings for the Participant follow-up (mock) workflows. Other PF workflows call this one and read the result. Change values only in **Build Config**.\n\n`mockMode: true` keeps the safety guard on: emails only to aniol.moner+*@n8n.io, DMs only to Aniol, never a live Tremendous order.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "When Called By Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Build Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Test Run": {
+      "main": [
+        [
+          {
+            "node": "Build Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "6cf379d9-76b6-4803-ba40-f262e6d0ea8e",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,11 +1,11 @@
 {
-  "id": "hE9PzLfDBgl8uB0d",
+  "id": "RFzstZfrp9PGN84T",
   "name": "Darwin Continuous Discovery Oneshot Backfill",
   "description": null,
   "nodes": [
     {
       "parameters": {},
-      "id": "5d9ea5a5-90e6-4c9f-932b-0ac539d5563f",
+      "id": "55631534-509b-415f-bd53-0da1bcece5b5",
       "name": "Run Backfill",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
@@ -21,7 +21,7 @@
         "nodeCredentialType": "calendlyOAuth2Api",
         "options": {}
       },
-      "id": "4badf511-7e5a-4dda-90f7-9ea3fcbe5811",
+      "id": "fc3d8cbd-7af6-4b24-85e4-03470adc36c1",
       "name": "Get Current User",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -31,8 +31,8 @@
       ],
       "credentials": {
         "calendlyOAuth2Api": {
-          "id": "83j8w58D3WbXc0Mv",
-          "name": "Calendly account - Aniol APP"
+          "id": "ijutlu3XwjDml6uu",
+          "name": "Calendly account"
         }
       }
     },
@@ -72,7 +72,7 @@
         },
         "options": {}
       },
-      "id": "597311bd-ee0a-46ba-a565-1860ee798871",
+      "id": "81e7170b-3df3-4b42-b112-32fbcf0fb1d3",
       "name": "List Scheduled Events (next 10 days)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -82,8 +82,8 @@
       ],
       "credentials": {
         "calendlyOAuth2Api": {
-          "id": "83j8w58D3WbXc0Mv",
-          "name": "Calendly account - Aniol APP"
+          "id": "ijutlu3XwjDml6uu",
+          "name": "Calendly account"
         }
       },
       "notes": "Calendly caps this at 100 results per page; pagination is not implemented since a 10-day window for one event type is expected to stay well under that. Re-run with a narrower window / check manually if this ever needs to scale up."
@@ -92,7 +92,7 @@
       "parameters": {
         "jsCode": "const events = $json.collection || [];\nconst results = [];\nfor (const se of events) {\n  const name = se.name || '';\n  if (!/research\\s*(with)?\\s*n8n/i.test(name)) continue;\n  const memberships = se.event_memberships || [];\n  const host = memberships[0] || {};\n  results.push({\n    json: {\n      externalId: se.uri || '',\n      organizerName: host.user_name || '',\n      organizerEmail: host.user_email || '',\n      title: name,\n      description: '',\n      startsAt: se.start_time || '',\n      endsAt: se.end_time || '',\n      rawPayload: JSON.stringify(se),\n    }\n  });\n}\nreturn results;"
       },
-      "id": "4fc9754c-85b2-4a19-ba77-efd9ac87ace4",
+      "id": "f6d998b2-f16f-4e82-ab45-c39f1902817c",
       "name": "Extract CD Bookings",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -110,7 +110,7 @@
           "queryReplacement": "={{ [$json.externalId, $json.organizerName, $json.organizerEmail, $json.title, $json.description, $json.startsAt, $json.endsAt, $json.rawPayload] }}"
         }
       },
-      "id": "89d18dc9-3b22-4f00-99ce-961e1032b16b",
+      "id": "f4c41836-7310-45e4-acd3-7d8939a71410",
       "name": "Upsert Backfilled CD Sessions",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -175,16 +175,17 @@
   },
   "settings": {
     "executionOrder": "v1",
+    "availableInMCP": true,
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "a1382bba-41af-4893-92b0-e66cf8f792d1",
+  "versionId": "21036ce6-1861-47f7-a4fe-a50c38ccbb70",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
-  "parentFolderId": "boYztb3YTl3q49Fk",
-  "isArchived": true,
+  "parentFolderId": "ofTK7eVY3QhieRZY",
+  "isArchived": false,
   "nodeGroups": []
 }

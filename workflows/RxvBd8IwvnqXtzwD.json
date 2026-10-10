@@ -1,0 +1,67 @@
+{
+  "id": "RxvBd8IwvnqXtzwD",
+  "name": "Qorwin",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9978b3d9-4e62-459f-b935-2ab787a25a73",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://api.qontext.ai/workspaces/ws_6cf8bb15-ac6f-4bfc-98d1-7069fc1101f0/knowledge-graphs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qontextApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "8d807964-ad51-4127-aed9-407dc2ce3044",
+      "name": "HTTP Request",
+      "credentials": {
+        "qontextApi": {
+          "id": "hzNNio0zP5yj4Cg5",
+          "name": "Qontext account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "a9980602-37a8-4522-a92a-3c92a2c83416",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

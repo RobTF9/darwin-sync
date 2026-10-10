@@ -1,0 +1,88 @@
+{
+  "id": "0UsbogQezNyaBLwr",
+  "name": "PF Reset Mock Data",
+  "description": "Deletes all is_mock rows from MOCK - PF Sessions. Manual only. DWN-6.",
+  "nodes": [
+    {
+      "id": "20b38e96-8368-4817-86ff-bc8ca2e9ba25",
+      "name": "Manual Reset",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "b538ab8c-8cf1-4e68-adc1-0ae1b8019175",
+      "name": "Delete All Mock Rows",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "is_mock",
+              "condition": "isTrue"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "96b3b97a-2bb7-4fd5-926e-f86cfb987125",
+      "name": "Sticky Note 7d491189",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        48,
+        0
+      ],
+      "parameters": {
+        "content": "## PF Reset Mock Data\nDeletes every row in **MOCK - PF Sessions** where `is_mock` is true. Run it by hand between test runs. It touches no other table.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Manual Reset": {
+      "main": [
+        [
+          {
+            "node": "Delete All Mock Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "bf1284a3-7a30-4202-85e3-ae7fe3612f35",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,0 +1,569 @@
+{
+  "id": "7fnMINI2Di89Cdpv",
+  "name": "Darwin Research Alerts",
+  "description": "Manages recurring research-topic alerts. A POST webhook (path darwin-alerts) adds/lists/removes alert configs in workflow static data; a daily 09:00 schedule posts due alerts to Slack mentioning Darwin to run the research.",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "darwin-alerts",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b6c31b65-93e7-471f-a2c1-ffadffa969ac",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        112
+      ],
+      "webhookId": "7cd41127-4440-4652-99d2-0d9aef7584af"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "fde13d37-d33b-4502-b4dc-b58c03505d63",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "0e6c7578-cb81-43cc-8c6e-0744d6e5fe73",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.no_alerts }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f3d2052e-df17-4a30-890d-0516dda8f446",
+      "name": "Check If Alerts Due",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        656,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $json.channel }}"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      },
+      "id": "c067cf9b-762a-4433-ba2c-480f077cc570",
+      "name": "Post Alert Message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        880,
+        624
+      ],
+      "webhookId": "c4f4b77c-1e7a-478a-a26b-f1fa30d403e5",
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "add"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "add"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "list"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "list"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "remove"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "remove"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "unknown"
+        }
+      },
+      "id": "43897fe6-1445-4e40-bbc9-1dfac881ab0d",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const alert = $input.first().json;\nreturn [{ json: {\n  success: true,\n  alert,\n  message: `Alert created: ${alert.frequency} summary about \"${alert.topic}\" to ${alert.channel}`,\n} }];"
+      },
+      "id": "8a9c1c4e-99ca-4c6f-97af-52e5dfe9d0f4",
+      "name": "Format Add Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r && r.id);\nreturn [{ json: { alerts: rows } }];"
+      },
+      "id": "98d81ebb-0453-492d-8a31-681fc40117d4",
+      "name": "Format List Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { success: true, message: 'Alert removed' } }];"
+      },
+      "id": "06b302a7-4d82-4f93-845b-eb72fc579384",
+      "name": "Format Remove Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO darwin_research_alerts (id, topic, frequency, channel, requested_by, created_at, last_run)\nVALUES (\n  '{{ Date.now().toString() }}',\n  '{{ $json.body.topic }}',\n  '{{ $json.body.frequency }}',\n  '{{ $json.body.channel }}',\n  '{{ $json.body.requested_by }}',\n  '{{ new Date().toISOString() }}',\n  NULL\n)\nRETURNING *;",
+        "options": {}
+      },
+      "id": "56bfac32-ed8e-4275-b9de-466138903f7c",
+      "name": "Insert Alert",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.7,
+      "position": [
+        456,
+        -168
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM darwin_research_alerts ORDER BY created_at DESC;",
+        "options": {}
+      },
+      "id": "fdb0054c-807c-44e3-8186-ec66250b11e1",
+      "name": "List Alerts",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.7,
+      "position": [
+        456,
+        24
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM darwin_research_alerts WHERE id = '{{ $json.body.alert_id }}' RETURNING *;",
+        "options": {}
+      },
+      "id": "1bce2545-53ee-45a8-8187-1a6a4299e63b",
+      "name": "Delete Alert",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.7,
+      "position": [
+        456,
+        216
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { error: `Unknown action. Use 'add', 'list', or 'remove'.` } }];"
+      },
+      "id": "4238891b-18aa-4b0e-8232-9ffe906b6fb7",
+      "name": "Bad Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM darwin_research_alerts\nWHERE\n  CASE\n    WHEN frequency = 'daily' THEN last_run IS NULL OR last_run::date < CURRENT_DATE\n    WHEN frequency = 'weekly' THEN (last_run IS NULL OR last_run::date < CURRENT_DATE) AND EXTRACT(dow FROM CURRENT_DATE) = 1\n    WHEN frequency = 'monthly' THEN (last_run IS NULL OR last_run::date < CURRENT_DATE) AND EXTRACT(day FROM CURRENT_DATE) = 1\n    ELSE false\n  END\nORDER BY created_at ASC;",
+        "options": {}
+      },
+      "id": "95f646c4-f2d6-4fc2-a1e0-6236ac779401",
+      "name": "Query Due Alerts",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.7,
+      "position": [
+        232,
+        632
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const alerts = $input.all().map(i => i.json).filter(a => a && a.id);\n\nconst periodTextMap = { daily: '24 hours', weekly: '7 days', monthly: '30 days' };\n\nconst dueAlerts = [];\nfor (const alert of alerts) {\n  const periodText = periodTextMap[alert.frequency] || '24 hours';\n  const message = `🔔 Research Alert: ${alert.topic}\\n\\n<@U0BLRFB0FJR> Please search for user research sessions from the past ${periodText} that mention \"${alert.topic}\" and provide a concise summary of the key findings and insights.`;\n  dueAlerts.push({ json: { id: alert.id, channel: alert.channel, message } });\n}\n\nif (dueAlerts.length === 0) return [{ json: { no_alerts: true } }];\nreturn dueAlerts;"
+      },
+      "id": "f87d4ef7-79f5-4522-b674-d3d131f8b760",
+      "name": "Format Alert Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE darwin_research_alerts\nSET last_run = '{{ new Date().toISOString() }}'\nWHERE id = '{{ $json.id }}';",
+        "options": {}
+      },
+      "id": "d2118d3f-f0f9-4e40-85b1-740267532295",
+      "name": "Update Last Run",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.7,
+      "position": [
+        1112,
+        632
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Check If Alerts Due": {
+      "main": [
+        [
+          {
+            "node": "Post Alert Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Add Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format List Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Remove Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Insert Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "List Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bad Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Alert": {
+      "main": [
+        [
+          {
+            "node": "Format Add Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Alerts": {
+      "main": [
+        [
+          {
+            "node": "Format List Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Alert": {
+      "main": [
+        [
+          {
+            "node": "Format Remove Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bad Action": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Query Due Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Due Alerts": {
+      "main": [
+        [
+          {
+            "node": "Format Alert Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert Messages": {
+      "main": [
+        [
+          {
+            "node": "Check If Alerts Due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Alert Message": {
+      "main": [
+        [
+          {
+            "node": "Update Last Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "ef9a8a95-13cd-4197-a73b-74c836657ed5",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

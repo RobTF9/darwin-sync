@@ -1,0 +1,585 @@
+{
+  "id": "DL3GYWwlyNTaEqQA",
+  "name": "AgentIntegrationRun",
+  "description": "Agent-side twin of IntegrationRun: loads every enabled integration case, dispatches each to AgentDispatch (which runs it through FirstClassDarwin via messageAnAgent), polls results, and posts the same Slack summary. Run ids carry the agent-integration- pr",
+  "nodes": [
+    {
+      "id": "8100a705-edcb-4086-a147-4c422cad130d",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        432
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "requested_by"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9a1dc37c-5ad6-4753-97e7-f260302b8ee9",
+      "name": "Run Id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        432
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "run-id",
+              "name": "run_id",
+              "value": "={{ 'agent-integration-' + $now.toFormat('yyyyLLdd-HHmmss') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "980ceee8-71bb-40a0-b8b5-ab47cf927a93",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        432
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "integration_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "enabled",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "efa877ab-c13b-424e-82b7-a5e0fd76133c",
+      "name": "Load Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        128
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "integration_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Run Id').first().json.run_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "59b4eb39-f874-49d0-b071-1503229142df",
+      "name": "Poll Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        48
+      ],
+      "parameters": {
+        "jsCode": "const runId = $('Run Id').first().json.run_id;\nconst expected = $('Load Cases').all().length;\nconst rows = $input.all().map(i => i.json).filter(r => r.run_id === runId);\nconst slugs = {};\nfor (const c of $('Load Cases').all()) slugs[c.json.id] = c.json.slug;\n// Load Results' getAll() overlaps pages while sub-workflows are still writing,\n// so it can emit the same row multiple times. Dedupe by case_id.\nconst seen = new Set();\nconst unique = [];\nfor (const r of rows) {\n  if (!r.case_id || seen.has(r.case_id)) continue;\n  seen.add(r.case_id);\n  unique.push(r);\n}\nconst counts = { pass: 0, fail: 0, error: 0 };\nconst cases = unique.map(r => {\n  counts[r.status] = (counts[r.status] || 0) + 1;\n  return { slug: slugs[r.case_id] || r.case_id, status: r.status, called_tools: r.called_tools, assertion_results: r.assertion_results };\n});\ncases.sort((a, b) => (a.slug < b.slug ? -1 : 1));\nconst poll = ($runIndex || 0) + 1;\nreturn [{ json: {\n  run_id: runId,\n  expected: expected,\n  landed: unique.length,\n  polls: poll,\n  complete: unique.length >= expected,\n  timeout: poll >= 60,\n  pass: counts.pass,\n  fail: counts.fail,\n  error: counts.error,\n  cases: cases\n} }];\n"
+      }
+    },
+    {
+      "id": "584ba344-af7a-43c1-bb4b-6436a58acd35",
+      "name": "Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        48
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.complete }}",
+              "operator": {
+                "id": "c1",
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            },
+            {
+              "leftValue": "={{ $json.timeout }}",
+              "operator": {
+                "id": "c2",
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8a91b306-0aa5-4d81-98c2-f69dea4c9aad",
+      "name": "Dispatch Case",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        432
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Uw3Hrw0105t2f4cI"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Run Id').item.json.run_id }}",
+            "case_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "ff982170-b47d-4b5a-ba00-f7c37d39b2a6",
+      "name": "Pace",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        512
+      ],
+      "parameters": {
+        "amount": 40
+      },
+      "webhookId": "be324835-18ad-4ff5-8756-268908bf9120"
+    },
+    {
+      "id": "e283febf-0e5e-4c10-be9b-922d8ee70182",
+      "name": "Batch",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        672,
+        432
+      ],
+      "parameters": {
+        "batchSize": 3,
+        "options": {}
+      }
+    },
+    {
+      "id": "33b52c6a-700d-40db-a4e0-62cb1dde8865",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// n8n Code node — \"Run Once for All Items\"\n// Input:  one or more items containing run objects (or arrays of them)\n// Output: a single item with the whole report as one markdown string\n\nconst CONFIG = {\n  useEmoji: true,       // ✅ / ❌ / 💥 / ⏭️ vs plain text labels\n};\n\nconst STATUS_ICON = { pass: '✅', fail: '❌', error: '💥', skip: '⏭️' };\nconst STATUS_RANK = { fail: 0, error: 1, pass: 2, skip: 3 };\n\nconst icon = (s) => (CONFIG.useEmoji ? `${STATUS_ICON[s] || '•'} ${s}` : s);\nconst rankOf = (s) => (Object.prototype.hasOwnProperty.call(STATUS_RANK, String(s).toLowerCase()) ? STATUS_RANK[String(s).toLowerCase()] : 4);\n\n// called_tools arrives as a JSON-encoded string, but tolerate arrays/null too.\nfunction parseTools(raw) {\n  if (Array.isArray(raw)) return raw.map(String);\n  if (typeof raw !== 'string' || raw.trim() === '') return [];\n  try {\n    const parsed = JSON.parse(raw);\n    return Array.isArray(parsed) ? parsed.map(String) : [String(parsed)];\n  } catch {\n    return [raw];\n  }\n}\n\n// assertion_results arrives as a JSON-encoded string (legacy rows) or a real array.\nfunction parseAssertions(raw) {\n  if (Array.isArray(raw)) return raw;\n  if (typeof raw !== 'string' || raw.trim() === '') return [];\n  try {\n    const parsed = JSON.parse(raw);\n    return Array.isArray(parsed) ? parsed : [parsed];\n  } catch {\n    return [];\n  }\n}\n\n// Pipes and newlines break markdown tables.\nconst cell = (t) => String(t).replace(/\\|/g, '\\\\|').replace(/\\n+/g, ' ');\n\nfunction table(headers, rows) {\n  const lines = [\n    `| ${headers.join(' | ')} |`,\n    `| ${headers.map(() => '---').join(' | ')} |`,\n  ];\n  for (const row of rows) lines.push(`| ${row.map(cell).join(' | ')} |`);\n  return lines.join('\\n');\n}\n\nconst pct = (part, total) => (total ? `${((part / total) * 100).toFixed(1)}%` : 'n/a');\n\n// Runs may arrive one-per-item, all nested in one item, or under a wrapper key.\nfunction collectRuns(items) {\n  const runs = [];\n  const push = (v) => {\n    if (Array.isArray(v)) v.forEach(push);\n    else if (v && typeof v === 'object' && Array.isArray(v.cases)) runs.push(v);\n  };\n  for (const item of items) {\n    const json = item.json ?? item;\n    if (Array.isArray(json) || (json && Array.isArray(json.cases))) {\n      push(json);\n    } else if (json && typeof json === 'object') {\n      // e.g. { data: [...] } or { runs: [...] } from an upstream HTTP node\n      Object.values(json).forEach(push);\n    }\n  }\n  return runs;\n}\n\nfunction renderRun(run, index, totalRuns) {\n  const cases = Array.isArray(run.cases) ? run.cases : [];\n  const out = [];\n\n  // Count from the cases themselves rather than trusting the summary fields.\n  const counts = {};\n  for (const c of cases) {\n    const status = String(c.status || 'unknown').toLowerCase();\n    counts[status] = (counts[status] || 0) + 1;\n  }\n  const passed = counts.pass || 0;\n\n  out.push(totalRuns > 1 ? `## Run ${index + 1}: \\`${run.run_id}\\`` : `## \\`${run.run_id}\\``, '');\n  out.push(\n    `**${run.complete ? 'Complete' : 'Incomplete'}** · ${run.landed}/${run.expected} cases landed · ` +\n      `${run.polls} poll${run.polls === 1 ? '' : 's'} · **${pct(passed, cases.length)} pass rate**`,\n    ''\n  );\n\n  if (!cases.length) {\n    out.push('No cases recorded for this run.', '');\n    return { markdown: out.join('\\n'), counts, total: cases.length, passed };\n  }\n\n  const order = ['pass', 'fail', 'error', 'skip'];\n  const rank = (s) => (order.indexOf(s) === -1 ? order.length : order.indexOf(s));\n  out.push(\n    table(\n      ['Result', 'Count', 'Share'],\n      Object.keys(counts)\n        .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))\n        .map((s) => [icon(s), counts[s], pct(counts[s], cases.length)])\n    ),\n    ''\n  );\n\n  // Discrepancies between the reported summary and the actual cases.\n  const warnings = [];\n  for (const key of ['pass', 'fail', 'error']) {\n    const reported = run[key];\n    const actual = counts[key] || 0;\n    if (typeof reported === 'number' && reported !== actual) {\n      warnings.push(`\\`${key}\\` reported as ${reported}, counted ${actual} in cases`);\n    }\n  }\n  if (typeof run.landed === 'number' && run.landed !== cases.length) {\n    warnings.push(`\\`landed\\` reported as ${run.landed}, but ${cases.length} cases present`);\n  }\n  if (typeof run.expected === 'number' && run.expected !== run.landed) {\n    warnings.push(`${run.expected - run.landed} case(s) never landed`);\n  }\n  if (warnings.length) {\n    out.push('> [!WARNING]');\n    out.push('> Summary counts do not match the case list:');\n    warnings.forEach((w) => out.push(`> - ${w}`));\n    out.push('');\n  }\n\n  // Cases, sorted with failures first.\n  out.push('### Cases', '');\n  out.push(\n    table(\n      ['Case', 'Status', 'Tools called'],\n      [...cases]\n        .sort(\n          (a, b) =>\n            rankOf(a.status) - rankOf(b.status) ||\n            String(a.slug).localeCompare(String(b.slug))\n        )\n        .map((c) => {\n          const tools = parseTools(c.called_tools);\n          return [\n            `\\`${c.slug}\\`,\n            icon(String(c.status || 'unknown').toLowerCase()),\n            tools.length ? tools.map((t) => `\\`${t}\\``).join(', ') : '—',\n          ];\n        })\n    ),\n    ''\n  );\n\n  // Failing assertion detail, so a red row is actionable without opening the DB.\n  const failing = cases.filter((c) => ['fail', 'error'].includes(String(c.status || '').toLowerCase()));\n  const failingLines = [];\n  for (const c of failing) {\n    const failed = parseAssertions(c.assertion_results).filter((a) => a && a.pass === false);\n    if (!failed.length) continue;\n    failingLines.push(\n      `- \\`${c.slug}\\`: ` +\n        failed\n          .map((a) => `\\`${a.type}${a.tool || a.value ? ' ' + (a.tool || a.value) : ''}\\``)\n          .join(', ')\n    );\n  }\n  if (failingLines.length) {\n    out.push('#### Failing assertions', '', ...failingLines, '');\n  }\n\n  return { markdown: out.join('\\n'), counts, total: cases.length, passed };\n}\n\n// --- main -------------------------------------------------------------------\n\nconst runs = collectRuns($input.all());\n\nif (!runs.length) {\n  throw new Error('No run objects found in input — expected objects with a `cases` array.');\n}\n\n// This workflow IS the dispatcher, so the current execution is the dispatcher run.\nconst baseUrl = $vars.instance_url || 'https://darwin-staging.app.n8n.cloud';\nconst wfId = ($workflow && $workflow.id) || 'agent-integration-run';\nconst executionUrl = `${baseUrl}/workflow/${wfId}/executions/${$execution.id}`;\n\nconst generatedAt = new Date().toISOString();\nconst rendered = runs.map((run, i) => renderRun(run, i, runs.length));\n\nconst totalCases = rendered.reduce((n, r) => n + r.total, 0);\nconst totalPass = rendered.reduce((n, r) => n + r.passed, 0);\nconst totalFailing = rendered.reduce(\n  (n, r) => n + (r.counts.fail || 0) + (r.counts.error || 0),\n  0\n);\n\nconst parts = [];\nif (runs.length > 1) {\n  parts.push(\n    `${runs.length} runs · ${totalCases} cases · ${pct(totalPass, totalCases)} overall pass rate`,\n    ''\n  );\n}\nrendered.forEach((r) => parts.push(r.markdown));\nparts.push(`_Generated ${generatedAt}_ · [Dispatcher execution](${executionUrl})`);\n\nconst markdown = parts.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trimEnd() + '\\n';\n\n// Single item out. Extra fields are there so downstream IF/Switch nodes don't\n// have to re-parse the markdown to decide whether to alert.\nreturn [\n  {\n    json: {\n      markdown,\n      generated_at: generatedAt,\n      execution_url: executionUrl,\n      run_ids: runs.map((r) => r.run_id),\n      run_count: runs.length,\n      total_cases: totalCases,\n      total_pass: totalPass,\n      total_failing: totalFailing,\n      pass_rate: totalCases ? Number(((totalPass / totalCases) * 100).toFixed(1)) : null,\n      all_passed: totalFailing === 0,\n      char_count: markdown.length,\n    },\n  },\n];"
+      }
+    },
+    {
+      "id": "f81f2b58-00a0-4db4-858a-478b2264adec",
+      "name": "format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Build Slack Block Kit markdown blocks from the Summary node's markdown output.\n// Splits long text across multiple mrkdwn blocks (3,000-char limit each),\n// up to ~90KB total serialized JSON payload to stay within Slack API limits.\n// Splits on newlines where possible. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\n\nconst PER_BLOCK = 2900;  // leave margin under Slack's 3000-char limit\nconst MAX_BLOCKS = 50;   // hard cap: Slack max 50 blocks\nconst MAX_PAYLOAD_BYTES = 90000;  // ~90KB budget for serialized { blocks: [...] }\nconst TRUNCATION_NOTE = '\\n\\n_… (truncated: response too long for a single Slack message)_';\n\nlet text = $json.markdown ?? '';\nconst fullText = text;  // preserve original for downstream use\n\n// --- Helper: estimate serialized size of a blocks array ---\nfunction estimatePayloadSize(blocksArr) {\n  // Serialize just the blocks array; the outer { \"blocks\": [...] } wrapper adds ~15 chars\n  return JSON.stringify(blocksArr).length + 20;\n}\n\n// --- Split text into chunks ---\nfunction splitIntoChunks(str, chunkSize, maxBlocks, maxBytes) {\n  const chunks = [];\n  const trialBlocks = [];\n\n  while (str.length > 0 && chunks.length < maxBlocks) {\n    if (str.length <= chunkSize) {\n      chunks.push(str);\n      trialBlocks.push({ type: 'markdown', text: str });\n      if (estimatePayloadSize(trialBlocks) > maxBytes) {\n        const removed = chunks.pop();\n        trialBlocks.pop();\n        const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n        const maxTextLen = Math.max(0, remaining - 60);\n        if (maxTextLen > 50) {\n          chunks.push(removed.slice(0, maxTextLen) + TRUNCATION_NOTE);\n        }\n      }\n      break;\n    }\n\n    // Try to find last newline within the chunk boundary\n    const sliceTarget = str.slice(0, chunkSize);\n    const lastNewline = sliceTarget.lastIndexOf('\\n');\n    let chunk;\n    if (lastNewline > chunkSize - 500) {\n      chunk = str.slice(0, lastNewline);\n      str = str.slice(lastNewline + 1);\n    } else {\n      chunk = sliceTarget;\n      str = str.slice(chunkSize);\n    }\n\n    const tentativeBlocks = [...trialBlocks, { type: 'markdown', text: chunk }];\n    if (estimatePayloadSize(tentativeBlocks) > maxBytes) {\n      const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n      const maxTextLen = Math.max(0, remaining - 60);\n      if (maxTextLen > 50) {\n        chunks.push(chunk.slice(0, maxTextLen) + TRUNCATION_NOTE);\n      }\n      break;\n    }\n\n    chunks.push(chunk);\n    trialBlocks.push({ type: 'markdown', text: chunk });\n  }\n\n  if (str.length > 0 && chunks.length === maxBlocks) {\n    chunks[chunks.length - 1] = chunks[chunks.length - 1].replace(/\\n*$/, '') + TRUNCATION_NOTE;\n  }\n\n  return chunks;\n}\n\nconst chunks = splitIntoChunks(text, PER_BLOCK, MAX_BLOCKS, MAX_PAYLOAD_BYTES);\nconst blocks = chunks.map(t => ({ type: 'markdown', text: t }));\nconst content = { blocks };\n\nreturn [{ json: { blocksJson: JSON.stringify(content), output: fullText } }];"
+      }
+    },
+    {
+      "id": "ba9ae05c-86a0-4908-9914-1e141512a2ce",
+      "name": "ChunkBlocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Group the formatted blocks into message-sized chunks so no single Slack\n// message exceeds Slack's cumulative block-text limit (~13k chars, undocumented —\n// see slackapi/bolt-js#2509). Emits one item per message; Send a message then posts\n// one message per item. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\nconst MSG_BUDGET = 8000; // chars of block text per message, safe margin under ~13k\n\nconst blocksJson = $('format').first().json.blocksJson;\n\nlet blocks;\ntry {\n  blocks = JSON.parse(blocksJson).blocks;\n  if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('no blocks');\n} catch (e) {\n  // Fall back to previous single-message behaviour if parsing fails\n  return [{ json: { blocksJson, part: 1, totalParts: 1 } }];\n}\n\nconst messages = [];\nlet current = [];\nlet currentLen = 0;\n\nfor (const block of blocks) {\n  const len = (block.text || '').length;\n  if (current.length > 0 && currentLen + len > MSG_BUDGET) {\n    messages.push(current);\n    current = [];\n    currentLen = 0;\n  }\n  current.push(block);\n  currentLen += len;\n}\nif (current.length > 0) messages.push(current);\n\nreturn messages.map((msgBlocks, i) => ({\n  json: {\n    blocksJson: JSON.stringify({ blocks: msgBlocks }),\n    part: i + 1,\n    totalParts: messages.length,\n  },\n}));"
+      }
+    },
+    {
+      "id": "ed63dd56-92c6-40ab-9d00-69482541ce3d",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09DRCJLQCE",
+          "mode": "id"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ $json.blocksJson }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "c998f79e-2d0e-45fd-b5f1-a00bb351cdcb"
+    },
+    {
+      "id": "0e317312-fcdd-4250-bcbd-a1cd162049ee",
+      "name": "Pace Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        224
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "316d0dcf-d426-49eb-95a6-31a2647d8588"
+    },
+    {
+      "id": "f9cc2980-a751-4680-a6b1-2a19b3fc3387",
+      "name": "Perf Report",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1400,
+        600
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "wNJp6yE4ZBKmtpfe"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Run Id').first().json.run_id }}",
+            "label": "FirstClassDarwin (agent) — integration suite",
+            "results_table": "integration_results",
+            "cases_table": "integration_cases",
+            "expected_slugs": "={{ $('Load Cases').all().map(i => i.json.slug).join(',') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "label",
+              "displayName": "label",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "results_table",
+              "displayName": "results_table",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "cases_table",
+              "displayName": "cases_table",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "expected_slugs",
+              "displayName": "expected_slugs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Run Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Id": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Results": {
+      "main": [
+        [
+          {
+            "node": "Poll Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Check": {
+      "main": [
+        [
+          {
+            "node": "Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete?": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pace Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Case": {
+      "main": [
+        [
+          {
+            "node": "Pace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace": {
+      "main": [
+        [
+          {
+            "node": "Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dispatch Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary": {
+      "main": [
+        [
+          {
+            "node": "format",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Perf Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format": {
+      "main": [
+        [
+          {
+            "node": "ChunkBlocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChunkBlocks": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace Poll": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "878c6dd9-5740-42b7-92cc-46bb5542478d",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "U1hoqp33rsBJ5M2X",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -44,7 +44,8 @@
             "email_subject": "={{ $json.body.email_subject }}",
             "email_body": "={{ $json.body.email_body }}",
             "calendly_url": "={{ $json.body.calendly_url }}",
-            "test_mode": true
+            "test_mode": true,
+            "bcc_email": "={{ $json.body.bcc_email }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -91,6 +92,15 @@
               "defaultMatch": false,
               "display": true,
               "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bcc_email",
+              "displayName": "bcc_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
               "canBeUsedToMatch": true
             }
           ]
@@ -143,7 +153,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "e4b98ece-7310-40e8-8d9a-c3b710e6fc04",
+  "versionId": "1f5d018a-9821-40df-a50e-0c51cc91782c",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

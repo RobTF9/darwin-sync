@@ -1,0 +1,115 @@
+{
+  "id": "kdIFhgpHSiBoTAdp",
+  "name": "PF Tremendous Balance Daily",
+  "description": "Daily 09:00 Madrid trigger for PF Tremendous Balance. Not published (DWN-6 gate).",
+  "nodes": [
+    {
+      "id": "45c66bd9-6429-4ac3-a56f-1a7d4430ee46",
+      "name": "Daily 09:00 Madrid",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9363404b-8aeb-4a63-91ae-ba242ab4ca6f",
+      "name": "Run Balance Check",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "OpaOdeTTXH6thDSM",
+          "cachedResultName": "PF Tremendous Balance"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "1817ce6e-9f35-4df9-b67f-0832024308cd",
+      "name": "Run Daily Check Now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "6be10f7e-674d-41c9-ba5f-af13c1b5fc73",
+      "name": "Sticky Note 3565c7d2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        48,
+        192
+      ],
+      "parameters": {
+        "content": "## PF Tremendous Balance Daily\nRuns **PF Tremendous Balance** every day at 09:00 Madrid. The admin gets a DM when the balance is below $500.\n\n**Not published.** Publishing needs a yes from Aniol (DWN-6 gate). Use **Run Daily Check Now** until then.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Daily 09:00 Madrid": {
+      "main": [
+        [
+          {
+            "node": "Run Balance Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Daily Check Now": {
+      "main": [
+        [
+          {
+            "node": "Run Balance Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "1211b8f2-20fa-486a-ac79-f4e138873012",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,0 +1,1025 @@
+{
+  "id": "1fG3hbq3hssOvDxX",
+  "name": "UsageReport",
+  "description": "Sub-workflow tool for the Test Suites MCP server. Reads Slack history with the Darwin bot token and reports distinct users who interact with Darwin, month by month. Linear pipeline: list conversations, find Darwin threads, fetch replies, aggregate. Exclud",
+  "nodes": [
+    {
+      "id": "d99a65a3-9df2-4990-9f61-ca7b4d3b20b9",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2000,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "oldest",
+              "type": "string"
+            },
+            {
+              "name": "bot_user_id",
+              "type": "string"
+            },
+            {
+              "name": "exclude_channels",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f931c5d3-c86f-40a1-9eae-4cf43656eb10",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -1760,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-env",
+              "name": "env",
+              "type": "string",
+              "value": "={{ $vars.env || 'production' }}"
+            },
+            {
+              "id": "cfg-mention",
+              "name": "mention",
+              "type": "string",
+              "value": "={{ '<@' + ((($json.bot_user_id || '').trim()) || (($vars.env || 'production') === 'staging' ? 'U0BLRFB0FJR' : 'U09Q22R53T6')) + '>' }}"
+            },
+            {
+              "id": "cfg-bots",
+              "name": "bots",
+              "type": "array",
+              "value": "={{ ['U09Q22R53T6', 'U0BLRFB0FJR'].concat((($json.bot_user_id || '').trim()) ? [($json.bot_user_id || '').trim()] : []) }}"
+            },
+            {
+              "id": "cfg-since",
+              "name": "since",
+              "type": "string",
+              "value": "={{ ($json.oldest || '').trim() || '2026-07-25' }}"
+            },
+            {
+              "id": "cfg-oldest",
+              "name": "oldest_epoch",
+              "type": "string",
+              "value": "={{ String(Math.floor(new Date((($json.oldest || '').trim() || '2026-07-25') + 'T00:00:00Z').getTime() / 1000)) }}"
+            },
+            {
+              "id": "cfg-excluded",
+              "name": "excluded",
+              "type": "array",
+              "value": "={{ ('C0BQH5S6P1P,C09DRCJLQCE,' + ($json.exclude_channels || '')).split(',').map(s => s.trim()).filter(Boolean) }}"
+            },
+            {
+              "id": "cfg-types",
+              "name": "types",
+              "type": "array",
+              "value": "={{ ['public_channel', 'private_channel', 'im'] }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4a9d443e-c384-4866-9007-3575365998bd",
+      "name": "Split Types",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1520,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "types",
+        "options": {
+          "destinationFieldName": "type"
+        }
+      }
+    },
+    {
+      "id": "00daf9ea-42ef-4926-be67-05cc4e0b82f6",
+      "name": "List Conversations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1280,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.conversations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "types",
+              "value": "={{ $json.type }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 400
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "f16524bd-12fc-4186-a990-0d098dc92dd7",
+      "name": "OK Pages",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -1040,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true && ($json.channels || []).length > 0 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8e6ff830-3d19-4916-a545-41e390d4ee79",
+      "name": "Split Channels",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "channels"
+      }
+    },
+    {
+      "id": "c13c080f-8800-4115-ae7b-ecfc91c559ab",
+      "name": "Readable Channels",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -560,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ !$('Config').first().json.excluded.includes($json.id) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "78325022-6973-4ce2-a480-4cb53438357a",
+      "name": "Fetch History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -320,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/conversations.history",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "oldest",
+              "value": "={{ $('Config').first().json.oldest_epoch }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1250
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 1250
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000
+    },
+    {
+      "id": "f6f4a8e9-c111-47ae-ba72-3e8fee97c33b",
+      "name": "History OK",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -80,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true && ($json.messages || []).length > 0 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4916ce95-8e8b-4737-b16d-b0edadbe111f",
+      "name": "Split History Messages",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        160,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "messages"
+      }
+    },
+    {
+      "id": "f7077902-b17a-45cc-95ee-76c70c47bda3",
+      "name": "Stamp Channel",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "st-ch",
+              "name": "channel_id",
+              "type": "string",
+              "value": "={{ $('Readable Channels').item.json.id }}"
+            },
+            {
+              "id": "st-im",
+              "name": "is_im",
+              "type": "boolean",
+              "value": "={{ !!$('Readable Channels').item.json.is_im }}"
+            },
+            {
+              "id": "st-thread",
+              "name": "thread_ts",
+              "type": "string",
+              "value": "={{ $json.thread_ts || $json.ts }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5eec75bc-f839-4916-bf6f-94c94ee0f7e9",
+      "name": "Candidate Threads",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        640,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ (!$json.subtype || $json.subtype === 'thread_broadcast') && ((!$json.bot_id && !!$json.user && !$('Config').first().json.bots.includes($json.user) && ($json.is_im || ($json.text || '').includes($('Config').first().json.mention))) || ($json.reply_users || []).some(u => $('Config').first().json.bots.includes(u))) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "30f72b80-3f1d-45e4-8bd7-fb4e6cc18584",
+      "name": "Dedupe Threads",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "operation": "removeDuplicateInputItems",
+        "compare": "selectedFields",
+        "fieldsToCompare": "channel_id, thread_ts"
+      }
+    },
+    {
+      "id": "4420aa51-2446-4f42-92ae-f1b3dba16165",
+      "name": "Fetch Replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/conversations.replies",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ $json.channel_id }}"
+            },
+            {
+              "name": "ts",
+              "value": "={{ $json.thread_ts }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1250
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "cursor",
+                    "value": "={{ $response.body.response_metadata ? $response.body.response_metadata.next_cursor : \"\" }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.response_metadata || !$response.body.response_metadata.next_cursor }}",
+              "requestInterval": 1250
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000
+    },
+    {
+      "id": "a764f7fd-f948-4064-be6c-032039d3db01",
+      "name": "Replies OK",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true && ($json.messages || []).length > 0 }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "280d4bce-ccea-45da-a7f2-8af6b6b3f464",
+      "name": "Split Reply Messages",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "messages"
+      }
+    },
+    {
+      "id": "f7356e7b-39d7-4b60-8390-8a2db5f5930e",
+      "name": "Stamp Thread",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1840,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tt-ch",
+              "name": "channel_id",
+              "type": "string",
+              "value": "={{ $('Dedupe Threads').item.json.channel_id }}"
+            },
+            {
+              "id": "tt-im",
+              "name": "is_im",
+              "type": "boolean",
+              "value": "={{ !!$('Dedupe Threads').item.json.is_im }}"
+            },
+            {
+              "id": "tt-key",
+              "name": "thread_key",
+              "type": "string",
+              "value": "={{ $('Dedupe Threads').item.json.channel_id + ':' + $('Dedupe Threads').item.json.thread_ts }}"
+            },
+            {
+              "id": "tt-month",
+              "name": "month",
+              "type": "string",
+              "value": "={{ new Date(parseFloat($json.ts) * 1000).toISOString().slice(0, 7) }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "463edd48-3242-442f-8a72-efe4d4001597",
+      "name": "Human Darwin Messages",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        2080,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ (!$json.subtype || $json.subtype === 'thread_broadcast') && !$json.bot_id && !!$json.user && !$('Config').first().json.bots.includes($json.user) && ($json.is_im || ($json.text || '').includes($('Config').first().json.mention)) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9288db13-5d87-4ba7-abb1-0383525b3199",
+      "name": "Dedupe Messages",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        2320,
+        0
+      ],
+      "parameters": {
+        "operation": "removeDuplicateInputItems",
+        "compare": "selectedFields",
+        "fieldsToCompare": "channel_id, ts"
+      }
+    },
+    {
+      "id": "22ba207f-7960-4fba-abf5-3537e7e25a97",
+      "name": "Distinct Users",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        0
+      ],
+      "parameters": {
+        "operation": "removeDuplicateInputItems",
+        "compare": "selectedFields",
+        "fieldsToCompare": "user"
+      }
+    },
+    {
+      "id": "a94720af-b505-45ce-82a3-1ae448142c86",
+      "name": "Fetch User Names",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2800,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.info",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user",
+              "value": "={{ $json.user }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 700
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "382b4175-b084-4a34-ba10-e43bc1e0087d",
+      "name": "Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3040,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Assemble the month-by-month usage report.\nconst cfg = $('Config').first().json;\nconst names = {};\nfor (const it of $input.all()) {\n  const b = it.json;\n  if (b && b.ok && b.user) {\n    const p = b.user.profile || {};\n    names[b.user.id] = p.display_name || p.real_name || b.user.real_name || b.user.name;\n  }\n}\nconst months = {};\nconst totalUsers = {};\nconst totalThreads = {};\nlet total = 0;\nfor (const it of $('Dedupe Messages').all()) {\n  const m = it.json;\n  if (!months[m.month]) months[m.month] = { users: {}, messages: 0, threads: {} };\n  months[m.month].users[m.user] = (months[m.month].users[m.user] || 0) + 1;\n  months[m.month].messages += 1;\n  months[m.month].threads[m.thread_key] = true;\n  totalUsers[m.user] = true;\n  totalThreads[m.thread_key] = true;\n  total += 1;\n}\nconst gaps = [];\nfor (const it of $('List Conversations').all()) {\n  const b = it.json;\n  if (b && b.ok === false) gaps.push(b.needed || b.error || 'unknown');\n}\nconst monthRows = Object.keys(months).sort().map(mo => ({\n  month: mo,\n  distinct_users: Object.keys(months[mo].users).length,\n  messages: months[mo].messages,\n  threads: Object.keys(months[mo].threads).length,\n  users: Object.entries(months[mo].users).sort((a, b) => b[1] - a[1]).map(e => ({ user: e[0], name: names[e[0]] || e[0], messages: e[1] }))\n}));\nreturn [{ json: {\n  env: cfg.env,\n  since: cfg.since,\n  excluded_channels: cfg.excluded,\n  scope_gaps: gaps,\n  months: monthRows,\n  totals: { distinct_users: Object.keys(totalUsers).length, messages: total, threads: Object.keys(totalThreads).length },\n  generated_at: new Date().toISOString()\n} }];"
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Split Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Types": {
+      "main": [
+        [
+          {
+            "node": "List Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Conversations": {
+      "main": [
+        [
+          {
+            "node": "OK Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OK Pages": {
+      "main": [
+        [
+          {
+            "node": "Split Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Channels": {
+      "main": [
+        [
+          {
+            "node": "Readable Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Readable Channels": {
+      "main": [
+        [
+          {
+            "node": "Fetch History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch History": {
+      "main": [
+        [
+          {
+            "node": "History OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "History OK": {
+      "main": [
+        [
+          {
+            "node": "Split History Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split History Messages": {
+      "main": [
+        [
+          {
+            "node": "Stamp Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp Channel": {
+      "main": [
+        [
+          {
+            "node": "Candidate Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Candidate Threads": {
+      "main": [
+        [
+          {
+            "node": "Dedupe Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe Threads": {
+      "main": [
+        [
+          {
+            "node": "Fetch Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Replies": {
+      "main": [
+        [
+          {
+            "node": "Replies OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replies OK": {
+      "main": [
+        [
+          {
+            "node": "Split Reply Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Reply Messages": {
+      "main": [
+        [
+          {
+            "node": "Stamp Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp Thread": {
+      "main": [
+        [
+          {
+            "node": "Human Darwin Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Darwin Messages": {
+      "main": [
+        [
+          {
+            "node": "Dedupe Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe Messages": {
+      "main": [
+        [
+          {
+            "node": "Distinct Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Distinct Users": {
+      "main": [
+        [
+          {
+            "node": "Fetch User Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User Names": {
+      "main": [
+        [
+          {
+            "node": "Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "51a9ad5c-9b81-44e4-ad84-20669b5ffa02",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": [
+    {
+      "id": "87dee478-44e2-4585-8327-aecd08a08bff",
+      "name": "Discover conversations",
+      "nodeIds": [
+        "f931c5d3-c86f-40a1-9eae-4cf43656eb10",
+        "4a9d443e-c384-4866-9007-3575365998bd",
+        "00daf9ea-42ef-4926-be67-05cc4e0b82f6",
+        "f16524bd-12fc-4186-a990-0d098dc92dd7",
+        "8e6ff830-3d19-4916-a545-41e390d4ee79",
+        "c13c080f-8800-4115-ae7b-ecfc91c559ab"
+      ],
+      "description": "Env config, then every conversation the Darwin bot can read, minus excluded channels"
+    },
+    {
+      "id": "a5d9b866-5ac8-4bee-bb53-39d96a0f315f",
+      "name": "Find Darwin threads",
+      "nodeIds": [
+        "78325022-6973-4ce2-a480-4cb53438357a",
+        "f6f4a8e9-c111-47ae-ba72-3e8fee97c33b",
+        "4916ce95-8e8b-4737-b16d-b0edadbe111f",
+        "f7077902-b17a-45cc-95ee-76c70c47bda3",
+        "5eec75bc-f839-4916-bf6f-94c94ee0f7e9",
+        "30f72b80-3f1d-45e4-8bd7-fb4e6cc18584"
+      ],
+      "description": "Page channel history and keep threads where Darwin was mentioned or replied"
+    },
+    {
+      "id": "24580624-9065-42a1-9c11-a82c36a85a51",
+      "name": "Collect messages",
+      "nodeIds": [
+        "4420aa51-2446-4f42-92ae-f1b3dba16165",
+        "a764f7fd-f948-4064-be6c-032039d3db01",
+        "280d4bce-ccea-45da-a7f2-8af6b6b3f464",
+        "f7356e7b-39d7-4b60-8390-8a2db5f5930e",
+        "463edd48-3242-442f-8a72-efe4d4001597",
+        "9288db13-5d87-4ba7-abb1-0383525b3199"
+      ],
+      "description": "Fetch each thread and keep deduped human messages directed at Darwin"
+    },
+    {
+      "id": "3e07f5bd-ef8f-452f-a3ff-08e363bc9ee3",
+      "name": "Aggregate & report",
+      "nodeIds": [
+        "22ba207f-7960-4fba-abf5-3537e7e25a97",
+        "a94720af-b505-45ce-82a3-1ae448142c86",
+        "382b4175-b084-4a34-ba10-e43bc1e0087d"
+      ],
+      "description": "Distinct users per month with display names, messages and thread counts"
+    }
+  ]
+}

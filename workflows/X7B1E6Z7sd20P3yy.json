@@ -1,0 +1,853 @@
+{
+  "id": "X7B1E6Z7sd20P3yy",
+  "name": "AgentSlackDispatch",
+  "description": "Retrieval eval worker (agent, Slack transport): runs ONE case through the REAL Slack path against FirstClassDarwin. Posts turns as Rob @mentioning the agent, polls the thread for the bot reply (no reaction signal on the agent platform), captures tool call",
+  "nodes": [
+    {
+      "id": "92c9084b-4a47-4f7c-add2-bfb37ac85b90",
+      "name": "Case Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -900,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "case_id"
+            },
+            {
+              "name": "channel_id"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5a865b3a-cb09-489f-a090-4acaf4782b32",
+      "name": "Get Bot Id",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -680,
+        0
+      ],
+      "parameters": {
+        "url": "https://slack.com/api/auth.test",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xp4OF6HOYzDlpIIJ",
+          "name": "n8n - FirstClassDarwin"
+        }
+      }
+    },
+    {
+      "id": "9d1b76a5-3e6d-4612-9553-6500ff2a7ab1",
+      "name": "Load Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        0
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "retrieval_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Case Input').item.json.case_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "a02c37b0-2ef1-44f9-8668-ea45cce87721",
+      "name": "Build Turns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const c = $input.first().json;\nlet ctx = c.context_messages;\nif (typeof ctx === 'string') { try { ctx = JSON.parse(ctx); } catch (e) { ctx = []; } }\nif (!Array.isArray(ctx)) ctx = [];\nconst turns = ctx.map(m => ({ text: String(m), is_first: false, is_final: false }));\nturns.push({ text: c.prompt, is_first: false, is_final: true });\nif (turns.length) turns[0].is_first = true;\nreturn turns.map(t => ({ json: t }));"
+      }
+    },
+    {
+      "id": "1f6a808b-f3a8-4ee2-b68b-3010431cc429",
+      "name": "Final Ts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        -240
+      ],
+      "parameters": {
+        "jsCode": "const threadTs = $('Post First').first().json.message.ts;\nlet finalMsgTs = threadTs;\ntry {\n  const lastReply = $('Post Reply').last().json;\n  if (lastReply && lastReply.message && lastReply.message.ts) finalMsgTs = lastReply.message.ts;\n} catch (e) { finalMsgTs = threadTs; }\nreturn [{ json: { thread_ts: threadTs, final_msg_ts: finalMsgTs } }];"
+      }
+    },
+    {
+      "id": "50c76b29-d8dd-4c50-bcc4-e88fb96ece10",
+      "name": "Is First Turn?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        200,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-first",
+              "leftValue": "={{ $json.is_first }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3f7303bb-d5d2-498e-9f54-973eae9ae74e",
+      "name": "Post First",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        420,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Case Input').item.json.channel_id }}"
+        },
+        "text": "=<@{{ $('Get Bot Id').first().json.user_id }}> {{ $json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      },
+      "webhookId": "06858b11-7baa-46e4-8fa1-ddd4fb37cd62"
+    },
+    {
+      "id": "66b2b356-d7fc-4267-be34-37e022e0851e",
+      "name": "Record Ts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        640,
+        100
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg-ts",
+              "name": "msg_ts",
+              "value": "={{ $json.message && $json.message.ts ? $json.message.ts : ($json.message_timestamp || $json.ts) }}",
+              "type": "string"
+            },
+            {
+              "id": "turn-text",
+              "name": "text",
+              "value": "={{ $('Build Turns').item.json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "77db4a8f-afd0-4409-bbc9-1d185dc5a0bd",
+      "name": "Post Reply",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        420,
+        200
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Case Input').item.json.channel_id }}"
+        },
+        "text": "=<@{{ $('Get Bot Id').first().json.user_id }}> {{ $json.text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $('Post First').first().json.message.ts }}"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      },
+      "webhookId": "fdf8a5f8-145b-4664-8279-9db138e871b4"
+    },
+    {
+      "id": "d6000de6-cfc5-4f6a-a56e-70b535e75892",
+      "name": "Turns",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -20,
+        0
+      ],
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "574a428c-e0eb-4e1d-b04b-d4698d67536c",
+      "name": "Pace Reply",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        860,
+        100
+      ],
+      "parameters": {
+        "amount": 15
+      },
+      "webhookId": "d562692c-7369-4f7d-9e13-8a06715b3f7c"
+    },
+    {
+      "id": "70cdc097-77e4-4918-a5d5-3116ac61ca45",
+      "name": "Fetch Replies",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1080,
+        100
+      ],
+      "parameters": {
+        "resource": "channel",
+        "operation": "replies",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Case Input').item.json.channel_id }}"
+        },
+        "ts": "={{ $('Post First').first().json.message.ts }}",
+        "limit": 100,
+        "filters": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      },
+      "webhookId": "2c4b764a-fd04-47b3-9f60-63247ae75790"
+    },
+    {
+      "id": "53ce6d71-16d8-42d0-8a04-a267a28333dd",
+      "name": "Check Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        100
+      ],
+      "parameters": {
+        "jsCode": "const botId = $('Get Bot Id').first().json.user_id;\nconst curTs = $('Record Ts').last().json.msg_ts;\nconst msgs = $input.all().map(i => i.json);\nconst done = msgs.some(m => m && m.user === botId && parseFloat(m.ts) > parseFloat(curTs));\nlet prev = null;\ntry { prev = $('Check Done').last().json; } catch (e) { prev = null; }\nconst polls = (prev && prev.msg_ts === curTs) ? (prev.polls || 0) + 1 : 1;\n// 40 polls x 15s = 10 min per turn. Under a parallel suite run the agent\n// queues sessions and replies late; 6 min produced false timeouts.\nreturn [{ json: { done: done, timedOut: !done && polls >= 40, polls: polls, msg_ts: curTs } }];"
+      }
+    },
+    {
+      "id": "fe0e5729-4433-42af-9ee1-28700d0738b4",
+      "name": "Done?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1520,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-done",
+              "leftValue": "={{ $json.done }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cond-timeout",
+              "leftValue": "={{ $json.timedOut }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "45630aa3-9c89-4776-8b02-3517d1490961",
+      "name": "Fetch Thread",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        420,
+        -240
+      ],
+      "parameters": {
+        "resource": "channel",
+        "operation": "replies",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Case Input').item.json.channel_id }}"
+        },
+        "ts": "={{ $('Final Ts').first().json.thread_ts }}",
+        "limit": 100,
+        "filters": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      },
+      "webhookId": "45232c34-a4c4-43c8-bc89-851127fd63a3"
+    },
+    {
+      "id": "fc28c44c-b252-4ef6-bedd-fa1896676f23",
+      "name": "Tool Workflows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -240
+      ],
+      "parameters": {
+        "jsCode": "const map = [\n  { workflowId: 'SeM49wLBqaM1KknA', tool: 'search' },\n  { workflowId: 'dLWwo63SMOZqfYfJ', tool: 'ls' },\n  { workflowId: 'Zfh4IcfyPk9fICFe', tool: 'get_resource_context' },\n  { workflowId: 'jUXyju77iBG3FGUz', tool: 'get_transcript' },\n  { workflowId: 'TvvDElh9iRoPoU7B', tool: 'get_gong_call' },\n  { workflowId: 'Ft4amYKPNROF6WLy', tool: 'get_forum_thread' },\n  { workflowId: 'YjXOYGteEjwRHSoN', tool: 'fan_out' },\n  { workflowId: 'K0V2Hk9C2whu6kQ7', tool: 'fan_out_results' },\n  { workflowId: 'NUxq8qIjfsYM4IaY', tool: 'wait' }\n];\nreturn map.map(m => ({ json: m }));"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "0c6bc32c-1ef3-4365-8478-07a0d74d4c61",
+      "name": "List Tool Execs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        860,
+        -240
+      ],
+      "parameters": {
+        "url": "={{ ($vars.instance_url || 'https://darwin-staging.app.n8n.cloud') + '/api/v1/executions?workflowId=' + $json.workflowId + '&limit=250' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "n8nApi",
+        "options": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "id": "c4abaf2c-b554-4fb3-ad30-d4c91e302889",
+      "name": "Get Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        -240
+      ],
+      "parameters": {
+        "jsCode": "const windowStartMs = Math.floor(parseFloat($('Final Ts').first().json.thread_ts) * 1000) - 5000;\n// Bound the window at the last message in the thread (the bot's final reply\n// plus buffer) — tool calls always finish before the reply posts. This keeps\n// the candidate set small when many cases run in parallel.\nlet windowEndMs = Date.now();\nconst threadMsgs = $('Fetch Thread').all().map(i => i.json);\nif (threadMsgs.length) {\n  const maxTs = Math.max.apply(null, threadMsgs.map(m => parseFloat(m.ts) || 0));\n  if (maxTs > 0) windowEndMs = Math.ceil(maxTs * 1000) + 10000;\n}\nconst toolByWf = {};\nfor (const i of $('Tool Workflows').all()) toolByWf[i.json.workflowId] = i.json.tool;\nconst out = [];\nfor (const item of $input.all()) {\n  const rows = (item.json && item.json.data) || [];\n  for (const e of rows) {\n    if (!e || !e.id) continue;\n    const t = new Date(e.startedAt).getTime();\n    if (t >= windowStartMs && t <= windowEndMs) out.push({ json: { id: String(e.id), workflowId: e.workflowId, tool: toolByWf[e.workflowId] || e.workflowId, startedAt: e.startedAt } });\n  }\n}\nout.sort((a, b) => new Date(a.json.startedAt) - new Date(b.json.startedAt));\nif (!out.length) return [{ json: { id: null } }];\nreturn out;"
+      }
+    },
+    {
+      "id": "997ffa46-1c80-41e2-9447-a26dc1c3f43e",
+      "name": "Fetch Exec Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1300,
+        -240
+      ],
+      "parameters": {
+        "url": "={{ ($vars.instance_url || 'https://darwin-staging.app.n8n.cloud') + '/api/v1/executions/' + $json.id + '?includeData=true' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "n8nApi",
+        "options": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "3v9sCEKD7Zp28oE8",
+          "name": "n8n account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "041afa03-915d-41a6-aa0b-78428685167e",
+      "name": "Capture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -240
+      ],
+      "parameters": {
+        "jsCode": "const runId = $('Case Input').first().json.run_id;\nconst caseId = $('Case Input').first().json.case_id;\nconst channelId = $('Case Input').first().json.channel_id;\nconst c = $('Load Case').first().json;\nconst botId = $('Get Bot Id').first().json.user_id;\nconst threadTs = $('Final Ts').first().json.thread_ts;\nconst finalMsgTs = parseFloat($('Final Ts').first().json.final_msg_ts);\nconst suffix = ':slack:' + channelId + ':' + threadTs;\n\nconst safeParse = (s) => { try { return JSON.parse(s); } catch (e) { return null; } };\n\n// Answer: all bot messages in the thread after the final user turn, joined.\n// Long replies post as several Slack messages; joining captures the whole answer.\nconst replies = $('Fetch Thread').all().map(i => i.json);\nconst botMsgs = replies\n  .filter(m => m && m.user === botId && parseFloat(m.ts) > finalMsgTs)\n  .sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts));\nconst answer = botMsgs.map(m => String(m.text || '')).join('\\n');\nconst lastBotTs = botMsgs.length ? parseFloat(botMsgs[botMsgs.length - 1].ts) : null;\nconst durationMs = lastBotTs ? Math.round((lastBotTs - parseFloat(threadTs)) * 1000) : null;\n\n// Tool calls: n8n executions of the tool sub-workflows. Each execution of a\n// workflow tool carries parentAgentRun.threadId that embeds the Slack channel\n// and thread_ts — a deterministic link to this exact eval thread. When the\n// public API omits parentAgentRun we fall back to the time-window candidates.\nconst toolByWf = {};\nfor (const i of $('Tool Workflows').all()) toolByWf[i.json.workflowId] = i.json.tool;\n\nconst compressRows = (items) => {\n  const rows = [];\n  for (const it of items) {\n    const v = it && it.json;\n    if (!v) continue;\n    if (Array.isArray(v.results)) {\n      for (const r of v.results.slice(0, 15)) {\n        rows.push({ content: String((r && (r.snippet || r.quote)) || '').slice(0, 1200), metadata: (r && typeof r === 'object') ? r : {}, score: (r && typeof r.score === 'number') ? r.score : null });\n        if (rows.length >= 15) break;\n      }\n    } else if (typeof v.transcript === 'string') {\n      rows.push({ content: v.transcript.slice(0, 1200), metadata: {}, score: null });\n    } else {\n      rows.push({ content: JSON.stringify(v).slice(0, 1200), metadata: {}, score: null });\n    }\n    if (rows.length >= 15) break;\n  }\n  return rows;\n};\n\nconst steps = [];\nconst calledN = [];\nlet parMatched = 0;\nlet parMissing = 0;\nlet scanned = 0;\nfor (const item of $input.all()) {\n  const j = item.json || {};\n  if (!j.id || !j.workflowId) continue;\n  scanned++;\n  const data = (typeof j.data === 'string') ? safeParse(j.data) : j.data;\n  if (!data || !data.resultData) continue;\n  const par = j.parentAgentRun || data.parentAgentRun || (data.executionData && data.executionData.parentAgentRun) || null;\n  if (par && par.threadId) {\n    if (!String(par.threadId).endsWith(suffix)) continue;\n    parMatched++;\n  } else {\n    parMissing++;\n  }\n  const tool = toolByWf[j.workflowId] || String(j.workflowId);\n  const rd = data.resultData.runData || {};\n  const lastNode = data.resultData.lastNodeExecuted;\n  let input = null;\n  for (const name of Object.keys(rd)) {\n    const runs = rd[name];\n    if (!Array.isArray(runs) || !runs.length) continue;\n    const r0 = runs[0];\n    const isTrigger = r0.executionIndex === 0 || !r0.source || !r0.source.length;\n    if (isTrigger && r0.data && r0.data.main && r0.data.main[0] && r0.data.main[0].length) { input = r0.data.main[0][0].json; }\n    if (r0.executionIndex === 0) break;\n  }\n  let outItems = [];\n  if (lastNode && rd[lastNode]) {\n    const lruns = rd[lastNode];\n    const lr = lruns[lruns.length - 1];\n    outItems = (lr.data && lr.data.main && lr.data.main[0]) || [];\n  }\n  if (!calledN.includes(tool)) calledN.push(tool);\n  steps.push({ tool: tool, turn: 1, input: input, rows: compressRows(outItems), started_at: j.startedAt || null, exec_id: String(j.id) });\n}\n\nconst baseUrl = String($vars.instance_url || 'https://darwin-staging.app.n8n.cloud').replace(/\\/$/, '');\nconst status = answer ? 'pending' : 'error';\nreturn [{ json: {\n  run_id: runId,\n  case_id: caseId,\n  case_slug: c.slug,\n  status: status,\n  agent_output: answer.slice(0, 13000),\n  called_tools: calledN,\n  raw_steps: steps.slice(0, 60),\n  session_id: threadTs,\n  duration_ms: durationMs,\n  capture: { execs_scanned: scanned, par_matched: parMatched, par_missing: parMissing },\n  execution_url: baseUrl + '/workflow/' + $workflow.id + '/executions/' + $execution.id\n} }];"
+      }
+    },
+    {
+      "id": "f594e597-f43e-4c6a-94d0-bd0c6739c3ef",
+      "name": "Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        -240
+      ],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst c = $('Load Case').first().json;\nif (r.status === 'error') return [{ json: Object.assign({}, r, { metrics: { reason: 'no bot reply in thread before timeout — see execution link' } }) }];\n\nconst norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');\nconst normText = s => String(s).toLowerCase().replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();\nconst TOOL_SOURCE = { session_search: 'sessions', search: 'sessions', get_session: 'sessions', get_sessions: 'sessions', slack_store: 'slack', forum_store: 'forum', plain: 'plain', gong: 'gong', get_jobs: 'jobs', get_opportunities: 'opportunities' };\n\nconst hits = [];\nfor (const s of (r.raw_steps || [])) {\n  if (!s.tool || !(s.tool in TOOL_SOURCE)) continue;\n  const source = TOOL_SOURCE[s.tool];\n  for (const row of (s.rows || [])) {\n    const m = row.metadata || {};\n    const str = v => (typeof v === 'string' ? v : null);\n    const num = v => (typeof v === 'number' ? v : null);\n    const content = String(row.content || '');\n    const rowSource = str(m.source) || source;\n    const h = {\n      rank: hits.length + 1, source: rowSource,\n      snippet: content.length > 300 ? content.slice(0, 300) + '...' : content,\n      quote: str(m.quote), attribution: str(m.attribution), project_name: str(m.project_name),\n      timestamp: num(m.timestamp), title: str(m.title), deep_link: str(m.deep_link),\n      created_at: str(m.created_at),\n      score: row.score ?? null, id: str(m.id) ?? String(hits.length + 1), group_key: str(m.group_key)\n    };\n    if (rowSource === 'sessions') { h.id = str(m.session_id) ?? h.id; h.group_key = str(m.session_id) ?? h.group_key; h.timestamp = num(m.start) ?? h.timestamp; h.attribution = str(m.participant_name) ?? h.attribution; h.created_at = str(m.created_at) ?? h.created_at; }\n    else if (rowSource === 'gong') { h.id = str(m.call_id) ?? h.id; h.group_key = str(m.call_id) ?? h.group_key; h.title = h.title ?? str(m.title); h.deep_link = str(m.url) ?? h.deep_link; h.created_at = str(m.date) ?? h.created_at; }\n    else if (rowSource === 'forum') { h.id = str(m.post_id) ?? h.id; h.group_key = h.group_key ?? (m.topic_id ? 'topic ' + m.topic_id : null); h.title = h.title ?? str(m.topic_title); h.deep_link = str(m.post_url) ?? h.deep_link; }\n    else if (rowSource === 'plain') { h.id = str(m.thread_id) ?? h.id; h.group_key = str(m.thread_id) ?? h.group_key; h.title = h.title ?? str(m.thread_title); }\n    else if (rowSource === 'slack') { h.id = str(m.ts) ?? h.id; h.group_key = str(m.ts) ?? h.group_key; h.deep_link = str(m.url) ?? h.deep_link; }\n    else { h.id = str(m.id) ?? h.id; h.group_key = h.group_key ?? str(m.id); h.title = h.title ?? str(m.theme); }\n    hits.push(h);\n  }\n}\n\nlet expected = c.expected || {};\nif (typeof expected === 'string') { try { expected = JSON.parse(expected); } catch (e) { expected = {}; } }\nconst requiredFields = Array.isArray(c.required_fields) ? c.required_fields : [];\nconst expectedTools = (Array.isArray(c.expected_tools) ? c.expected_tools : []).map(norm);\n\nconst hitText = h => normText([h.quote, h.snippet, h.title].filter(Boolean).join(' '));\nconst isSess = (h, id) => h.source === 'sessions' && (h.group_key === id || h.id === id);\n\nconst expSources = expected.sources || [];\nconst expSessions = expected.session_ids || [];\nconst absentIds = expected.absent_session_ids || [];\nconst expQuotes = expected.quotes || [];\n\nconst distinctSources = new Set(hits.map(h => h.source)).size;\nconst sourceRecall = expSources.length ? expSources.filter(s => hits.some(h => h.source === s)).length / expSources.length : null;\nconst sessionRecall = expSessions.length ? expSessions.filter(id => hits.some(h => isSess(h, id))).length / expSessions.length : null;\nconst absentCompliance = absentIds.length ? 1 - absentIds.filter(id => hits.some(h => isSess(h, id))).length / absentIds.length : null;\nconst quoteRecall = expQuotes.length ? expQuotes.filter(q => hits.some(h => hitText(h).includes(normText(q)))).length / expQuotes.length : null;\n\nlet mrr = null;\nif (expSessions.length + expQuotes.length + expSources.length > 0) {\n  mrr = 0;\n  for (const h of hits) {\n    const match = expSessions.some(id => isSess(h, id)) || expQuotes.some(q => hitText(h).includes(normText(q))) || expSources.includes(h.source);\n    if (match) { mrr = 1 / h.rank; break; }\n  }\n}\n\nconst top5 = hits.slice(0, 5);\nconst fieldCompleteness = requiredFields.length && top5.length\n  ? top5.filter(h => requiredFields.every(f => h[f] !== null && h[f] !== undefined && h[f] !== '')).length / top5.length\n  : null;\n\nconst groupDiversity = new Set(hits.map(h => h.group_key).filter(Boolean)).size;\n\nconst called = (r.called_tools || []).map(norm);\nconst routing = expectedTools.length ? expectedTools.some(t => called.includes(t)) : null;\n\nconst answer = normText(r.agent_output || '');\nconst answerQuoteRecall = expQuotes.length ? expQuotes.filter(q => answer.includes(normText(q))).length / expQuotes.length : null;\nconst answerSessionRecall = expSessions.length ? expSessions.filter(id => String(r.agent_output || '').includes(id)).length / expSessions.length : null;\n\nconst layers = [];\nif (routing !== null) layers.push(routing);\nif (answerQuoteRecall !== null && requiredFields.length) layers.push(answerQuoteRecall > 0);\nif (hits.length) {\n  if (expSources.length) layers.push(sourceRecall === 1);\n  if (expSessions.length) layers.push(sessionRecall > 0);\n  if (absentIds.length) layers.push(absentCompliance === 1);\n  if (expected.min_sources) layers.push(distinctSources >= expected.min_sources);\n  if (requiredFields.length) layers.push(fieldCompleteness === 1);\n}\nconst status = layers.length && layers.every(Boolean) ? 'pass' : 'fail';\n\nconst zeroTools = [];\nfor (const s of (r.raw_steps || [])) {\n  if (s.tool && Array.isArray(s.rows) && s.rows.length === 0 && (s.tool in TOOL_SOURCE)) zeroTools.push(s.tool);\n}\nlet reason = '—';\nif (status !== 'pass') {\n  if (routing === false) {\n    reason = 'never called ' + (c.expected_tools || []).join(' / ') + ' (used: ' + ((r.called_tools || []).join(', ') || 'none') + ')';\n  } else if (!(r.called_tools || []).length) {\n    reason = 'agent answered without calling any tool';\n  } else if (!hits.length) {\n    reason = 'no retrieval hits captured' + (zeroTools.length ? ' — ' + zeroTools.join(', ') + ' returned 0 rows' : '');\n  } else if (absentIds.length && absentCompliance !== null && absentCompliance < 1) {\n    const leaked = absentIds.filter(id => hits.some(h => isSess(h, id)));\n    reason = 'unapproved session surfaced (' + leaked.length + ' of ' + absentIds.length + ' guarded)';\n  } else if (expSources.length && sourceRecall !== null && sourceRecall < 1) {\n    const missing = expSources.filter(s => !hits.some(h => h.source === s));\n    const zero = zeroTools.filter(t => missing.includes(TOOL_SOURCE[t]));\n    reason = 'no hits from expected source: ' + missing.join(', ') + (zero.length ? ' — ' + zero.join(', ') + ' returned 0 rows' : '');\n  } else if (expSessions.length && sessionRecall === 0) {\n    reason = 'none of the ' + expSessions.length + ' expected sessions surfaced in ' + hits.length + ' hits';\n  } else if (expected.min_sources && distinctSources < expected.min_sources) {\n    reason = 'too few sources: ' + distinctSources + ' < ' + expected.min_sources + ' required';\n  } else if (requiredFields.length && fieldCompleteness !== null && fieldCompleteness < 1) {\n    const missingFields = requiredFields.filter(f => hits.some(h => h[f] == null || h[f] === ''));\n    reason = 'hits missing required fields: ' + (missingFields.length ? missingFields.join(', ') : requiredFields.join(', '));\n  } else if (answerQuoteRecall === 0 && requiredFields.length) {\n    reason = 'answer missing expected quotes';\n  } else {\n    reason = 'see metrics';\n  }\n}\n\nreturn [{ json: Object.assign({}, r, {\n  status: status,\n  metrics: {\n    reason: reason,\n    routing: routing,\n    answer_quote_recall: answerQuoteRecall,\n    answer_session_recall: answerSessionRecall,\n    retrieval_hits: hits.length,\n    capture: r.capture || null,\n    retrieval: {\n      source_recall: sourceRecall,\n      distinct_sources: distinctSources,\n      session_recall: sessionRecall,\n      absent_compliance: absentCompliance,\n      quote_recall: quoteRecall,\n      mrr: mrr,\n      field_completeness: fieldCompleteness,\n      group_diversity: groupDiversity\n    }\n  }\n}) }];"
+      }
+    },
+    {
+      "id": "853faf43-4280-4cd9-bc58-e3b5f52e7c5b",
+      "name": "Save Result",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1960,
+        -240
+      ],
+      "parameters": {
+        "tableId": "retrieval_results",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "case_slug",
+              "fieldValue": "={{ $json.case_slug }}"
+            },
+            {
+              "fieldId": "mechanism",
+              "fieldValue": "agent-slack"
+            },
+            {
+              "fieldId": "target",
+              "fieldValue": "={{ $vars.env }}"
+            },
+            {
+              "fieldId": "agent",
+              "fieldValue": "firstclassdarwin"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "agent_output",
+              "fieldValue": "={{ $json.agent_output }}"
+            },
+            {
+              "fieldId": "called_tools",
+              "fieldValue": "={{ $json.called_tools }}"
+            },
+            {
+              "fieldId": "raw_steps",
+              "fieldValue": "={{ $json.raw_steps }}"
+            },
+            {
+              "fieldId": "metrics",
+              "fieldValue": "={{ $json.metrics }}"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "={{ $json.duration_ms }}"
+            },
+            {
+              "fieldId": "execution_url",
+              "fieldValue": "={{ $json.execution_url }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.session_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Case Input": {
+      "main": [
+        [
+          {
+            "node": "Get Bot Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bot Id": {
+      "main": [
+        [
+          {
+            "node": "Load Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Case": {
+      "main": [
+        [
+          {
+            "node": "Build Turns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Turns": {
+      "main": [
+        [
+          {
+            "node": "Turns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Ts": {
+      "main": [
+        [
+          {
+            "node": "Fetch Thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is First Turn?": {
+      "main": [
+        [
+          {
+            "node": "Post First",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post First": {
+      "main": [
+        [
+          {
+            "node": "Record Ts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Ts": {
+      "main": [
+        [
+          {
+            "node": "Pace Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Reply": {
+      "main": [
+        [
+          {
+            "node": "Record Ts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Turns": {
+      "main": [
+        [
+          {
+            "node": "Final Ts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is First Turn?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace Reply": {
+      "main": [
+        [
+          {
+            "node": "Fetch Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Replies": {
+      "main": [
+        [
+          {
+            "node": "Check Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Done": {
+      "main": [
+        [
+          {
+            "node": "Done?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Done?": {
+      "main": [
+        [
+          {
+            "node": "Turns",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pace Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Thread": {
+      "main": [
+        [
+          {
+            "node": "Tool Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool Workflows": {
+      "main": [
+        [
+          {
+            "node": "List Tool Execs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Tool Execs": {
+      "main": [
+        [
+          {
+            "node": "Get Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Candidates": {
+      "main": [
+        [
+          {
+            "node": "Fetch Exec Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Exec Data": {
+      "main": [
+        [
+          {
+            "node": "Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture": {
+      "main": [
+        [
+          {
+            "node": "Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "f874ce38-466e-4527-9c9f-69736e937851",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "U1hoqp33rsBJ5M2X",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "097b87d2-7c45-4e01-9f28-aa959b412d4e",
+      "name": "Slack transport",
+      "nodeIds": [
+        "50c76b29-d8dd-4c50-bcc4-e88fb96ece10",
+        "3f7303bb-d5d2-498e-9f54-973eae9ae74e",
+        "77db4a8f-afd0-4409-bbc9-1d185dc5a0bd",
+        "66b2b356-d7fc-4267-be34-37e022e0851e",
+        "574a428c-e0eb-4e1d-b04b-d4698d67536c",
+        "70cdc097-77e4-4918-a5d5-3116ac61ca45",
+        "53ce6d71-16d8-42d0-8a04-a267a28333dd",
+        "fe0e5729-4433-42af-9ee1-28700d0738b4"
+      ],
+      "description": "Posts each case turn as Rob mentioning the agent; polls the thread until the bot replies (replaces the old reaction signal)"
+    },
+    {
+      "id": "9a33390f-78fb-467b-84a0-20bf1e0ee067",
+      "name": "Capture and score",
+      "nodeIds": [
+        "1f6a808b-f3a8-4ee2-b68b-3010431cc429",
+        "45630aa3-9c89-4776-8b02-3517d1490961",
+        "fc28c44c-b252-4ef6-bedd-fa1896676f23",
+        "0c6bc32c-1ef3-4365-8478-07a0d74d4c61",
+        "c4abaf2c-b554-4fb3-ad30-d4c91e302889",
+        "997ffa46-1c80-41e2-9447-a26dc1c3f43e",
+        "041afa03-915d-41a6-aa0b-78428685167e",
+        "f594e597-f43e-4c6a-94d0-bd0c6739c3ef",
+        "853faf43-4280-4cd9-bc58-e3b5f52e7c5b"
+      ],
+      "description": "Reads the answer from the thread, matches tool sub-workflow executions by parentAgentRun.threadId, scores with the standard retrieval scorer"
+    }
+  ]
+}

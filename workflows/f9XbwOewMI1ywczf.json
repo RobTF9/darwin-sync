@@ -1,6 +1,7 @@
 {
   "id": "f9XbwOewMI1ywczf",
   "name": "ErrorHarnessGlobal",
+  "description": "Chaos-test harness for the global Error handler (iDcm070UekOYt0f1). Webhook sets execution custom data (channel/sessionId) then throws, exercising the handler's custom-data (non-Darwin) branch. Called by ErrorRun.",
   "nodes": [
     {
       "id": "6dc2473c-2fd9-4423-89b0-2a3bff6a2c5a",

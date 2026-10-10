@@ -1,0 +1,302 @@
+{
+  "id": "xun3AnUO02zQvIWQ",
+  "name": "PF Real Booking Import",
+  "description": "Manual. Reads Aniol's bookings of the demo event type from Calendly (PAT, read only) and sends them to Darwin Sessions Ingest. Replaces a live webhook on staging. DWN-6.",
+  "nodes": [
+    {
+      "id": "f8f4dc2d-4f4c-43d6-8465-4245cd7e2019",
+      "name": "Import Now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "20da879c-8f03-447e-ad51-1c02b28e7ea2",
+      "name": "Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Settings for the real-data test. Only events of this one Calendly event type are read,\n// so invitee data of other (real) sessions is never fetched.\nreturn [{\n  json: {\n    demoEventName: 'Session follow-up demo',\n    minStart: $now.minus({ hours: 6 }).toUTC().toISO(),\n    maxStart: $now.plus({ days: 14 }).toUTC().toISO(),\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "eb120d79-f3f5-4c0b-976b-a86bcdee8ece",
+      "name": "Get My Calendly User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.calendly.com/users/me",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "calendlyApi": {
+          "id": "uyVUVnsibxZ0NrWR",
+          "name": "Aniol-Calendly-PAT"
+        }
+      }
+    },
+    {
+      "id": "35c9b376-0813-46e6-9c03-0519a52dd9a0",
+      "name": "List My Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.calendly.com/scheduled_events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user",
+              "value": "={{ $json.resource.uri }}"
+            },
+            {
+              "name": "min_start_time",
+              "value": "={{ $('Settings').first().json.minStart }}"
+            },
+            {
+              "name": "max_start_time",
+              "value": "={{ $('Settings').first().json.maxStart }}"
+            },
+            {
+              "name": "count",
+              "value": "100"
+            },
+            {
+              "name": "sort",
+              "value": "start_time:asc"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "calendlyApi": {
+          "id": "uyVUVnsibxZ0NrWR",
+          "name": "Aniol-Calendly-PAT"
+        }
+      }
+    },
+    {
+      "id": "4231f9bc-8c9d-4e95-b5b8-dacf852ee3fb",
+      "name": "Keep Demo Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Keeps only the events of the demo event type (by name). Other events are dropped before any invitee lookup.\nconst name = $('Settings').first().json.demoEventName;\nconst events = $input.first().json.collection || [];\nreturn events.filter((e) => e.name === name).map((e) => ({ json: { event: e } }));\n"
+      }
+    },
+    {
+      "id": "337866b5-083b-49fc-aabd-95c03a75acb3",
+      "name": "Get Invitees",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.event.uri }}/invitees",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "count",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "calendlyApi": {
+          "id": "uyVUVnsibxZ0NrWR",
+          "name": "Aniol-Calendly-PAT"
+        }
+      }
+    },
+    {
+      "id": "58644e6a-a4e8-4d35-8ddb-f5cdc4e352aa",
+      "name": "Build Webhook Bodies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Builds one Calendly webhook body per invitee, in the same shape as the Calendly Trigger output,\n// so Darwin Sessions Ingest (Calendly) gets exactly what a real webhook would send.\n// Only aniol.moner+...@n8n.io invitees pass (the ingest has the same guard).\nconst events = $('Keep Demo Events').all();\nconst allowed = /^aniol\\.moner\\+[^@]+@n8n\\.io$/;\nconst created = [];\nconst canceled = [];\n$input.all().forEach((item, i) => {\n  const ev = events[i].json.event;\n  for (const inv of item.json.collection || []) {\n    if (!allowed.test((inv.email || '').toLowerCase())) continue;\n    const isCanceled = inv.status === 'canceled';\n    const body = {\n      _label: `${inv.name} | ${ev.start_time} | ${isCanceled ? 'canceled' : 'created'}`,\n      event: isCanceled ? 'invitee.canceled' : 'invitee.created',\n      payload: { ...inv, scheduled_event: ev },\n    };\n    (isCanceled ? canceled : created).push({ json: body });\n  }\n});\n// Creates first, then cancels. The ingest gives the same result in any order.\nreturn [...created, ...canceled];\n"
+      }
+    },
+    {
+      "id": "520c8e16-8666-44a4-9547-7fdacd0360ed",
+      "name": "Send To Sessions Ingest",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "mode": "each",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BroGfMZ821FTfWSE",
+          "cachedResultName": "Darwin Sessions Ingest (Calendly)"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "0303e738-a5d2-42a7-8b46-e463dbacebb9",
+      "name": "Sticky Note a57941f3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ],
+      "parameters": {
+        "content": "## PF Real Booking Import\nReal-data test without a Calendly webhook on staging (AGENTS.md: no live ingestion on staging).\n\n1. Book the Calendly event type **Session follow-up demo** (host Aniol) with an invitee email `aniol.moner+something@n8n.io`.\n2. Click **Import Now**. It reads your events from 6 h ago to 14 days ahead (Aniol-Calendly-PAT, read only), keeps only the demo event type, and sends each booking to Darwin Sessions Ingest (Calendly) as a webhook body.\n3. Run again after a cancel or reschedule. Re-runs are safe: the ingest never resets follow-up fields.\n\nOther invitee emails are dropped here and in the ingest.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Import Now": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Get My Calendly User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get My Calendly User": {
+      "main": [
+        [
+          {
+            "node": "List My Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List My Events": {
+      "main": [
+        [
+          {
+            "node": "Keep Demo Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Demo Events": {
+      "main": [
+        [
+          {
+            "node": "Get Invitees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Invitees": {
+      "main": [
+        [
+          {
+            "node": "Build Webhook Bodies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Webhook Bodies": {
+      "main": [
+        [
+          {
+            "node": "Send To Sessions Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "deb9de5f-775a-48b4-bb95-686b4abf21ee",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

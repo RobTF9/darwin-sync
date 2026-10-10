@@ -1,6 +1,7 @@
 {
   "id": "ecLEljbdJZekIU9G",
   "name": "GetAsyncOutput",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -38,8 +39,7 @@
         "filters": {
           "conditions": [
             {
-              "keyName": "sessionId",
-              "keyValue": "={{ $json.query.sessionId }}"
+              "keyValue": "={{ $json.query.id }}"
             }
           ]
         }
@@ -100,7 +100,7 @@
             },
             {
               "id": "1213edbd-78e9-4fdd-86cd-a412ab00d633",
-              "name": "output",
+              "name": "message",
               "value": "={{ $json.output }}",
               "type": "string"
             }
@@ -195,7 +195,7 @@
     "availableInMCP": false
   },
   "triggerCount": 1,
-  "versionId": "8fe0f933-53cf-4708-8d58-a506df0bb367",
+  "versionId": "b6e3f063-82c3-4015-a239-3531a6e5aaac",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

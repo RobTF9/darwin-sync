@@ -1,0 +1,188 @@
+{
+  "id": "dzhUHS2Mjvsjv1qs",
+  "name": "FanOutAgentWorker",
+  "description": "Runs ONE fan-out item: sends the composed per-item prompt to the SonOfFanOut agent via messageAnAgent, then marks the fan_out_item tracking row complete (with the reply) or error. Dispatched fire-and-forget by FanOutAgent — one execution per item gives re",
+  "nodes": [
+    {
+      "id": "37f8cec9-ee4c-4274-84c8-128e9dec2053",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "row_id"
+            },
+            {
+              "name": "item"
+            },
+            {
+              "name": "instruction"
+            },
+            {
+              "name": "context"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5e31879f-464f-456a-b142-675149428e3e",
+      "name": "Ask Worker",
+      "type": "n8n-nodes-base.messageAnAgent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        80
+      ],
+      "parameters": {
+        "agentSource": "referenced",
+        "agentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PvtNbrLZDPqzQwYM"
+        },
+        "message": "={{ $json.instruction + '\\n\\n## Item\\n' + (typeof $json.item === 'string' ? $json.item : JSON.stringify($json.item)) + ($json.context ? ('\\n\\n## Shared Context\\n' + $json.context) : '') + '\\n\\nThis is one item from a fan_out batch. Respond with your findings for THIS ITEM ONLY — do not reference other items or assume you have seen the rest of the batch.' }}",
+        "advanced": {
+          "enableStreaming": false,
+          "sessionId": "={{ 'fanout-' + $json.row_id }}"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "e8d9d1ab-6352-492a-83fe-3eb245601a5c",
+      "name": "Mark Complete",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "operation": "update",
+        "tableId": "fan_out_item",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Input').first().json.row_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "complete"
+            },
+            {
+              "fieldId": "response",
+              "fieldValue": "={{ typeof $json.text === 'string' && $json.text ? $json.text : JSON.stringify($json.output ?? $json) }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "78996bab-2a8f-4c73-92ad-6063c2609b38",
+      "name": "Mark Error",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "operation": "update",
+        "tableId": "fan_out_item",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Input').first().json.row_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "error"
+            },
+            {
+              "fieldId": "response",
+              "fieldValue": "={{ 'Agent error: ' + ($json.error ? (typeof $json.error === 'string' ? $json.error : JSON.stringify($json.error)) : JSON.stringify($json)).slice(0, 2000) }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Ask Worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Worker": {
+      "main": [
+        [
+          {
+            "node": "Mark Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "011c0412-b4d6-4a69-95dd-d706e3cc3826",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "NCt4R7psjj0OsNSk",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,0 +1,109 @@
+{
+  "id": "QH0AvEMjC99PuwRz",
+  "name": "My workflow 2",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        64,
+        -224
+      ],
+      "id": "0dc40991-c974-4f75-8e69-9fcc66129786",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -224
+      ],
+      "id": "5601343e-9d15-44dd-b2ba-10ce671da4b7",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        512,
+        -224
+      ],
+      "id": "ea9e3d86-8a0a-48bc-9568-a9f9a8a6a284",
+      "name": "Form",
+      "webhookId": "731c73ed-7a4b-4fef-a009-d1835a903803"
+    },
+    {
+      "parameters": {
+        "formTitle": "Test",
+        "formFields": {
+          "values": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -160,
+        -224
+      ],
+      "id": "d86c7a0d-0f6d-4167-a8dd-0b441c0d4e51",
+      "name": "On form submission1",
+      "webhookId": "236b5466-e713-4c5e-b2ed-cd7aaa3c3a23"
+    }
+  ],
+  "connections": {
+    "No Operation, do nothing": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        []
+      ]
+    },
+    "On form submission1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "8ea0140d-e1d7-41c0-be57-8f51d50662eb",
+  "owner": {
+    "type": "personal",
+    "projectId": "gaAiXT3wHyNP6mrE",
+    "projectName": "Robert Squires <robert+darwin@n8n.io>",
+    "personalEmail": "robert+darwin@n8n.io"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -71,7 +71,6 @@
     },
     {
       "parameters": {
-        "tableId": "integration_results",
         "fieldsUi": {
           "fieldValues": [
             {
@@ -105,9 +104,18 @@
             {
               "fieldId": "session_id",
               "fieldValue": "={{ $json.session_id }}"
+            },
+            {
+              "fieldId": "agent",
+              "fieldValue": "darwin-workflow"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "={{ Date.now() - $('Stamp Start').item.json.started_at_ms }}"
             }
           ]
-        }
+        },
+        "tableId": "integration_results"
       },
       "id": "483f0ea8-ae4d-42e7-88b3-03a134ed18c1",
       "name": "Save Result",
@@ -123,103 +131,6 @@
           "name": "Supabase Tests"
         }
       }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "87e6f4c6-0a22-455d-aae3-323c71cf57e8",
-              "leftValue": "={{ $json.agent }}",
-              "rightValue": "=builder",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        0,
-        304
-      ],
-      "id": "54583bf2-3058-441f-83dc-60dbca98d9ff",
-      "name": "If"
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "ZMyr5DWlrfXlhhKs",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/ZMyr5DWlrfXlhhKs",
-          "cachedResultName": "Darwin — Builder"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "task": "={{ $('Load Case').item.json.prompt }}",
-            "session_id": "={{ $('Load Case').item.json.id }}+{{ $('Case Input').item.json.run_id }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "task",
-              "displayName": "task",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "session_id",
-              "displayName": "session_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "slack_channel",
-              "displayName": "slack_channel",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": true
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "mode": "each",
-        "options": {
-          "waitForSubWorkflow": true
-        }
-      },
-      "id": "e5fd4c49-1761-465f-8009-a463c6616f5b",
-      "name": "Call Builder",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        240,
-        176
-      ],
-      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -322,6 +233,30 @@
       ],
       "id": "7f886c64-65e7-476b-9f10-7f95332a96ce",
       "name": "Call Darwin"
+    },
+    {
+      "id": "4c4ffcfa-2bb4-45bc-808a-66411d50922f",
+      "name": "Stamp Start",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        180,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stamp",
+              "name": "started_at_ms",
+              "type": "number",
+              "value": "={{ Date.now() }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -330,17 +265,6 @@
         [
           {
             "node": "Load Case",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Load Case": {
-      "main": [
-        [
-          {
-            "node": "If",
             "type": "main",
             "index": 0
           }
@@ -358,40 +282,33 @@
         ]
       ]
     },
-    "If": {
-      "main": [
-        [
-          {
-            "node": "Call Builder",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Call Darwin",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Call Builder": {
-      "main": [
-        [
-          {
-            "node": "Evaluate",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Call Darwin": {
       "main": [
         [
           {
             "node": "Evaluate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Case": {
+      "main": [
+        [
+          {
+            "node": "Stamp Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp Start": {
+      "main": [
+        [
+          {
+            "node": "Call Darwin",
             "type": "main",
             "index": 0
           }
@@ -406,7 +323,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "79b9ea41-062c-47dc-9ae2-4e42b3e753ba",
+  "versionId": "d0d529e4-510d-4525-a40b-9e8fd1d41363",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

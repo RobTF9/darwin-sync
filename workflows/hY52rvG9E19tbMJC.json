@@ -1,6 +1,7 @@
 {
   "id": "hY52rvG9E19tbMJC",
   "name": "UnitRun",
+  "description": "Unit suite orchestrator: callable as sub-workflow (no independent schedule). Loads all Unit cases, dispatches each to UnitDispatch synchronously, returns summary.",
   "nodes": [
     {
       "id": "9ac7dfcd-9e97-4fdd-979a-de9f0cca0da3",

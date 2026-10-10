@@ -1,0 +1,319 @@
+{
+  "id": "M4sMF2lIddUpcKwQ",
+  "name": "Design Feedback MCP Server",
+  "description": "Read-only MCP server exposing Slack message search, Slack thread reading and Google Drive search/read for design feedback collection.",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "n8nOAuth2",
+        "path": "design-feedback",
+        "instructions": "Read design feedback from the n8n internal Slack and Google Drive. Search Slack first, then read full threads. Search Drive for documents, then read them by ID. All tools are read-only."
+      },
+      "id": "ddf50f96-ebb9-4841-9be1-e519f8707936",
+      "name": "Design Feedback MCP",
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        192,
+        112
+      ],
+      "webhookId": "43f65058-5d33-4300-b612-84411434d0d8"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search messages, files and channels in the n8n internal Slack workspace. Accepts keyword terms or a natural-language question. Use it to find design feedback and discussions.",
+        "method": "POST",
+        "url": "https://slack.com/api/assistant.search.context",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $fromAI(\"query\", \"Search query: keyword terms or a natural-language question, e.g. what feedback did we get on the assistant panel?\", \"string\"), content_types: [\"messages\", \"files\"], channel_types: [\"public_channel\", \"private_channel\", \"mpim\", \"im\"], limit: 10 }) }}",
+        "options": {},
+        "optimizeResponse": true
+      },
+      "id": "53d443f6-99c5-4355-81f7-73fc066322b7",
+      "name": "slack_search_messages",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        -208,
+        352
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Read all messages of one Slack thread. Pass the channel ID and the timestamp of the thread parent message.",
+        "url": "https://slack.com/api/conversations.replies",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('channel', 'Slack channel ID, e.g. C0123456789') }}"
+            },
+            {
+              "name": "ts",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('ts', 'Timestamp of the thread parent message, e.g. 1726000000.000000') }}"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {},
+        "optimizeResponse": true
+      },
+      "id": "0b6759dc-7b3e-4106-a6cd-d6e816da6c92",
+      "name": "slack_read_thread",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        0,
+        352
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search files in Google Drive. Use name contains \"term\" or fullText contains \"term\" in the query.",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('q', 'Drive search query, e.g. name contains \"feedback\"') }}"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,mimeType,modifiedTime,webViewLink)"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            },
+            {
+              "name": "includeItemsFromAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {},
+        "optimizeResponse": true
+      },
+      "id": "4b4e602f-2743-4baf-96fa-9b5a3a088eca",
+      "name": "drive_search_files",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        352
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Read the text content of one Google Drive file by its ID. Works best for text, markdown and document files.",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $fromAI(\"file_id\", \"The Drive file ID to read\", \"string\") }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "alt",
+              "value": "media"
+            }
+          ]
+        },
+        "options": {},
+        "optimizeResponse": true,
+        "responseType": "text",
+        "truncateResponse": true,
+        "maxLength": 20000
+      },
+      "id": "92d01a63-f5af-47c8-95f6-13fb2dcf0852",
+      "name": "drive_read_file",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        400,
+        352
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Read a Google Docs, Sheets or Slides file as plain text by its ID. Use drive_search_files first to find the ID.",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $fromAI(\"file_id\", \"The Google Docs file ID to read as text\", \"string\") }}/export",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "mimeType",
+              "value": "text/plain"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {},
+        "optimizeResponse": true,
+        "responseType": "text",
+        "truncateResponse": true,
+        "maxLength": 30000
+      },
+      "id": "10a8bed4-b36a-4590-a02d-27c8ec5abcee",
+      "name": "drive_read_doc",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        528,
+        352
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "bXwaLvJM3XTPyBDr",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/mcp-registry.notion",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        352
+      ],
+      "id": "24dbe5be-3d24-4096-840f-657761bdd4f4",
+      "name": "Notion MCP",
+      "credentials": {
+        "notionMcpOAuth2Api": {
+          "id": "EfRwi4z9gZuSRYj1",
+          "name": "Notion account 4"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "slack_search_messages": {
+      "ai_tool": [
+        [
+          {
+            "node": "Design Feedback MCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "slack_read_thread": {
+      "ai_tool": [
+        [
+          {
+            "node": "Design Feedback MCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "drive_search_files": {
+      "ai_tool": [
+        [
+          {
+            "node": "Design Feedback MCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "drive_read_file": {
+      "ai_tool": [
+        [
+          {
+            "node": "Design Feedback MCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "drive_read_doc": {
+      "ai_tool": [
+        [
+          {
+            "node": "Design Feedback MCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion MCP": {
+      "ai_tool": [
+        [
+          {
+            "node": "Design Feedback MCP",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "6a6e3440-6c0c-42cb-b207-71b1e05994b9",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "OKUk9Zo1zv3wAMec",
+  "isArchived": false,
+  "nodeGroups": []
+}

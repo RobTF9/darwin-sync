@@ -1,0 +1,341 @@
+{
+  "id": "OpaOdeTTXH6thDSM",
+  "name": "PF Tremendous Balance",
+  "description": "Daily (unpublished) and per-order Tremendous balance check; DMs the admin below $500 or when an order is blocked. Stub balance from PF Config. DWN-6.",
+  "nodes": [
+    {
+      "id": "bb5f0f7b-8fbb-4240-9ea3-37184ba10a51",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        272,
+        320
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HfYVjOSLtPqfeYJb",
+          "cachedResultName": "PF Config"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "f2dfef7d-0c4d-4498-be04-1a605a4db3f5",
+      "name": "Compute Balance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Reads the Tremendous balance and decides if the admin must be told.\n// source 'daily': schedule or manual run. DM the admin when below the threshold.\n// source 'order': called by PF Reward before an order. DM the admin only when the order is blocked.\nlet input = {};\ntry { input = $('When Called By Another Workflow').first().json; } catch (e) { input = {}; }\nconst cfg = $('Load Config').first().json;\nconst source = input.source || 'daily';\nconst amount = Number(input.amount || 0);\n\nif (cfg.tremendousMode !== 'stub') {\n  throw new Error(`Tremendous mode \"${cfg.tremendousMode}\" is not built yet. Only \"stub\" works in this build.`);\n}\nconst balance = Number(cfg.mockBalanceUsd);\nconst threshold = Number(cfg.balanceThresholdUsd);\nconst belowThreshold = balance < threshold;\nconst enough = amount > 0 ? balance >= amount : true;\nconst notify = (source === 'daily' && belowThreshold) || (source === 'order' && !enough);\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst stubNote = cfg.tremendousMode === 'stub' ? ' (stub balance from PF Config)' : '';\nlet adminText = '';\nif (source === 'order') {\n  adminText = `${tag}A $${amount} reward for ${input.participant_name || 'a participant'} (host: ${input.host_name || 'unknown'}) was blocked: the Tremendous balance is $${balance}${stubNote}. Please refill it. The host can then send the reward again through Darwin.`;\n} else {\n  adminText = `${tag}The Tremendous balance is $${balance}${stubNote}. This is below $${threshold}. Please refill it.`;\n}\n\nreturn [{\n  json: {\n    source,\n    balance,\n    threshold,\n    below_threshold: belowThreshold,\n    amount,\n    enough,\n    notify,\n    admin_email: (cfg.adminEmail || '').toLowerCase(),\n    admin_allowed: !cfg.mockMode || cfg.allowedHostEmails.includes((cfg.adminEmail || '').toLowerCase()),\n    admin_text: adminText,\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "9ae42771-0c0b-4a28-948f-b6dbe01067ed",
+      "name": "Tell Admin?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.notify && $json.admin_allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "b21b7166-330f-423f-9a73-2617098e9abe",
+      "name": "Find Admin In Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1024,
+        384
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.lookupByEmail",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $('Compute Balance').first().json.admin_email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "b5536794-1f80-4355-b27e-d1496f2f0245",
+      "name": "DM Admin",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1248,
+        384
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $('Compute Balance').first().json.admin_text }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "5bf7a5b7-0617-4c4d-9c86-12a7fcf5bdff"
+    },
+    {
+      "id": "af912f19-3a6f-4080-b749-ad843ece31d8",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1504,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r-bal",
+              "name": "balance",
+              "value": "={{ $('Compute Balance').first().json.balance }}",
+              "type": "number"
+            },
+            {
+              "id": "r-enough",
+              "name": "enough",
+              "value": "={{ $('Compute Balance').first().json.enough }}",
+              "type": "boolean"
+            },
+            {
+              "id": "r-below",
+              "name": "below_threshold",
+              "value": "={{ $('Compute Balance').first().json.below_threshold }}",
+              "type": "boolean"
+            },
+            {
+              "id": "r-told",
+              "name": "admin_told",
+              "value": "={{ $('Compute Balance').first().json.notify && $('Compute Balance').first().json.admin_allowed }}",
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "834ee8b6-7137-4fc9-bcee-28e338df654b",
+      "name": "Run Check Now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "8562665a-1937-4dfa-9556-0001c080ddce",
+      "name": "When Called By Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        384
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "110f137a-41f6-49fe-b99b-719b492aaac6",
+      "name": "Sticky Note cab6f1ab",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        688,
+        384
+      ],
+      "parameters": {
+        "content": "## PF Tremendous Balance\nDaily at 09:00 Madrid (**not published**, DWN-6 gate) or by hand: DM the admin when the balance is below the threshold ($500).\n\nCalled by PF Reward before every order with `{ source: order, amount, participant_name, host_name }`: returns `enough`, and DMs the admin only when the order is blocked.\n\nStub mode: the balance is `mockBalanceUsd` from PF Config. Sandbox and live are not built yet.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Compute Balance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Balance": {
+      "main": [
+        [
+          {
+            "node": "Tell Admin?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell Admin?": {
+      "main": [
+        [
+          {
+            "node": "Find Admin In Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Admin In Slack": {
+      "main": [
+        [
+          {
+            "node": "DM Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DM Admin": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Check Now": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called By Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "db9e110a-3aab-42e8-9b5c-4cedac48c739",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "248368d9-b2f1-4368-b60c-338d3ee9bf72",
+      "name": "Read balance",
+      "nodeIds": [
+        "bb5f0f7b-8fbb-4240-9ea3-37184ba10a51",
+        "f2dfef7d-0c4d-4498-be04-1a605a4db3f5"
+      ],
+      "description": "Loads config, reads the balance (stub today), decides if the admin must be told."
+    },
+    {
+      "id": "be74779a-e631-44c8-b509-093d8d6aa287",
+      "name": "Tell admin",
+      "nodeIds": [
+        "b21b7166-330f-423f-9a73-2617098e9abe",
+        "b5536794-1f80-4355-b27e-d1496f2f0245"
+      ],
+      "description": "Finds the admin in Slack and sends the refill or blocked-order DM."
+    }
+  ]
+}

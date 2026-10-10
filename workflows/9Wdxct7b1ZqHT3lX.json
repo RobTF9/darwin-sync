@@ -1,0 +1,108 @@
+{
+  "id": "9Wdxct7b1ZqHT3lX",
+  "name": "PF Step 8 Test Runner",
+  "description": "Fake Calendly events for step 8 tests (T7 cancel, T8 reschedule, T11 host guard, T5c). Manual only. DWN-6.",
+  "nodes": [
+    {
+      "id": "50993e76-900c-4c61-bd14-e8753bea1a21",
+      "name": "Run Step 8 Fixtures",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7b4a06f3-929c-4d87-aa5c-e80947c2e6a3",
+      "name": "Step 8 Fake Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Step 8 fixtures: fake Calendly events relative to now, sent in order to PF Calendly Capture.\n//   T7   K: created, then canceled before the check  -> never asked\n//   T8   R: created, then rescheduled to R2          -> R never asked, R2 asked\n//   T11  H: host is not on the allowlist             -> guard_blocked, no DM\n//   T5c  N: normal session, host answers No, then ignores the rebook question\nconst run = $now.toFormat('HHmmss');\nconst RR = 'https://api.calendly.com/event_types/ebd64db8-7c09-4e31-bc2e-339065fbb930';\nconst inv = (c) => `https://api.calendly.com/scheduled_events/MOCK-EVT-${c}-${run}/invitees/MOCK-INV-${c}-${run}`;\nconst evt = (c) => `https://api.calendly.com/scheduled_events/MOCK-EVT-${c}-${run}`;\nconst start = $now.minus({ minutes: 2 }).startOf('second');\nconst end = start.plus({ minutes: 5 });\nconst host = { user: 'https://api.calendly.com/users/MOCK-HOST', user_email: 'aniol.moner@n8n.io', user_name: 'Aniol Moner' };\nconst otherHost = { user: 'https://api.calendly.com/users/MOCK-OTHER', user_email: 'other.host@example.com', user_name: 'Other Host' };\n\nfunction payload(c, first, tag, o = {}) {\n  return {\n    uri: inv(c), email: `aniol.moner+${tag}@n8n.io`, name: `${first} Mock`, first_name: first, last_name: 'Mock',\n    status: o.cancel ? 'canceled' : 'active', timezone: 'Europe/Madrid',\n    rescheduled: o.rescheduled ?? false, old_invitee: o.old ?? null, new_invitee: o.new ?? null,\n    reschedule_url: `https://calendly.com/reschedulings/MOCK-${c}`, cancel_url: `https://calendly.com/cancellations/MOCK-${c}`,\n    cancellation: o.cancel ? { canceled_by: `${first} Mock`, canceler_type: 'invitee', reason: o.cancel, created_at: $now.toISO() } : null,\n    no_show: null, tracking: {},\n    scheduled_event: {\n      uri: evt(c), name: 'Research with n8n', event_type: RR,\n      start_time: start.toUTC().toISO(), end_time: end.toUTC().toISO(), status: o.cancel ? 'canceled' : 'active',\n      event_memberships: [o.host ?? host],\n    },\n  };\n}\nconst created = (p, label) => ({ json: { _label: label, event: 'invitee.created', payload: p } });\nconst canceled = (p, label) => ({ json: { _label: label, event: 'invitee.canceled', payload: p } });\n\nreturn [\n  created(payload('K', 'Kim', 't7'), 'T7 create'),\n  canceled(payload('K', 'Kim', 't7', { cancel: 'Something came up' }), 'T7 cancel'),\n  created(payload('R', 'Rui', 't8'), 'T8 original'),\n  canceled(payload('R', 'Rui', 't8', { cancel: 'Rescheduled', rescheduled: true, new: inv('R2') }), 'T8 old canceled as rescheduled'),\n  created(payload('R2', 'Rui', 't8', { old: inv('R') }), 'T8 new booking'),\n  created(payload('H', 'Hana', 't11', { host: otherHost }), 'T11 other host'),\n  created(payload('N', 'Nora', 't5c'), 'T5c no rebook answer'),\n];\n"
+      }
+    },
+    {
+      "id": "506e3711-a9f5-4f3c-a73b-510de3e1edf8",
+      "name": "Send Each To Capture",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "each",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "OTRuMi0PTM6NYO97",
+          "cachedResultName": "PF Calendly Capture"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "5fdb0ed6-84f9-4e1d-8df7-a1feac52cc55",
+      "name": "Sticky Note 67732a12",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        0
+      ],
+      "parameters": {
+        "content": "## PF Step 8 Test Runner\nSends fake Calendly events (times relative to now) for T7 (cancel before the check), T8 (reschedule), T11 (host not allowed) and T5c (no rebook answer) to **PF Calendly Capture**. Then run **PF Show-up Check**.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Run Step 8 Fixtures": {
+      "main": [
+        [
+          {
+            "node": "Step 8 Fake Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 8 Fake Events": {
+      "main": [
+        [
+          {
+            "node": "Send Each To Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "0469465a-a2e0-4a7f-a118-6e6a8f9407ea",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

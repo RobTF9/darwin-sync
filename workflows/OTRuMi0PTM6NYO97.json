@@ -1,0 +1,466 @@
+{
+  "id": "OTRuMi0PTM6NYO97",
+  "name": "PF Calendly Capture",
+  "description": "Writes Calendly invitee.created / invitee.canceled events (incl. reschedules) to MOCK - PF Sessions. Sub-workflow, no webhook. DWN-6.",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "bb9c2ae1-ccb8-4dc4-9b7a-58c1d2f9c28c",
+      "name": "When Called By Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HfYVjOSLtPqfeYJb",
+          "cachedResultName": "PF Config"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "7512e5fe-18b4-4fc4-98e1-028ef3f9acc2",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns one Calendly webhook body into the fields we store.\n// Accepts the body directly ({ event, payload }) or wrapped in { body }.\nconst input = $('When Called By Another Workflow').first().json;\nconst cfg = $('Load Config').first().json;\nconst body = input.body ?? input;\nconst event = body.event;\nconst p = body.payload ?? {};\nconst se = p.scheduled_event ?? {};\nconst host = (se.event_memberships ?? [])[0] ?? {};\nconst tracking = p.tracking ?? {};\n\nconst eventTypeUri = se.event_type ?? '';\nconst eventTypeUuid = eventTypeUri.split('/').pop();\n\nlet sourceKind = 'research';\nif (tracking.utm_source === cfg.uxrUtmSource) sourceKind = 'uxr_recruiting';\nelse if (eventTypeUuid === cfg.roundRobinEventTypeUuid) sourceKind = 'continuous_discovery';\n\n// Same utm parameters as the original booking, so the rebook link matches the outreach link.\nconst utm = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']\n  .filter((k) => tracking[k])\n  .map((k) => `${k}=${encodeURIComponent(tracking[k])}`)\n  .join('&');\n\nconst name = p.name || [p.first_name, p.last_name].filter(Boolean).join(' ');\nconst email = (p.email || '').toLowerCase();\n\n// Mock guard: in mock mode only fake participants may enter the table.\nlet dropReason = null;\nif (!['invitee.created', 'invitee.canceled'].includes(event)) dropReason = `ignored event ${event}`;\nelse if (!p.uri) dropReason = 'payload has no invitee uri';\nelse if (cfg.mockMode && !new RegExp(cfg.allowedParticipantEmailPattern).test(email)) dropReason = 'mock guard: participant email not allowed';\n\nreturn [{\n  json: {\n    valid: dropReason === null,\n    drop_reason: dropReason,\n    event,\n    rescheduled: p.rescheduled === true,\n    invitee_uri: p.uri ?? null,\n    event_uri: se.uri ?? p.event ?? null,\n    event_type_uri: eventTypeUri || null,\n    event_name: se.name ?? null,\n    source_kind: sourceKind,\n    batch_id: sourceKind === 'uxr_recruiting' ? (tracking.utm_campaign ?? null) : null,\n    participant_name: name || null,\n    participant_first_name: p.first_name || (name ? name.split(' ')[0] : null),\n    participant_email: email || null,\n    host_name: host.user_name ?? null,\n    host_email: (host.user_email || '').toLowerCase() || null,\n    starts_at: se.start_time ?? null,\n    ends_at: se.end_time ?? null,\n    old_invitee: p.old_invitee || null,\n    new_invitee: p.new_invitee || null,\n    mark_old_invitee: event === 'invitee.created' && p.old_invitee ? p.old_invitee : null,\n    cancel_reason: p.cancellation?.reason ?? null,\n    canceled_at: p.cancellation?.created_at ?? null,\n    reschedule_url: p.reschedule_url ?? null,\n    utm,\n    is_mock: cfg.mockMode === true,\n  },\n}];\n"
+      },
+      "id": "499f38dc-6985-4255-8bde-95efa4be2cdb",
+      "name": "Normalize Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "74e19328-ea8b-4870-b178-5a7058340819",
+      "name": "Keep Valid Mock Event",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "keyValue": "={{ $json.invitee_uri }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "id": "f57b6ba2-e11b-480d-b7fe-c4e508f04f8a",
+      "name": "Find Existing Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Normalize Event').first().json.event_type_uri }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e365fe7e-118a-46aa-9f6b-5361e6f34bd9",
+      "name": "Get Event Type",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        0
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "ijutlu3XwjDml6uu",
+          "name": "Calendly account"
+        },
+        "calendlyApi": {
+          "id": "uyVUVnsibxZ0NrWR",
+          "name": "Aniol-Calendly-PAT"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decides the final column values for this invitee row.\n// Only the columns in the output are written. Follow-up columns are never reset here.\nconst ev = $('Normalize Event').first().json;\nconst existing = $('Find Existing Row').first().json ?? {};\nconst eventType = $('Get Event Type').first().json ?? {};\nconst hasRow = existing.id !== undefined && existing.id !== null;\n\nconst schedulingUrl = eventType.resource?.scheduling_url;\nlet bookingLink = ev.reschedule_url;\nif (schedulingUrl) {\n  bookingLink = ev.utm ? `${schedulingUrl}${schedulingUrl.includes('?') ? '&' : '?'}${ev.utm}` : schedulingUrl;\n}\n\nconst row = {\n  invitee_uri: ev.invitee_uri,\n  event_uri: ev.event_uri,\n  event_type_uri: ev.event_type_uri,\n  event_name: ev.event_name,\n  source_kind: ev.source_kind,\n  batch_id: ev.batch_id,\n  participant_name: ev.participant_name,\n  participant_first_name: ev.participant_first_name,\n  participant_email: ev.participant_email,\n  host_name: ev.host_name,\n  host_email: ev.host_email,\n  starts_at: ev.starts_at,\n  ends_at: ev.ends_at,\n  is_mock: ev.is_mock,\n};\n\nif (ev.event === 'invitee.created') {\n  row.booking_link = bookingLink;\n  if (ev.old_invitee) row.rescheduled_from = ev.old_invitee;\n  // A cancel can arrive before its create. Then the row keeps its final state.\n  const isFinal = ['canceled', 'rescheduled'].includes(existing.booking_status);\n  row.booking_status = isFinal ? existing.booking_status : 'active';\n  if (!hasRow || !existing.followup_status) row.followup_status = 'pending';\n} else {\n  if (ev.rescheduled) {\n    row.booking_status = 'rescheduled';\n    if (ev.new_invitee) row.rescheduled_to = ev.new_invitee;\n  } else {\n    row.booking_status = 'canceled';\n    row.canceled_at = ev.canceled_at || $now.toISO();\n    row.cancel_reason = ev.cancel_reason;\n  }\n  if (!hasRow) row.booking_link = bookingLink;\n}\n\nreturn [{ json: row }];\n"
+      },
+      "id": "b6d2faca-c51d-4fdb-9e00-1c1de5689822",
+      "name": "Build Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "keyValue": "={{ $json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "f1ac1f27-8cd7-4d9e-a951-390a2114833a",
+      "name": "Upsert Session Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Normalize Event').first().json.mark_old_invitee }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "92a1eae9-fed0-405f-a68e-a5ccb96ed64e",
+      "name": "Is New Booking Of A Reschedule?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "old-status",
+              "name": "booking_status",
+              "value": "rescheduled",
+              "type": "string"
+            },
+            {
+              "id": "old-to",
+              "name": "rescheduled_to",
+              "value": "={{ $('Normalize Event').first().json.invitee_uri }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2631f85c-968e-4875-b539-c605bed5c73e",
+      "name": "Old Row Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2016,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "keyValue": "={{ $('Normalize Event').first().json.mark_old_invitee }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "96cefe55-1cc7-44db-b247-f1cb528ec2bc",
+      "name": "Mark Old Row Rescheduled",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## PF Calendly Capture\nInput: one Calendly webhook body (`invitee.created` or `invitee.canceled`). Writes one row per invitee to **MOCK - PF Sessions**.\n\n- Reschedule: old row becomes `rescheduled`, new row gets `rescheduled_from`. Order of the two webhooks does not matter.\n- Cancel before create: row stays `canceled`.\n- Follow-up columns are never reset.\n- Mock guard: in mock mode, participant emails outside aniol.moner+* are dropped.\n\nNo webhook here. A webhook wrapper is added only at go-live (DWN-6).",
+        "color": 5
+      },
+      "id": "a6abb3b9-f9e0-4760-b744-81e7ca412cfe",
+      "name": "Sticky Note 9d448c37",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        288
+      ]
+    }
+  ],
+  "connections": {
+    "When Called By Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Normalize Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Event": {
+      "main": [
+        [
+          {
+            "node": "Keep Valid Mock Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Valid Mock Event": {
+      "main": [
+        [
+          {
+            "node": "Find Existing Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Existing Row": {
+      "main": [
+        [
+          {
+            "node": "Get Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Event Type": {
+      "main": [
+        [
+          {
+            "node": "Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Row": {
+      "main": [
+        [
+          {
+            "node": "Upsert Session Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Session Row": {
+      "main": [
+        [
+          {
+            "node": "Is New Booking Of A Reschedule?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Booking Of A Reschedule?": {
+      "main": [
+        [
+          {
+            "node": "Old Row Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Old Row Fields": {
+      "main": [
+        [
+          {
+            "node": "Mark Old Row Rescheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "495524af-797d-47dc-bae6-e1832ac89e7f",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "7cdce3f9-0528-4531-82ba-c95d38543a84",
+      "name": "Read and check event",
+      "nodeIds": [
+        "7512e5fe-18b4-4fc4-98e1-028ef3f9acc2",
+        "499f38dc-6985-4255-8bde-95efa4be2cdb",
+        "74e19328-ea8b-4870-b178-5a7058340819"
+      ],
+      "description": "Loads PF Config, turns the Calendly body into flat fields, drops unknown events and non-mock emails."
+    },
+    {
+      "id": "21e008d3-c603-4b73-ac0c-d5cd61bac932",
+      "name": "Write session row",
+      "nodeIds": [
+        "f57b6ba2-e11b-480d-b7fe-c4e508f04f8a",
+        "e365fe7e-118a-46aa-9f6b-5361e6f34bd9",
+        "b6d2faca-c51d-4fdb-9e00-1c1de5689822",
+        "f1ac1f27-8cd7-4d9e-a951-390a2114833a"
+      ],
+      "description": "Reads the existing row and the event type link, decides the final state, upserts by invitee_uri."
+    },
+    {
+      "id": "8360c2a5-777d-42fb-8440-462d0673ca90",
+      "name": "Link reschedule",
+      "nodeIds": [
+        "92a1eae9-fed0-405f-a68e-a5ccb96ed64e",
+        "2631f85c-968e-4875-b539-c605bed5c73e",
+        "96cefe55-1cc7-44db-b247-f1cb528ec2bc"
+      ],
+      "description": "For the new booking of a reschedule, marks the old invitee row as rescheduled."
+    }
+  ]
+}

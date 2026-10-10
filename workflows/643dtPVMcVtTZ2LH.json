@@ -1,0 +1,1848 @@
+{
+  "id": "643dtPVMcVtTZ2LH",
+  "name": "PF Session Follow-up",
+  "description": "One run per session: Slack DM with yes/no links, reminder, edits the message after the answer, marks showed_up / no_show / unanswered. Sub-workflow. DWN-6.",
+  "nodes": [
+    {
+      "id": "72c8b0ed-6735-4ca0-ad0e-e88338fe0091",
+      "name": "When Called By Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        288
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "5ae04e47-e61d-42e8-a172-aa8a89919f39",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        272,
+        416
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HfYVjOSLtPqfeYJb",
+          "cachedResultName": "PF Config"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "6fd90e7f-5961-48cf-b684-233512b71f09",
+      "name": "Get Session Row",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        416
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('When Called By Another Workflow').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "9296f51f-9048-4add-800c-8e425303b3a3",
+      "name": "Prepare Follow-up",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        416
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Checks the session can be asked about, then builds the Slack texts and wait limits.\nconst input = $('When Called By Another Workflow').first().json;\nconst cfg = $('Load Config').first().json;\nconst row = $('Get Session Row').first().json ?? {};\nconst mode = input.mode || 'auto';\n\nlet blockStatus = null;\nif (!row.id) blockStatus = 'skipped_no_row';\nelse if (row.booking_status !== 'active') blockStatus = 'skipped_not_active';\nelse if (cfg.mockMode && !cfg.allowedHostEmails.includes((row.host_email || '').toLowerCase())) blockStatus = 'guard_blocked';\n\nconst tz = cfg.timezone;\nconst start = DateTime.fromISO(row.starts_at || $now.toISO()).setZone(tz);\nconst end = DateTime.fromISO(row.ends_at || $now.toISO()).setZone(tz);\n// Wait for the first answer until the session ends, but at least 2 minutes.\nconst minAsk = $now.plus({ minutes: 2 });\nconst askUntil = (end > minAsk ? end : minAsk).toUTC().toISO();\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst hostFirst = (row.host_name || '').split(' ')[0] || 'there';\nconst who = row.participant_name || row.participant_email || 'the participant';\nconst first = row.participant_first_name || who;\nconst when = start.toFormat('HH:mm');\n\nreturn [{\n  json: {\n    ok: blockStatus === null,\n    block_status: blockStatus,\n    mode,\n    invitee_uri: row.invitee_uri ?? input.invitee_uri,\n    host_email: row.host_email,\n    ends_at: row.ends_at,\n    ask_until: askUntil,\n    reminder_minutes: cfg.finalTimeoutMinutes,\n    ask_text: `${tag}Hi ${hostFirst}, your session \"${row.event_name}\" with ${who} started at ${when} (${tz}). Did ${first} join?`,\n    remind_text: `${tag}Reminder: did ${who} join your session \"${row.event_name}\" at ${when} (${tz})?`,\n    yes_note_before_end: `:white_check_mark: You answered: *${first} joined*. When the session ends at ${end.toFormat('HH:mm')}, I will ask you about the reward.`,\n    yes_note_after_end: `:white_check_mark: You answered: *${first} joined*. I will ask you about the reward now.`,\n    no_note: `:x: You answered: *${first} did not join*.`,\n    rebook_text: `${tag}Do you want me to send ${first} an email with a link to book a new time? It comes from noreply@info.n8n.io and names you as the host.`,\n    rebook_yes_note: `:email: OK, I will send ${first} the link to book a new time.`,\n    rebook_no_note: `:no_entry_sign: OK, I will not send anything to ${first}.`,\n    rebook_timeout_note: `:zzz: No answer, so I did not send anything to ${first}.`,\n    first_timeout_note: ':hourglass_flowing_sand: No answer yet. I sent you a reminder.',\n    final_timeout_note: ':zzz: No answer, so I stopped asking. You can still tell Darwin later: \"I want to send the reward for my last session\".',\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "0912ead2-7ae2-42b6-90ce-5347b11768f9",
+      "name": "Allowed To Ask?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        752,
+        288
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "4eabbea4-2a47-4da9-8201-a32cf155c3a0",
+      "name": "Find Host In Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1024,
+        512
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.lookupByEmail",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $('Prepare Follow-up').first().json.host_email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "372d9f34-bd69-4056-a604-a34498218e3e",
+      "name": "Post Question",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1248,
+        512
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $('Prepare Follow-up').first().json.ask_text }}\n\n<{{ $execution.resumeUrl.split('?')[0] }}/first?{{ $execution.resumeUrl.split('?')[1] }}&answer=yes|Yes, they joined>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/first?{{ $execution.resumeUrl.split('?')[1] }}&answer=no|No, they did not>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "ff54bd30-bc0d-40a7-a63a-f8f426cbae37"
+    },
+    {
+      "id": "e1a90cb3-8252-4b32-ad1d-613acfb9f248",
+      "name": "Wait For Answer",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1472,
+        512
+      ],
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "responseMode": "onReceived",
+        "limitWaitTime": true,
+        "limitType": "atSpecifiedTime",
+        "maxDateAndTime": "={{ $('Prepare Follow-up').first().json.ask_until }}",
+        "options": {
+          "webhookSuffix": "first",
+          "ignoreBots": true,
+          "responseData": "Answer saved. Back to Slack.",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Location",
+                "value": "slack://open?team=TG9695PUK"
+              }
+            ]
+          }
+        },
+        "responseCode": 302
+      },
+      "webhookId": "87589f65-7b6d-42c9-9cf7-6e07a8927a77"
+    },
+    {
+      "id": "bcb608c0-076e-483e-8f1d-0aeb8cdf6472",
+      "name": "Update Question",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1696,
+        512
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Question').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Question').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Follow-up').first().json.ask_text }}\n\n{{ $json.query?.answer === 'yes' ? (DateTime.fromISO($('Prepare Follow-up').first().json.ends_at) > $now ? $('Prepare Follow-up').first().json.yes_note_before_end : $('Prepare Follow-up').first().json.yes_note_after_end) : ($json.query?.answer === 'no' ? $('Prepare Follow-up').first().json.no_note : $('Prepare Follow-up').first().json.first_timeout_note) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "51152db8-ece3-4a09-aa81-94f5d156936e"
+    },
+    {
+      "id": "934ec79c-52ca-4d6d-90f6-376915a88a3f",
+      "name": "Route First Answer",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1504,
+        368
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "joined",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Answer').first().json.query?.answer ?? '' }}",
+                    "rightValue": "yes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "not joined",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Answer').first().json.query?.answer ?? '' }}",
+                    "rightValue": "no",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No answer"
+        }
+      }
+    },
+    {
+      "id": "863fcb98-1079-4dcc-8325-3ed2a1784521",
+      "name": "Mark Showed Up",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2528,
+        416
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "showed_up",
+            "showup_answered_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "showup_answered_at",
+              "displayName": "showup_answered_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "dfc96231-8e4a-4a49-914a-14f96cb57753",
+      "name": "Wait Until Session End",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2752,
+        416
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": "={{ Math.max(1, Math.ceil((DateTime.fromISO($('Prepare Follow-up').first().json.ends_at).toMillis() - $now.toMillis()) / 1000)) }}",
+        "unit": "seconds"
+      },
+      "webhookId": "88a88665-65d1-40ec-9a28-c4912b0e531b"
+    },
+    {
+      "id": "b9cdd335-d1ed-448d-89bb-811bc6460a82",
+      "name": "Mark No Show",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2528,
+        608
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "no_show",
+            "showup_answered_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "showup_answered_at",
+              "displayName": "showup_answered_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ce397462-2076-4488-b02e-7b6220fd4922",
+      "name": "Mark Reminded",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1776,
+        288
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "reminded"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "dd51ccc5-96a3-4148-bc74-d76b3872a1fe",
+      "name": "Post Reminder",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2000,
+        288
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $('Prepare Follow-up').first().json.remind_text }}\n\n<{{ $execution.resumeUrl.split('?')[0] }}/reminder?{{ $execution.resumeUrl.split('?')[1] }}&answer=yes|Yes, they joined>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/reminder?{{ $execution.resumeUrl.split('?')[1] }}&answer=no|No, they did not>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "93474635-44f0-49f5-8963-4195724b8828"
+    },
+    {
+      "id": "724a89c6-fd93-4f9c-8a7a-9849ab4b2bc6",
+      "name": "Wait For Reminder Answer",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2224,
+        288
+      ],
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "responseMode": "onReceived",
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": "={{ $('Prepare Follow-up').first().json.reminder_minutes }}",
+        "resumeUnit": "minutes",
+        "options": {
+          "webhookSuffix": "reminder",
+          "ignoreBots": true,
+          "responseData": "Answer saved. Back to Slack.",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Location",
+                "value": "slack://open?team=TG9695PUK"
+              }
+            ]
+          }
+        },
+        "responseCode": 302
+      },
+      "webhookId": "ae928693-dd9f-4336-b196-a196d7cd6b3f"
+    },
+    {
+      "id": "267e6002-5c2f-4a77-9912-3c44a5676b74",
+      "name": "Update Reminder",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2448,
+        288
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Reminder').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Reminder').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Follow-up').first().json.remind_text }}\n\n{{ $json.query?.answer === 'yes' ? (DateTime.fromISO($('Prepare Follow-up').first().json.ends_at) > $now ? $('Prepare Follow-up').first().json.yes_note_before_end : $('Prepare Follow-up').first().json.yes_note_after_end) : ($json.query?.answer === 'no' ? $('Prepare Follow-up').first().json.no_note : $('Prepare Follow-up').first().json.final_timeout_note) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "9cf76cbb-47ac-4ba6-94c9-a482c0eeb089"
+    },
+    {
+      "id": "7e33d01a-9ec7-47ea-ae95-ab239e6bec11",
+      "name": "Route Reminder Answer",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2256,
+        144
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "joined",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Reminder Answer').first().json.query?.answer ?? '' }}",
+                    "rightValue": "yes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "not joined",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Reminder Answer').first().json.query?.answer ?? '' }}",
+                    "rightValue": "no",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No answer"
+        }
+      }
+    },
+    {
+      "id": "431b5111-f8fe-4a12-8535-d082a31dbb6a",
+      "name": "Mark Unanswered",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "unanswered"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f80ff2ef-bb52-465f-8738-4bc28b3b11d3",
+      "name": "Mark Not Asked",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1136,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "={{ $('Prepare Follow-up').first().json.block_status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4183106d-0318-44ad-8d0c-5dfe1325f1f0",
+      "name": "Sticky Note f65b0b36",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        608
+      ],
+      "parameters": {
+        "content": "## PF Session Follow-up\nInput: `{ invitee_uri, mode }`. One run per session.\n\nThe question is a Slack DM with two **links** (not buttons), so clicks never reach the recruiting interactivity handler. Each link resumes this run with `answer=yes` or `answer=no`. After the answer or the timeout, the message is edited: links removed, answer shown.\n\nNo answer: one reminder (mock 3 min, real 24 h), then `unanswered`. Only an explicit `yes` / `no` counts as an answer.",
+        "color": 5
+      }
+    },
+    {
+      "id": "66987a7e-8496-4747-ba37-2211c4aeb6ab",
+      "name": "Post Rebook Question",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2900,
+        600
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ $('Prepare Follow-up').first().json.rebook_text }}\n\n<{{ $execution.resumeUrl.split('?')[0] }}/rebook?{{ $execution.resumeUrl.split('?')[1] }}&answer=yes|Yes, send it>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/rebook?{{ $execution.resumeUrl.split('?')[1] }}&answer=no|No, do not send it>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "c9b1a2f9-6773-40cc-987f-41e41eb1c308"
+    },
+    {
+      "id": "6ade54ad-be00-488a-a67c-4bc5c87d41a9",
+      "name": "Wait For Rebook Answer",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3120,
+        600
+      ],
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "responseMode": "onReceived",
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": "={{ $('Prepare Follow-up').first().json.reminder_minutes }}",
+        "resumeUnit": "minutes",
+        "options": {
+          "webhookSuffix": "rebook",
+          "ignoreBots": true,
+          "responseData": "Answer saved. Back to Slack.",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Location",
+                "value": "slack://open?team=TG9695PUK"
+              }
+            ]
+          }
+        },
+        "responseCode": 302
+      },
+      "webhookId": "c48fc439-a3d3-41f5-ae19-8a456140f7a6"
+    },
+    {
+      "id": "69719e7a-6e22-4ba6-8849-f80bb682883e",
+      "name": "Update Rebook Question",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        3340,
+        600
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Rebook Question').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Rebook Question').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Follow-up').first().json.rebook_text }}\n\n{{ $json.query?.answer === 'yes' ? $('Prepare Follow-up').first().json.rebook_yes_note : ($json.query?.answer === 'no' ? $('Prepare Follow-up').first().json.rebook_no_note : $('Prepare Follow-up').first().json.rebook_timeout_note) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "948d19d0-77e2-4903-a8a4-3fc0db50e74b"
+    },
+    {
+      "id": "494b7913-59b8-4edd-aae9-e395f750fe99",
+      "name": "Route Rebook Answer",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        3560,
+        600
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "send",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Rebook Answer').first().json.query?.answer ?? '' }}",
+                    "rightValue": "yes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "do not send",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Wait For Rebook Answer').first().json.query?.answer ?? '' }}",
+                    "rightValue": "no",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No answer"
+        }
+      }
+    },
+    {
+      "id": "06dbda13-e06f-4970-a7f9-64b8d26ee6f1",
+      "name": "Mark Rebook Approved",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3780,
+        450
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "rebook_status": "approved"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "rebook_status",
+              "displayName": "rebook_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fba66d55-93c1-4a25-ac94-d7e8164b83e5",
+      "name": "Mark Rebook Declined",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3780,
+        600
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "rebook_status": "declined"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "rebook_status",
+              "displayName": "rebook_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "20bffbb3-0758-4f3a-ad48-a1075f628c74",
+      "name": "Mark Rebook Unanswered",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3780,
+        750
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "rebook_status": "unanswered"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "rebook_status",
+              "displayName": "rebook_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ab8cad2f-f916-4c1a-9a52-26a85b37645d",
+      "name": "Build Rebook Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        450
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Builds the rebook email and applies the mock guard.\nconst cfg = $('Load Config').first().json;\nconst row = $('Get Session Row').first().json;\nconst tz = cfg.timezone;\nconst first = row.participant_first_name || 'there';\nconst hostFirst = (row.host_name || '').split(' ')[0] || 'our research team';\nconst day = DateTime.fromISO(row.starts_at).setZone(tz).toFormat('cccc d LLLL');\nconst to = (row.participant_email || '').toLowerCase();\nconst link = row.booking_link;\n\n// Why the email cannot be sent. The last check exists only in test mode.\nlet blockedNote = null;\nif (!to) blockedNote = `:warning: I could not send the email: ${first} has no email address in the booking.`;\nelse if (!link) blockedNote = ':warning: I could not send the email: there is no booking link for this session.';\nelse if (cfg.mockMode && !new RegExp(cfg.allowedParticipantEmailPattern).test(to)) blockedNote = `:lock: Test mode: I only send emails to Aniol's test addresses, so nothing was sent to ${to}.`;\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst text = [\n  `Hi ${first},`,\n  '',\n  `Sorry we missed you on ${day} for your session with ${hostFirst} from n8n.`,\n  '',\n  'If you still want to talk, you can pick a new time here:',\n  link,\n  '',\n  'Thanks,',\n  'The n8n research team',\n].join('\\n');\n\nreturn [{\n  json: {\n    allowed: blockedNote === null,\n    to,\n    from: cfg.emailFrom,\n    reply_to: cfg.emailReplyTo,\n    subject: `${tag}Sorry we missed you, ${first}`,\n    text,\n    sent_note: `:email: Sent to ${first} (${to}) at ${$now.setZone(tz).toFormat('HH:mm')}.`,\n    blocked_note: blockedNote,\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "c40a55da-447b-4ae7-a8a4-e04c7c0d25c0",
+      "name": "Email Allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4220,
+        450
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "4a4e4204-923a-44d0-ac49-3e65064f8b98",
+      "name": "Send Rebook Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4440,
+        350
+      ],
+      "parameters": {
+        "operation": "send",
+        "fromEmail": "={{ $('Build Rebook Email').first().json.from }}",
+        "toEmail": "={{ $('Build Rebook Email').first().json.to }}",
+        "subject": "={{ $('Build Rebook Email').first().json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $('Build Rebook Email').first().json.text }}",
+        "options": {
+          "replyTo": "={{ $('Build Rebook Email').first().json.reply_to }}",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "4xgehQnKp4Y5flIf",
+          "name": "SMTP Mailgun n8n official (use it with \"info.n8n.io\")"
+        }
+      },
+      "webhookId": "93547dc1-2f69-4e97-b4db-eca9c05652fb"
+    },
+    {
+      "id": "ad643e21-ada4-4fdc-aedb-9ce2aefec3d4",
+      "name": "Mark Email Sent",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4660,
+        350
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "rebook_status": "sent",
+            "noshow_email_sent_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "rebook_status",
+              "displayName": "rebook_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "noshow_email_sent_at",
+              "displayName": "noshow_email_sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ad92dda3-685a-45e6-a279-4906836ab325",
+      "name": "Confirm Email Sent",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        4880,
+        350
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Rebook Question').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Rebook Question').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Follow-up').first().json.rebook_text }}\n\n{{ $('Build Rebook Email').first().json.sent_note }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "25b39026-f72a-46be-aead-5b64fb2594a1"
+    },
+    {
+      "id": "757e0dcb-757a-4aab-8cfa-de222e9cdd41",
+      "name": "Mark Email Blocked",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4440,
+        550
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "invitee_uri",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "rebook_status": "guard_blocked"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "rebook_status",
+              "displayName": "rebook_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b01c559e-ee26-4373-84aa-2feac12a6b93",
+      "name": "Report Email Blocked",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        4660,
+        550
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "update",
+        "authentication": "accessToken",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Post Rebook Question').first().json.channel }}"
+        },
+        "ts": "={{ $('Post Rebook Question').first().json.message.ts }}",
+        "messageType": "text",
+        "text": "={{ $('Prepare Follow-up').first().json.rebook_text }}\n\n{{ $('Build Rebook Email').first().json.blocked_note }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "eab907d1-bab9-4f47-821d-ac74e06e1a15"
+    },
+    {
+      "id": "b8d29ab2-2325-414a-bb3d-08d6093dc440",
+      "name": "Reward Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3200,
+        -200
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ri-uri",
+              "name": "invitee_uri",
+              "value": "={{ $('Prepare Follow-up').first().json.invitee_uri }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8cd11fdd-50dd-4d6d-a084-012218501413",
+      "name": "Start Reward",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        3420,
+        -200
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YKTgyYkJwppQZXGT",
+          "cachedResultName": "PF Reward"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Called By Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Get Session Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Session Row": {
+      "main": [
+        [
+          {
+            "node": "Prepare Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Allowed To Ask?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Allowed To Ask?": {
+      "main": [
+        [
+          {
+            "node": "Find Host In Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Not Asked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Host In Slack": {
+      "main": [
+        [
+          {
+            "node": "Post Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Question": {
+      "main": [
+        [
+          {
+            "node": "Wait For Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Answer": {
+      "main": [
+        [
+          {
+            "node": "Update Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Question": {
+      "main": [
+        [
+          {
+            "node": "Route First Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route First Answer": {
+      "main": [
+        [
+          {
+            "node": "Mark Showed Up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark No Show",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Reminded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Showed Up": {
+      "main": [
+        [
+          {
+            "node": "Wait Until Session End",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Reminded": {
+      "main": [
+        [
+          {
+            "node": "Post Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Reminder": {
+      "main": [
+        [
+          {
+            "node": "Wait For Reminder Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Reminder Answer": {
+      "main": [
+        [
+          {
+            "node": "Update Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reminder": {
+      "main": [
+        [
+          {
+            "node": "Route Reminder Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Reminder Answer": {
+      "main": [
+        [
+          {
+            "node": "Mark Showed Up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark No Show",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Unanswered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark No Show": {
+      "main": [
+        [
+          {
+            "node": "Post Rebook Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Rebook Question": {
+      "main": [
+        [
+          {
+            "node": "Wait For Rebook Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Rebook Answer": {
+      "main": [
+        [
+          {
+            "node": "Update Rebook Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Rebook Question": {
+      "main": [
+        [
+          {
+            "node": "Route Rebook Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Rebook Answer": {
+      "main": [
+        [
+          {
+            "node": "Mark Rebook Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Rebook Declined",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Rebook Unanswered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Rebook Approved": {
+      "main": [
+        [
+          {
+            "node": "Build Rebook Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Rebook Email": {
+      "main": [
+        [
+          {
+            "node": "Email Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Allowed?": {
+      "main": [
+        [
+          {
+            "node": "Send Rebook Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Email Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Rebook Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Confirm Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Email Blocked": {
+      "main": [
+        [
+          {
+            "node": "Report Email Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Until Session End": {
+      "main": [
+        [
+          {
+            "node": "Reward Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reward Input": {
+      "main": [
+        [
+          {
+            "node": "Start Reward",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "c6d38fcb-1f42-4d8f-a4c1-68b95a94adb6",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "f1a2bf7a-3463-4007-86ae-e8e3aee4ad66",
+      "name": "Check session",
+      "nodeIds": [
+        "5ae04e47-e61d-42e8-a172-aa8a89919f39",
+        "6fd90e7f-5961-48cf-b684-233512b71f09",
+        "9296f51f-9048-4add-800c-8e425303b3a3"
+      ],
+      "description": "Loads config and the session row, checks it is active and the host passes the mock guard, builds texts."
+    },
+    {
+      "id": "2cb8e6c3-f4ea-4272-94c9-a7592480ebab",
+      "name": "Ask host",
+      "nodeIds": [
+        "4eabbea4-2a47-4da9-8201-a32cf155c3a0",
+        "372d9f34-bd69-4056-a604-a34498218e3e",
+        "e1a90cb3-8252-4b32-ad1d-613acfb9f248",
+        "bcb608c0-076e-483e-8f1d-0aeb8cdf6472"
+      ],
+      "description": "DMs the host a yes/no question with links, waits until the session end, then edits the message to show the answer."
+    },
+    {
+      "id": "ba0ca915-ac83-45c5-bf33-bf463493a591",
+      "name": "Reminder",
+      "nodeIds": [
+        "ce397462-2076-4488-b02e-7b6220fd4922",
+        "dd51ccc5-96a3-4148-bc74-d76b3872a1fe",
+        "724a89c6-fd93-4f9c-8a7a-9849ab4b2bc6",
+        "267e6002-5c2f-4a77-9912-3c44a5676b74"
+      ],
+      "description": "No first answer: asks once more (mock 3 min, real 24 h), then edits the message."
+    },
+    {
+      "id": "8ef80d47-e63f-4c7d-8bed-c2d27f46d989",
+      "name": "Joined",
+      "nodeIds": [
+        "863fcb98-1079-4dcc-8325-3ed2a1784521",
+        "dfc96231-8e4a-4a49-914a-14f96cb57753",
+        "b8d29ab2-2325-414a-bb3d-08d6093dc440",
+        "8cd11fdd-50dd-4d6d-a084-012218501413"
+      ],
+      "description": "Marks showed_up, waits until the session end, then starts PF Reward."
+    },
+    {
+      "id": "1ad96f73-4a99-40d6-bde6-0294d978b2b1",
+      "name": "Ask before rebook email",
+      "nodeIds": [
+        "b9cdd335-d1ed-448d-89bb-811bc6460a82",
+        "66987a7e-8496-4747-ba37-2211c4aeb6ab",
+        "6ade54ad-be00-488a-a67c-4bc5c87d41a9",
+        "69719e7a-6e22-4ba6-8849-f80bb682883e"
+      ],
+      "description": "Marks no_show, asks the host if the participant should get a rebook email, edits the message with the decision."
+    },
+    {
+      "id": "9b656bdb-23ef-47c7-abe5-06fd2af5b277",
+      "name": "Prepare rebook email",
+      "nodeIds": [
+        "06dbda13-e06f-4970-a7f9-64b8d26ee6f1",
+        "ab8cad2f-f916-4c1a-9a52-26a85b37645d"
+      ],
+      "description": "Host said yes: marks approved, builds the email, applies the mock guard."
+    },
+    {
+      "id": "8af1b5f7-546f-43ad-90a9-90e31e473adf",
+      "name": "Send rebook email",
+      "nodeIds": [
+        "4a4e4204-923a-44d0-ac49-3e65064f8b98",
+        "ad643e21-ada4-4fdc-aedb-9ce2aefec3d4",
+        "ad92dda3-685a-45e6-a279-4906836ab325"
+      ],
+      "description": "Sends from noreply@info.n8n.io through Mailgun, stamps the row, edits the DM with the send time."
+    },
+    {
+      "id": "97a4e5ed-22fe-4a65-a4e3-f9b938ab1ec0",
+      "name": "Email blocked",
+      "nodeIds": [
+        "757e0dcb-757a-4aab-8cfa-de222e9cdd41",
+        "b01c559e-ee26-4373-84aa-2feac12a6b93"
+      ],
+      "description": "Guard or missing data: nothing sent, row marked guard_blocked, DM says why."
+    }
+  ]
+}

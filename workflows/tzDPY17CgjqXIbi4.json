@@ -1,6 +1,7 @@
 {
   "id": "tzDPY17CgjqXIbi4",
   "name": "DriftReport",
+  "description": "Nightly comparison of workflows between the Darwin staging and production n8n instances. Classifies each workflow as in-sync, drifted, new-on-staging, or orphaned-on-production, then posts a drift summary to Slack (#project-darwin).",
   "nodes": [
     {
       "parameters": {
@@ -184,7 +185,8 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
   "versionId": "44d93f1e-6f4d-4feb-9732-8394ba6e986b",

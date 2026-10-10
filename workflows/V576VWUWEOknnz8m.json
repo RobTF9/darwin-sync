@@ -1,6 +1,7 @@
 {
   "id": "V576VWUWEOknnz8m",
   "name": "ErrorRun",
+  "description": "Chaos-harness runner for Darwin's error workflows. Creates/finds #darwin-chaos-tests, posts a test thread, fires ErrorHarnessSlack (wyNafb6mqOy3MWHV) and ErrorHarnessGlobal (f9XbwOewMI1ywczf) as sub-workflows so the error handlers fire in production mode,",
   "nodes": [
     {
       "parameters": {},

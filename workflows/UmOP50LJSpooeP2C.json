@@ -1,0 +1,95 @@
+{
+  "id": "UmOP50LJSpooeP2C",
+  "name": "PF One-off Cleanup Darwin Sessions",
+  "description": "One-off: deletes Darwin Sessions rows 813-817, created by message_changed events during DWN-6 tests. Archive after use.",
+  "nodes": [
+    {
+      "id": "438676a9-b8c7-41da-b416-db305be474b5",
+      "name": "Run Cleanup",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "008b0cd8-638a-4955-a089-c3354e5ab1f4",
+      "name": "Delete Junk Darwin Sessions 813-817",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "lxbB2v0RHaAAVH6E",
+          "cachedResultName": "Darwin Sessions"
+        },
+        "matchType": "anyCondition",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "813"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "814"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "815"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "816"
+            },
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "817"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Delete Junk Darwin Sessions 813-817",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "5124719e-09cb-4de5-b566-926f8f310f77",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": true,
+  "nodeGroups": []
+}

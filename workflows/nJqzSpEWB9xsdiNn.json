@@ -1,0 +1,559 @@
+{
+  "id": "nJqzSpEWB9xsdiNn",
+  "name": "NPS taxonomy experiment - Jev vs Sonnet",
+  "description": "Experiment only. Manual trigger. Compares the live Sonnet classifier with Jev (TypeSafe) on the same NPS comments. Writes nothing. Do not publish. Do not push to production.",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "7434f605-d661-4fbb-bf43-aead6e8083dc",
+      "name": "Run Experiment",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// All settings for one experiment run. Change them here, then run the workflow.\n// The Jev questions are also here, so you can tune them in one place.\nconst WINDOW_START = '2026-09-24T00:00:00Z'; // UTC, included\nconst WINDOW_END = '2026-10-01T00:00:00Z';   // UTC, not included\nconst MAX_COMMENTS = 250;                      // Use 25 for the first test run. One week is approx. 2,000.\nconst JEV_MODEL = 'jev-1.13.0';               // Pinned version. Do not use the alias while you tune thresholds.\nconst SECONDARY_THRESHOLD = 0.7;              // Topic Noul value that makes a secondary category\nconst PILLAR_THRESHOLD = 0.7;                 // Pillar Noul value that makes a pillar\n\n// AXIS 1. One Choice picks the primary category.\nconst CATEGORY_CRITERIA = {\n  'UX': {\n    what: 'Interaction, flow, layout, visual design, navigation, editor behaviour, credential setup, save or undo, popups, wanting the product UI in another language. The product works but is awkward, confusing or pleasant. A vague opinion such as \"not user friendly\" or \"convenient interface\" is UX.',\n    not_for: 'Errors, crashes or hangs (Reliability). Slowness (Performance).',\n    examples: ['convenient interface', 'We dont have autosave!', 'the AI assistant builds most of my workflow now'],\n  },\n  'Reliability': {\n    what: 'Failures, errors, crashes, blank pages, hangs, stuck loops, dropped connections, wrong results, bugs, difficult debugging. A vague opinion such as \"buggy\" or \"unreliable\" is Reliability.',\n    not_for: 'A product that works but confuses (UX) or works but slowly (Performance).',\n    examples: ['the page goes white and I need to refresh'],\n  },\n  'Performance': {\n    what: 'Speed, latency, execution time. The product works correctly, just slowly. \"too slow\" is Performance.',\n    not_for: 'Errors or hangs (Reliability).',\n    examples: ['very flexible but too slow for free'],\n  },\n  'Pricing': {\n    what: 'What n8n charges: cost, plan tiers, subscription value, trial length, credit or execution limits, discounts, value for money. A bare \"expensive\" is Pricing.',\n    not_for: 'A cost point that exists because of self-hosting, such as \"free when run locally\" (Self-hosting/Deployment).',\n    examples: ['expensive', 'simple and effective, although a bit expensive'],\n  },\n  'Integrations': {\n    what: 'Availability, breadth, quality or absence of connectors and nodes for third-party services. Any comment that names an external service or connector.',\n    not_for: 'Comments that name no external service or connector.',\n    examples: ['good, but no claude code integrated', 'If there were more native connections I would have given it a 10.'],\n  },\n  'Documentation': {\n    what: 'Quality, existence, coverage or translation of docs, help files, tutorials, the Academy, community learning content. \"There is no doc for this\". Missing doc translation.',\n    not_for: 'The product itself being hard to learn (Learning Curve). Wanting the product UI in another language (UX).',\n    examples: ['No foreign language (at least for doc or helpfile)'],\n  },\n  'Learning Curve': {\n    what: 'The product itself is steep, complex, intense or intimidating. Not suitable for non-developers. Long time to competence. \"I cannot figure this out\".',\n    not_for: 'Missing or poor docs (Documentation).',\n    examples: ['its good but very intense. Would not recommend for non dev users.'],\n  },\n  'Self-hosting/Deployment': {\n    what: 'Self-hosting, running locally, Docker, containers, community edition, open source and licensing, deployment platforms, install and setup effort, data on own infrastructure. Also a cost point that exists because of deployment.',\n    not_for: 'Only what n8n charges (Pricing).',\n    examples: ['I appreciate being able to run it fully locally in a dockerized container', 'to have it for free, I have to download so many things'],\n  },\n  'Support': {\n    what: 'Interactions with the n8n support team or n8n staff.',\n    not_for: 'Help from the community forum (Documentation).',\n    examples: ['support never answered my ticket'],\n  },\n  'No Driver Named': {\n    what: 'Carries a mood but names no product topic at all, or is unintelligible keyboard mash.',\n    not_for: 'A vague opinion about a named topic. \"expensive\" names Pricing. \"buggy\" names Reliability.',\n    examples: ['love it', 'muito bom, adorei', 'nothing', 'dfgdfg'],\n  },\n  'Other': {\n    what: 'Clearly about a specific product topic that fits none of the other options, for example execution logs, roles or permissions.',\n    not_for: 'Vague comments (No Driver Named).',\n    examples: ['we need better execution logs and role permissions for our team'],\n  },\n};\n\n// Secondary category. One Noul per topic category. Code picks the secondary.\nconst TOPICS = {\n  topic_ux: ['UX', 'how the product is to use: interaction, flow, layout, visual design, navigation, editor behaviour, credential setup, save or undo, popups, ease of use'],\n  topic_reliability: ['Reliability', 'failures, errors, crashes, blank pages, hangs, bugs, wrong results, difficult debugging'],\n  topic_performance: ['Performance', 'speed, latency or execution time'],\n  topic_pricing: ['Pricing', 'what n8n charges: cost, plans, trials, credit or execution limits, value for money'],\n  topic_integrations: ['Integrations', 'connectors or nodes for third-party services, or a named external service'],\n  topic_documentation: ['Documentation', 'docs, help files, tutorials, the Academy, learning content'],\n  topic_learning_curve: ['Learning Curve', 'the product being steep, complex or not for non-developers'],\n  topic_self_hosting: ['Self-hosting/Deployment', 'self-hosting, running locally, Docker, community edition, open source, install effort, own infrastructure'],\n  topic_support: ['Support', 'the n8n support team or n8n staff'],\n};\n\n// AXIS 2. One Noul per pillar (code applies the \"None unless clear\" rule),\n// and also one Choice, so the run can compare the two methods.\nconst PILLARS = {\n  pillar_ai_building: ['AI Building',\n    'The AI is authoring or fixing the automation: prompting to generate a workflow, the AI assistant or AI builder, generation quality, AI-assisted debugging, self-healing.',\n    'AI that runs inside the workflow, or an external agent that drives n8n.'],\n  pillar_visual_auditability: ['Visual Auditability',\n    'Understanding one workflow: the canvas, data flow, node inputs and outputs, \"I can see what happens\", easier to follow than code, inspecting a run to understand it.',\n    'Operating many workflows, or team control.'],\n  pillar_runtime_governance: ['Runtime Governance',\n    'Things that matter only with a team or many workflows: execution logs at scale, monitoring, alerting, roles, permissions, SSO, policy, audit trail, budget caps, environments, data-access control.',\n    'Crashes, bugs, hangs and \"does not work\". These are never Runtime Governance.'],\n  pillar_power_ceiling: ['Power & Ceiling',\n    'Whether n8n can do the hard thing: Code node, HTTP request, webhooks, arbitrary code, Python or JavaScript, libraries, complex branching and loops, hitting a limit, needing more control over node internals.',\n    'A passing adjective such as \"flexible\" or \"powerful\" when the comment is about something else.'],\n  pillar_setup_activation: ['Setup & Activation',\n    'The period before the user was productive: installing or running n8n, credentials, OAuth, API keys, connecting the first service, reaching a first working workflow, initial learning burden.',\n    'The plain fact of running n8n yourself (Self-hosting & Openness).'],\n  pillar_agents_vs_workflows: ['Agents vs Workflows',\n    'The AI is a component inside the automation, or an external agent drives n8n: agents as a thing you build, agent tools, MCP, orchestration, deterministic versus probabilistic steps, human-in-the-loop.',\n    'AI that authors the workflow (AI Building).'],\n  pillar_self_hosting_openness: ['Self-hosting & Openness',\n    'Sovereignty: self-hosting, running locally, Docker, community edition, open source and licensing, bring your own key, model choice, privacy, no lock-in, own infrastructure.',\n    'The effort of installing or connecting (Setup & Activation).'],\n  pillar_community_ecosystem: ['Community & Ecosystem',\n    'Value made by other people: the community, the forum, third-party custom nodes, templates, creators, marketplace, external tools built on n8n.',\n    '\"community edition\", which is a licensing tier. Docs and the Academy, which n8n makes.'],\n};\n\nconst PILLAR_RULE = 'Price, cost, plans, trials and discounts are never a strategic bet. Documentation quality is never a strategic bet. A passing adjective is not enough: the bet must be what the comment is actually about.';\n\nconst questions = {\n  category: {\n    type: 'choice',\n    instructions: {\n      question: 'Which part of the n8n product is `comment` mainly about?',\n      focus: 'Pick the one main topic area. A request does not decide the topic: \"We dont have autosave!\" is UX. When two options fit, pick the one that the most specific phrase in the comment belongs to.',\n    },\n    criteria: CATEGORY_CRITERIA,\n  },\n  pillar: {\n    type: 'choice',\n    instructions: {\n      question: 'Which strategic bet is `comment` actually about?',\n      focus: 'Most comments are None. Pick None when no bet is clearly addressed, or when two bets are equally plausible. ' + PILLAR_RULE,\n    },\n    criteria: Object.assign(\n      Object.fromEntries(Object.values(PILLARS).map(([label, what, notFor]) => [label, { what, not_for: notFor }])),\n      { 'None': 'No strategic bet is clearly addressed. Use this when in doubt.' },\n    ),\n  },\n  sentiment: {\n    type: 'choice',\n    instructions: {\n      question: 'What is the dominant tone of `comment` itself?',\n      focus: 'Ignore `nps_score`. For \"great, but X\", pick the tone that dominates. Pick neutral only when the tone is truly balanced or absent.',\n    },\n    criteria: {\n      positive: 'The dominant tone is approval.',\n      negative: 'The dominant tone is dissatisfaction or complaint.',\n      neutral: 'The tone is truly balanced, or there is no tone.',\n    },\n  },\n  is_request: {\n    type: 'noul',\n    instructions: 'Does `comment` ask for, wish for, or imply wanting something that does not exist or does not work as wanted?',\n    criteria: {\n      true: 'For example \"it would be great if\", \"please add\", \"there should be\", \"we dont have\", \"if there were more X I would give a 10\".',\n      false: 'The comment only describes what exists, gives praise, or reports a bug with no implied ask.',\n    },\n  },\n  actionable: {\n    type: 'noul',\n    instructions: 'Could a product manager write a ticket title from `comment` without inventing any detail that the user did not give?',\n    criteria: {\n      true: 'The comment names a concrete, changeable specific: a named UI element, a described failure, a named third-party service, a named missing capability, a specific cost or limit, or a specific documentation gap.',\n      false: 'The comment gives only an opinion, a mood, intensity, or a bare topic word such as \"expensive\", \"too slow\" or \"not user friendly\". Praise counts only when it names a specific mechanism.',\n    },\n  },\n  is_english: {\n    type: 'noul',\n    instructions: 'Is `comment` written in English?',\n  },\n};\n\nfor (const [id, [label, definition]] of Object.entries(TOPICS)) {\n  questions[id] = {\n    type: 'noul',\n    instructions: `Does \\`comment\\` contain a phrase that makes its own point about ${label}? ${label} means ${definition}.`,\n    criteria: {\n      true: `At least one phrase in the comment is about ${label}.`,\n      false: `No phrase in the comment is about ${label}. A word that only describes a different point does not count.`,\n    },\n  };\n}\n\nfor (const [id, [label, what, notFor]] of Object.entries(PILLARS)) {\n  questions[id] = {\n    type: 'noul',\n    instructions: `Is \\`comment\\` actually about ${label}? ${label} means: ${what}`,\n    criteria: {\n      true: `The main point of the comment is about ${label}.`,\n      false: `The comment is not about ${label}, or mentions it only in passing. Not ${label}: ${notFor} ${PILLAR_RULE}`,\n    },\n  };\n}\n\nreturn [{\n  json: {\n    window_start: WINDOW_START,\n    window_end: WINDOW_END,\n    max_comments: MAX_COMMENTS,\n    jev_model: JEV_MODEL,\n    secondary_threshold: SECONDARY_THRESHOLD,\n    pillar_threshold: PILLAR_THRESHOLD,\n    topic_labels: Object.fromEntries(Object.entries(TOPICS).map(([id, [label]]) => [id, label])),\n    pillar_labels: Object.fromEntries(Object.entries(PILLARS).map(([id, [label]]) => [id, label])),\n    jev_questions: questions,\n  },\n}];\n"
+      },
+      "id": "8e7b40f3-1e6d-4d0c-875a-d725a0005b75",
+      "name": "Experiment config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "n8n-telemetry"
+        },
+        "sqlQuery": "-- Experiment input. Same source table as the live \"NPS daily swipe\", but a fixed\n-- window from \"Experiment config\", so a run can be repeated on the same comments.\nSELECT feedback, nps, timestamp\nFROM `n8n-telemetry.rudder_schema.user_responded_value_survey_feedback`\nWHERE timestamp >= TIMESTAMP('{{ $json.window_start }}')\n  AND timestamp < TIMESTAMP('{{ $json.window_end }}')\n  AND feedback IS NOT NULL AND TRIM(feedback) != ''\nORDER BY timestamp",
+        "options": {}
+      },
+      "id": "fd6095ff-d306-48d8-a7ad-b4cc3f9094e5",
+      "name": "Fetch NPS Feedback (fixed window)",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        512,
+        208
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "0pCOXJXMqCYd7C37",
+          "name": "BigQuery n8n Service Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Copy of the filter rules in the live \"Triage Feedback\" node of \"NPS daily swipe\".\n// Both models get the same comments that the live workflow sends to Sonnet.\n// Change from the live node: the segmentation fields are not carried, because\n// this experiment does not use them.\nconst LETTER = /\\p{L}/u;\nconst LATIN_ONLY = /^[a-z0-9]+$/;\n\nconst GENERIC = new Set([\n  'good', 'goood', 'goog', 'god', 'great', 'nice', 'top', 'best', 'cool',\n  'love', 'wow', 'thx', 'ty', 'thanks', 'thank', 'perfect', 'amazing',\n  'awesome', 'awsome', 'excellent', 'excelent', 'excelente', 'super',\n  'superb', 'otimo', 'bom', 'bien', 'genial', 'fantastic', 'wonderful',\n  'wonderfull', 'happy', 'mantap', 'bagus', 'verygood', 'gracias', 'danke',\n  'merci', 'ok', 'okay', 'oke', 'yes', 'si', 'no', 'na', 'idk', 'fine',\n  'hi', 'hello', 'test', 'teste', 'meh', 'because', 'cause', 'nothing',\n  'muito', 'mucho', 'mucha', 'muchas', 'todas', 'yeah', 'like',\n  'bad', 'poor', 'sad', 'terrible', 'awful', 'horrible',\n]);\n\nconst MEANINGFUL_SHORT = new Set([\n  'free', 'easy', 'slow', 'fast', 'cost', 'bug', 'bugs', 'lag', 'hard',\n  'ux', 'ui', 'api', 'mcp', 'sql', 'csv', 'crm', 'http', 'ai', 'llm',\n  'docs', 'doc', 'node', 'save', 'paid', 'n8n',\n]);\n\nconst out = [];\nconst dropped = { noLetters: 0, repeatedChar: 0, generic: 0, shortToken: 0, tinyTokens: 0 };\n\nfor (const item of $input.all()) {\n  const raw = (item.json.feedback ?? '').toString();\n  const fb = raw.trim();\n\n  if (!LETTER.test(fb)) { dropped.noLetters++; continue; }\n\n  const norm = fb.toLowerCase().replace(/[^\\p{L}\\p{N}\\p{M}\\s]/gu, '').replace(/\\s+/g, ' ').trim();\n  const tokens = norm.split(' ').filter(Boolean);\n\n  if (/^(.)\\1+$/u.test(norm.replace(/\\s/g, ''))) { dropped.repeatedChar++; continue; }\n\n  if (tokens.length === 1 && GENERIC.has(tokens[0])) { dropped.generic++; continue; }\n\n  if (tokens.length === 1 && LATIN_ONLY.test(tokens[0]) && tokens[0].length <= 4 && !MEANINGFUL_SHORT.has(tokens[0])) {\n    dropped.shortToken++;\n    continue;\n  }\n\n  if (tokens.length > 1 && tokens.every(t => LATIN_ONLY.test(t) && t.length <= 2)) {\n    dropped.tinyTokens++;\n    continue;\n  }\n\n  out.push({ json: {\n    feedback: raw,\n    nps: item.json.nps,\n    response_timestamp: item.json.timestamp ?? null,\n  } });\n}\n\nconst totalDropped = Object.values(dropped).reduce((a, b) => a + b, 0);\nconsole.log(`[Triage] in=${$input.all().length} dropped=${totalDropped} ${JSON.stringify(dropped)} toClassify=${out.length}`);\n\nreturn out;\n"
+      },
+      "id": "c4607b8d-d150-4a52-85f6-d4980e0c9ca8",
+      "name": "Triage Feedback (copy of live)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": "={{ $('Experiment config').first().json.max_comments }}"
+      },
+      "id": "5e489257-6b57-424c-8556-5480933c446a",
+      "name": "Limit to MAX_COMMENTS",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        960,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "exp-id",
+              "name": "exp_id",
+              "value": "={{ $itemIndex }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "b7910e3a-3d55-43c1-9fa9-d946b758fe10",
+      "name": "Assign Experiment ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One Jev request for each comment. The fixed questions are in \"Experiment config\".\n// This node adds only the parts that change for each comment: the state, and\n// the evidence question. Jev cannot write text, so it cannot quote evidence.\n// Instead, code splits the comment into clauses and Jev picks one clause.\n// The evidence is then always verbatim, but at clause level.\nconst NONE = 'none of these';\nconst MAX_CLAUSES = 30;\nconst MAX_CLAUSE_CHARS = 300;\n\nfunction clauses(text) {\n  const out = [];\n  for (const line of String(text).split(/\\n+/)) {\n    const parts = line.split(/(?<=[.!?;:])\\s+|\\s*,\\s*|\\s+[-–]\\s+|\\s+(?=(?:but|however|although|though|except|mas|pero|aber|mais)\\s)/i);\n    for (const part of parts) {\n      const clause = part.trim().replace(/^[\\s\"'“”(]+|[\\s\"'“”).!?;:,]+$/g, '').slice(0, MAX_CLAUSE_CHARS);\n      if (/\\p{L}/u.test(clause) && clause !== NONE && !out.includes(clause)) out.push(clause);\n    }\n  }\n  return out.slice(0, MAX_CLAUSES);\n}\n\nreturn $input.all().map(item => {\n  const comment = String(item.json.feedback ?? '').trim();\n  const found = clauses(comment);\n  const options = found.length > 0 ? found : [comment.slice(0, MAX_CLAUSE_CHARS)];\n\n  const criteria = {};\n  for (const option of options) criteria[option] = null;\n  criteria[NONE] = 'No part of the comment names a concrete, changeable specific. The comment gives only an opinion, a mood, intensity, or a bare topic word such as \"expensive\", \"too slow\" or \"not user friendly\".';\n\n  return { json: {\n    ...item.json,\n    jev_state: { comment, nps_score: item.json.nps },\n    jev_evidence_question: {\n      type: 'choice',\n      instructions: {\n        question: 'Which part of `comment` names a concrete, changeable specific?',\n        focus: 'A concrete, changeable specific is a named UI element, a described failure, a named third-party service, a named missing capability, a specific cost or limit, or a specific documentation gap.',\n      },\n      criteria,\n    },\n  } };\n});\n"
+      },
+      "id": "9866b804-9ba2-4b4a-9a9a-f66e8e07fde8",
+      "name": "Build Jev Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.typesafe.ai/v1/systemone",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $('Experiment config').first().json.jev_model, state: $json.jev_state, questions: Object.assign({}, $('Experiment config').first().json.jev_questions, { evidence: $json.jev_evidence_question }) }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 10,
+              "batchInterval": 500
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "4ca4e8ef-2f99-4314-90a7-dedcdf6daa78",
+      "name": "Ask Jev",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1984,
+        760
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "s99AtLGD1jjDVzJQ",
+          "name": "Jev-aniol"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns the Jev answers into the same fields as the Sonnet arm, with the same\n// rules as the live Zip node: enum clamps, secondary is not the primary, max two\n// categories, No Driver Named means pillar None, actionable means evidence is not empty.\n// It also keeps the raw probabilities, so the analysis can test other thresholds.\n// \"Ask Jev\" returns only the API response, so the comment fields come from\n// \"Build Jev Request\" (same item order).\nconst requests = $('Build Jev Request').all();\nconst config = $('Experiment config').first().json;\nconst TOPIC_LABELS = config.topic_labels;\nconst PILLAR_LABELS = config.pillar_labels;\nconst SECONDARY_T = config.secondary_threshold;\nconst PILLAR_T = config.pillar_threshold;\nconst ALT_SECONDARY_T = 0.3;\nconst NONE = 'none of these';\n\nconst ALLOWED_CATEGORIES = ['UX', 'Reliability', 'Performance', 'Pricing', 'Integrations', 'Documentation', 'Learning Curve', 'Self-hosting/Deployment', 'Support', 'No Driver Named', 'Other'];\nconst ALLOWED_SENTIMENT = ['positive', 'negative', 'neutral'];\nconst ALLOWED_PILLARS = ['AI Building', 'Visual Auditability', 'Runtime Governance', 'Power & Ceiling', 'Setup & Activation', 'Agents vs Workflows', 'Self-hosting & Openness', 'Community & Ecosystem', 'None'];\n\nconst round = (n) => Math.round((Number(n) || 0) * 1000) / 1000;\nconst roundMap = (m) => Object.fromEntries(Object.entries(m || {}).map(([k, v]) => [k, round(v)]));\n\nreturn $input.all().map((item, i) => {\n  const { answers, model, usage, error } = item.json;\n  const base = requests[item.pairedItem?.item ?? i]?.json ?? {};\n  const { jev_state, jev_evidence_question, ...rest } = base;\n\n  if (error || !answers) {\n    const message = typeof error === 'string' ? error : (error?.message || (error ? JSON.stringify(error) : 'no answers'));\n    return { json: {\n      ...rest,\n      jev_status: `error: ${message}`,\n      jev_category: '', jev_category_secondary: '', jev_category_secondary_alt: '',\n      jev_evidence: '', jev_is_request: false, jev_actionable: false, jev_actionable_noul: false,\n      jev_sentiment: '', jev_pillar_noul: '', jev_pillar_choice: '',\n      jev_category_confidence: null, jev_is_english: null,\n      jev_input_tokens: 0, jev_model: model ?? '',\n    } };\n  }\n\n  let status = 'ok';\n  let category = answers.category?.choice;\n  if (!ALLOWED_CATEGORIES.includes(category)) { status = `enum_violation(${category})`; category = 'Other'; }\n  const isNoDriver = category === 'No Driver Named';\n\n  // Secondary, method 1: the highest topic Noul above the threshold that is not the primary.\n  const topicNouls = Object.fromEntries(Object.entries(TOPIC_LABELS).map(([id, label]) => [label, answers[id]?.noul ?? 0]));\n  const secondaryCandidates = Object.entries(topicNouls)\n    .filter(([label, p]) => label !== category && p >= SECONDARY_T)\n    .sort((a, b) => b[1] - a[1]);\n  const secondary = isNoDriver ? '' : (secondaryCandidates[0]?.[0] ?? '');\n\n  // Secondary, method 2: the second-highest option of the category Choice.\n  const categoryProbs = answers.category?.probabilities ?? {};\n  const ranked = Object.entries(categoryProbs).sort((a, b) => b[1] - a[1]);\n  const second = ranked[1];\n  const secondaryAlt = (!isNoDriver && second && second[1] >= ALT_SECONDARY_T && !['No Driver Named', 'Other'].includes(second[0])) ? second[0] : '';\n\n  // Pillar, method 1: one pillar Noul is above the threshold and no other one is (tie-break 10).\n  const pillarNouls = Object.fromEntries(Object.entries(PILLAR_LABELS).map(([id, label]) => [label, answers[id]?.noul ?? 0]));\n  const pillarRanked = Object.entries(pillarNouls).sort((a, b) => b[1] - a[1]);\n  let pillarNoul = (pillarRanked[0]?.[1] >= PILLAR_T && !(pillarRanked[1]?.[1] >= PILLAR_T)) ? pillarRanked[0][0] : 'None';\n\n  // Pillar, method 2: the pillar Choice.\n  let pillarChoice = ALLOWED_PILLARS.includes(answers.pillar?.choice) ? answers.pillar.choice : 'None';\n\n  if (isNoDriver) { pillarNoul = 'None'; pillarChoice = 'None'; }\n\n  const sentiment = ALLOWED_SENTIMENT.includes(answers.sentiment?.choice) ? answers.sentiment.choice : 'neutral';\n  const evidenceChoice = answers.evidence?.choice;\n  const evidence = (!evidenceChoice || evidenceChoice === NONE) ? '' : evidenceChoice;\n\n  return { json: {\n    ...rest,\n    jev_status: status,\n    jev_category: category,\n    jev_category_secondary: secondary,\n    jev_category_secondary_alt: secondaryAlt,\n    jev_evidence: evidence,\n    jev_is_request: (answers.is_request?.noul ?? 0) >= 0.5,\n    jev_actionable: evidence.length > 0,\n    jev_actionable_noul: (answers.actionable?.noul ?? 0) >= 0.5,\n    jev_sentiment: sentiment,\n    jev_pillar_noul: pillarNoul,\n    jev_pillar_choice: pillarChoice,\n    jev_category_confidence: round(answers.category?.confidence),\n    jev_is_english: round(answers.is_english?.noul),\n    jev_input_tokens: usage?.input_tokens ?? 0,\n    jev_model: model ?? '',\n    jev_raw: {\n      category_probs: roundMap(categoryProbs),\n      topic_nouls: roundMap(topicNouls),\n      pillar_nouls: roundMap(pillarNouls),\n      pillar_choice_probs: roundMap(answers.pillar?.probabilities),\n      evidence_confidence: round(answers.evidence?.confidence),\n      is_request: round(answers.is_request?.noul),\n      actionable: round(answers.actionable?.noul),\n    },\n  } };\n});\n"
+      },
+      "id": "c6c9c8e8-a9e2-4b76-bcd4-52e2acdea488",
+      "name": "Map Jev Answers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One row for each comment, with the Sonnet result, the Jev result and agree flags.\n// Agreement is not accuracy. The rows where the models disagree are the rows to adjudicate.\nconst norm = (s) => String(s || '').toLowerCase().replace(/[^\\p{L}\\p{N}\\s]/gu, '').replace(/\\s+/g, ' ').trim();\n\nfunction evidenceAgrees(a, b) {\n  const x = norm(a);\n  const y = norm(b);\n  if (!x && !y) return true;\n  if (!x || !y) return false;\n  return x.includes(y) || y.includes(x);\n}\n\nfunction sameSet(a1, a2, b1, b2) {\n  const a = [a1, a2].filter(Boolean).sort().join('|');\n  const b = [b1, b2].filter(Boolean).sort().join('|');\n  return a === b;\n}\n\nreturn $input.all().map(({ json: r }) => {\n  const agree = {\n    category: r.sonnet_category === r.jev_category,\n    category_set: sameSet(r.sonnet_category, r.sonnet_category_secondary, r.jev_category, r.jev_category_secondary),\n    category_set_alt: sameSet(r.sonnet_category, r.sonnet_category_secondary, r.jev_category, r.jev_category_secondary_alt),\n    secondary: r.sonnet_category_secondary === r.jev_category_secondary,\n    secondary_alt: r.sonnet_category_secondary === r.jev_category_secondary_alt,\n    pillar_noul: r.sonnet_strategy_pillar === r.jev_pillar_noul,\n    pillar_choice: r.sonnet_strategy_pillar === r.jev_pillar_choice,\n    sentiment: r.sonnet_sentiment === r.jev_sentiment,\n    is_request: r.sonnet_is_request === r.jev_is_request,\n    actionable: r.sonnet_actionable === r.jev_actionable,\n    actionable_noul: r.sonnet_actionable === r.jev_actionable_noul,\n    evidence: evidenceAgrees(r.sonnet_evidence, r.jev_evidence),\n  };\n  const mainFields = ['category', 'secondary', 'pillar_noul', 'sentiment', 'is_request', 'actionable'];\n  return { json: {\n    ...r,\n    agree,\n    disagreements: mainFields.filter(f => !agree[f]),\n  } };\n});\n"
+      },
+      "id": "ab8980e4-4511-4d68-a41c-49561327a0e1",
+      "name": "Compare Sonnet vs Jev",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One summary item for the run. Sonnet tokens and the time of each model are\n// not visible to a Code node. Read them from the execution data of\n// \"Anthropic Chat Model\", \"Classify Batch (Sonnet)\" and \"Ask Jev\".\nconst JEV_PRICE_PER_MTOK = 0.042;\nconst allRows = $input.all().map(i => i.json);\n// Agreement uses only rows where both models returned a result.\nconst rows = allRows.filter(r => r.sonnet_status !== 'unmatched' && !String(r.jev_status).startsWith('error'));\nconst n = rows.length;\nconst pct = (count, total) => total ? Math.round((count / total) * 1000) / 10 : null;\n\nconst agreeKeys = rows.length ? Object.keys(rows[0].agree) : [];\nconst agreement = Object.fromEntries(agreeKeys.map(k => [k, pct(rows.filter(r => r.agree[k]).length, n)]));\n\nfunction countBy(field) {\n  const out = {};\n  for (const r of rows) out[r[field] || '(empty)'] = (out[r[field] || '(empty)'] || 0) + 1;\n  return Object.fromEntries(Object.entries(out).sort((a, b) => b[1] - a[1]));\n}\n\nfunction categoryAgreement(subset) {\n  return { n: subset.length, category_agree_pct: pct(subset.filter(r => r.agree.category).length, subset.length) };\n}\n\nconst english = rows.filter(r => (r.jev_is_english ?? 0) >= 0.5);\nconst notEnglish = rows.filter(r => r.jev_is_english !== null && (r.jev_is_english ?? 0) < 0.5);\n\nconst byConfidence = {\n  'confidence >= 0.8': categoryAgreement(rows.filter(r => r.jev_category_confidence >= 0.8)),\n  '0.5 to 0.8': categoryAgreement(rows.filter(r => r.jev_category_confidence >= 0.5 && r.jev_category_confidence < 0.8)),\n  'below 0.5': categoryAgreement(rows.filter(r => r.jev_category_confidence !== null && r.jev_category_confidence < 0.5)),\n};\n\nconst jevTokens = allRows.reduce((sum, r) => sum + (r.jev_input_tokens || 0), 0);\n\nreturn [{ json: {\n  comments: allRows.length,\n  comments_scored: n,\n  sonnet_unmatched: allRows.filter(r => r.sonnet_status === 'unmatched').length,\n  sonnet_enum_violations: allRows.filter(r => String(r.sonnet_status).startsWith('enum_violation')).length,\n  jev_errors: allRows.filter(r => String(r.jev_status).startsWith('error')).length,\n  jev_enum_violations: allRows.filter(r => String(r.jev_status).startsWith('enum_violation')).length,\n  agreement_pct: agreement,\n  category_agreement_by_language: { english: categoryAgreement(english), not_english: categoryAgreement(notEnglish) },\n  category_agreement_by_jev_confidence: byConfidence,\n  rows_with_any_disagreement: rows.filter(r => r.disagreements.length > 0).length,\n  distribution: {\n    sonnet_category: countBy('sonnet_category'),\n    jev_category: countBy('jev_category'),\n    sonnet_pillar: countBy('sonnet_strategy_pillar'),\n    jev_pillar_noul: countBy('jev_pillar_noul'),\n    jev_pillar_choice: countBy('jev_pillar_choice'),\n  },\n  jev_input_tokens_total: jevTokens,\n  jev_input_tokens_per_comment: allRows.length ? Math.round(jevTokens / allRows.length) : 0,\n  jev_cost_usd_estimate: Math.round(jevTokens / 1e6 * JEV_PRICE_PER_MTOK * 1e6) / 1e6,\n  jev_model: allRows.find(r => r.jev_model)?.jev_model ?? '',\n} }];\n"
+      },
+      "id": "b98ad7dc-b940-4eaa-a8d8-de952b54de01",
+      "name": "Summarize Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2784,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json);\nconst lines = items.map((it, idx) => `${idx}. NPS=${it.nps} | ${(it.feedback || '').replace(/\\n/g, ' ')}`).join('\\n');\nreturn [{ json: { items, promptText: lines } }];\n"
+      },
+      "id": "5ed75b22-727d-4c96-92c3-3c9072a26923",
+      "name": "Build Sonnet Batch Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.promptText }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You classify a BATCH of open-text NPS feedback comments for n8n, an AI-first workflow automation product used by both technical and non-technical users.\n\nYou assign TWO INDEPENDENT AXES to every comment:\n- AXIS 1 (category): what part of the product the comment is about. Every comment gets one.\n- AXIS 2 (strategy_pillar): which strategic bet the comment speaks to, if any. MOST COMMENTS GET \"None\" HERE. That is the expected and correct outcome.\nThe axes do not constrain each other. A comment can be Reliability on Axis 1 and AI Building on Axis 2, and both readings are correct.\n\nINPUT\nEach line is formatted: \"INDEX. NPS=<score> | <feedback text>\"\nComments arrive in many languages. Classify all of them. Emit labels in English, but quote evidence verbatim in the original language.\n\nOUTPUT\nA JSON array, exactly one object per input line, same order, fields in this order:\nindex, evidence, category, evidence_secondary, category_secondary, is_request, actionable, sentiment, strategy_pillar\nFill the fields in the order listed. Quote the evidence BEFORE choosing the category - the quote justifies the label, not the other way round.\nUse an empty string \"\" for absent values. Never use null.\n\nSTEP 1 - evidence\nQuote, verbatim, the shortest contiguous phrase naming a CONCRETE, CHANGEABLE SPECIFIC: a named UI element, a described failure, a named third-party service, a named missing capability, a specific cost or limit, a specific documentation gap.\nIf no such phrase exists - only an opinion, a mood, or a bare topic noun - set evidence to \"\".\nDo not paraphrase. Do not stitch words from different parts of the comment. If you cannot point at one contiguous phrase, there is no evidence.\n\nSTEP 2 - category (AXIS 1)\nExactly one. Every line gets one.\n- UX: interaction, flow, layout, visual design, navigation, editor behaviour, credential setup, save/undo, popups, product-language localization. Works but awkward, confusing, or pleasant.\n- Reliability: failures, errors, crashes, blank pages, hangs, stuck loops, dropped connections, wrong results, bugs, debugging difficulty.\n- Performance: speed, latency, execution time. Works correctly, just slowly.\n- Pricing: cost, plan tiers, subscription value, trial length, credit or execution limits, discounts, value for money.\n- Integrations: availability, breadth, quality or absence of connectors and nodes to third-party services.\n- Documentation: quality, existence, coverage or translation of docs, help files, tutorials, the Academy, community learning content.\n- Learning Curve: the PRODUCT being steep, complex, intense, intimidating; suitability for non-developers; time to competence.\n- Self-hosting/Deployment: self-hosting, running locally, Docker, containers, community edition, open source and licensing, deployment platforms, install and setup effort, data on own infrastructure.\n- Support: interactions with n8n's support team or staff.\n- No Driver Named: carries a mood but names NO product topic (\"love it\", \"muito bom\", \"nothing\"), or is unintelligible.\n- Other: IS clearly about a specific product topic that fits none of the above. Use sparingly - a rising Other count signals the taxonomy needs a new category. Do NOT use it for vague comments; those are No Driver Named.\n\nAXIS 1 TIE-BREAKS (in order)\n1. Requests never determine the category. Flag via is_request; the category is the topic area. \"We dont have autosave!\" is UX with is_request true.\n2. Errors, blanks, hangs, crashes -> Reliability. Works but confuses -> UX. Works but slowly -> Performance.\n3. If the cost point exists BECAUSE of deployment (\"free when run locally\") primary is Self-hosting/Deployment, Pricing may be secondary. Purely about what n8n charges -> Pricing.\n4. \"I can't figure this out\", \"not for non-devs\" -> Learning Curve. \"There's no doc for this\" -> Documentation.\n5. Names an external service or connector -> Integrations.\n6. Missing doc translation -> Documentation. Wanting the product UI in another language -> UX with is_request true.\n7. A vague opinion ABOUT a named topic keeps that topic. \"expensive\" -> Pricing. \"not user friendly\" -> UX. \"buggy\" -> Reliability. No Driver Named is only for when no topic is named at all.\n8. Still tied -> pick the one the evidence phrase sits inside.\n\nSTEP 3 - category_secondary and evidence_secondary\nOnly when a distinct second topic carries its OWN separate evidence phrase. Max two categories.\nIf you set category_secondary you must set evidence_secondary to a different contiguous phrase from the same comment.\nCannot quote a second distinct phrase -> both \"\".\nDo not use secondary to hedge between two candidates for one point.\nNever set it on a No Driver Named row.\nMost comments have \"\" for both. That is correct.\n\nSTEP 4 - is_request\ntrue when the comment asks for, wishes for, or implies wanting something that does not exist or does not work as wanted: \"it would be great if\", \"please add\", \"there should be\", \"we don't have\", \"if there were more X I'd give a 10\".\nfalse for description of what exists, praise, or a bug report with no implied ask.\nis_request true and sentiment positive can co-occur.\n\nSTEP 5 - actionable\nCould a product manager write a ticket title from this without inventing any detail the user did not supply?\n- evidence is \"\" -> actionable false. No exceptions.\n- Praise is actionable only when it names a specific mechanism or element. \"most intuitive workflow designer\" -> false. \"run it fully locally in a dockerized container\" -> true.\n- A bare topic noun plus an opinion is not actionable either way: \"convenient interface\", \"not user friendly\", \"expensive\", \"Reliable\" -> false. They still keep their real category.\n- Intensity is not specificity. \"TRAVA DEMAIS!!!\", \"too slow\" -> false.\nactionable false does not mean worthless. Vague comments are counted in aggregate, so they must still be categorised correctly.\n\nSTEP 6 - sentiment\nTone of the comment itself. Independent of NPS score, actionable, and is_request.\n- positive: dominant tone is approval.\n- negative: dominant tone is dissatisfaction or complaint.\n- neutral: genuinely balanced, or no discernible tone.\nFor \"great, but X\", pick whichever dominates; neutral only when truly even.\nONLY positive, negative, neutral are permitted. Never \"mixed\" or anything else. Unsure -> neutral.\n\nSTEP 7 - strategy_pillar (AXIS 2)\nExactly one of the nine values below. \"None\" is the DEFAULT and the most common answer - roughly three quarters of comments should be None. Do not stretch to fill this field.\n- AI Building: the AI is AUTHORING or FIXING the automation. Prompting to generate a workflow, the AI assistant/builder, generation quality, AI-assisted debugging, self-healing.\n- Visual Auditability: comprehending ONE workflow. Canvas, data flow, node inputs and outputs, \"I can see what's happening\", easier to follow than code, inspecting a run to understand it.\n- Runtime Governance: things that only matter with a TEAM or MANY workflows. Execution logs at scale, monitoring, alerting, roles, permissions, SSO, policy, audit trail, budget caps, environments, data-access control.\n- Power & Ceiling: whether n8n can do the HARD thing. Code node, HTTP request, webhooks, arbitrary code, Python/JS, libraries, complex branching and loops, hitting a limit, needing more control over node internals.\n- Setup & Activation: the period BEFORE the user was productive. Installing or running n8n, credentials, OAuth, API keys, connecting the first service, reaching a first working workflow, initial learning burden.\n- Agents vs Workflows: the AI is a COMPONENT INSIDE the automation, or n8n is being driven by an external agent. Agents as a thing you build, agent tools, MCP, orchestration, deterministic vs probabilistic steps, human-in-the-loop.\n- Self-hosting & Openness: sovereignty. Self-hosting, running locally, Docker, community edition, open source and licensing, BYOK, model choice, privacy, avoiding lock-in, own infrastructure.\n- Community & Ecosystem: value produced by OTHER PEOPLE. Community, forum, third-party custom nodes, templates, creators, marketplace, external tools built on n8n.\n- None: no strategic bet is clearly addressed. Use this whenever in doubt.\n\nAXIS 2 TIE-BREAKS (in order)\n1. AI AUTHORING the workflow -> AI Building. AI INSIDE the workflow, or an external agent driving n8n -> Agents vs Workflows.\n2. Understanding ONE workflow -> Visual Auditability. Operating MANY, or organisational control -> Runtime Governance.\n3. The EFFORT of getting running or connected -> Setup & Activation. The FACT of running it yourself -> Self-hosting & Openness.\n4. Learning toward first success -> Setup & Activation. Ongoing creation experience with AI -> AI Building.\n5. Crashes, bugs, hangs, \"doesn't work\" NEVER map to Runtime Governance. They may still map to whichever pillar owns the failing surface - a crashing AI assistant is AI Building.\n6. Price, cost, plans, trials, discounts -> None. Axis 1 Pricing already owns them.\n7. Documentation or tutorial quality -> None, UNLESS the point is specifically community-produced content, which is Community & Ecosystem.\n8. \"community edition\" is Self-hosting & Openness, NOT Community & Ecosystem. It is a licensing tier, not the community.\n9. A passing adjective is not enough. \"very flexible but too slow\" does not earn Power & Ceiling - the flexibility is incidental. The pillar must be what the comment is actually ABOUT.\n10. If two pillars remain plausible and nothing above resolves it -> None. With small weekly volumes a false positive distorts more than a miss, so prefer None over a guess.\n\nSTEP 8 - unintelligible input\nKeyboard mash, random characters, or text you cannot interpret: evidence \"\", category \"No Driver Named\", secondary fields \"\", is_request false, actionable false, sentiment \"neutral\", strategy_pillar \"None\".\nNever skip, merge, reorder or drop a line. Every input line gets exactly one object. Before returning, confirm the object count equals the input line count and the index values match.\n\nEXAMPLE INPUT\n0. NPS=7 | It seems somewhat unreliable, the page goes white and I need to refresh\n1. NPS=10 | convenient interface\n2. NPS=6 | We dont have autosave!\n3. NPS=6 | good, but no claude code integrated\n4. NPS=9 | n8n offers amazing flexibility, ease of use and a wide range native connections. If there were more native connections I would have given it a 10.\n5. NPS=5 | to have it for free, I have to download so many things so its so much effort and its not Worth the price\n6. NPS=10 | פשוט ויעיל, למרות שקצת יקר\n7. NPS=8 | its good but very intense. Would not recommend for non dev users.\n8. NPS=8 | Very powerful but can be tricky. No foreign language (at least for doc or helpfile). Academy is a great way to understand and progress.\n9. NPS=9 | muito bom, adorei\n10. NPS=10 | I appreciate being able to run it fully locally in a dockerized container\n11. NPS=10 | very flexible but too slow for free\n12. NPS=4 | dfgdfg\n13. NPS=0 | expensive\n14. NPS=10 | the AI assistant builds most of my workflow now, its impressive\n15. NPS=9 | I love that I can see the data flowing through each node, much clearer than reading code\n16. NPS=5 | we need better execution logs and role permissions for our team\n\nEXAMPLE OUTPUT\n[{\"index\":0,\"evidence\":\"the page goes white and I need to refresh\",\"category\":\"Reliability\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"None\"},{\"index\":1,\"evidence\":\"\",\"category\":\"UX\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"positive\",\"strategy_pillar\":\"None\"},{\"index\":2,\"evidence\":\"We dont have autosave\",\"category\":\"UX\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"None\"},{\"index\":3,\"evidence\":\"no claude code integrated\",\"category\":\"Integrations\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"Agents vs Workflows\"},{\"index\":4,\"evidence\":\"If there were more native connections\",\"category\":\"Integrations\",\"evidence_secondary\":\"amazing flexibility\",\"category_secondary\":\"UX\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"positive\",\"strategy_pillar\":\"Power & Ceiling\"},{\"index\":5,\"evidence\":\"I have to download so many things so its so much effort\",\"category\":\"Self-hosting/Deployment\",\"evidence_secondary\":\"its not Worth the price\",\"category_secondary\":\"Pricing\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"Setup & Activation\"},{\"index\":6,\"evidence\":\"\",\"category\":\"Pricing\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"positive\",\"strategy_pillar\":\"None\"},{\"index\":7,\"evidence\":\"Would not recommend for non dev users\",\"category\":\"Learning Curve\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"neutral\",\"strategy_pillar\":\"Setup & Activation\"},{\"index\":8,\"evidence\":\"No foreign language (at least for doc or helpfile)\",\"category\":\"Documentation\",\"evidence_secondary\":\"can be tricky\",\"category_secondary\":\"Learning Curve\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"neutral\",\"strategy_pillar\":\"None\"},{\"index\":9,\"evidence\":\"\",\"category\":\"No Driver Named\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"positive\",\"strategy_pillar\":\"None\"},{\"index\":10,\"evidence\":\"run it fully locally in a dockerized container\",\"category\":\"Self-hosting/Deployment\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"positive\",\"strategy_pillar\":\"Self-hosting & Openness\"},{\"index\":11,\"evidence\":\"\",\"category\":\"Performance\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"negative\",\"strategy_pillar\":\"None\"},{\"index\":12,\"evidence\":\"\",\"category\":\"No Driver Named\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"neutral\",\"strategy_pillar\":\"None\"},{\"index\":13,\"evidence\":\"\",\"category\":\"Pricing\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":false,\"sentiment\":\"negative\",\"strategy_pillar\":\"None\"},{\"index\":14,\"evidence\":\"the AI assistant builds most of my workflow\",\"category\":\"UX\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"positive\",\"strategy_pillar\":\"AI Building\"},{\"index\":15,\"evidence\":\"see the data flowing through each node\",\"category\":\"UX\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":false,\"actionable\":true,\"sentiment\":\"positive\",\"strategy_pillar\":\"Visual Auditability\"},{\"index\":16,\"evidence\":\"better execution logs and role permissions\",\"category\":\"Other\",\"evidence_secondary\":\"\",\"category_secondary\":\"\",\"is_request\":true,\"actionable\":true,\"sentiment\":\"negative\",\"strategy_pillar\":\"Runtime Governance\"}]\n\nWHAT THESE ESTABLISH\n- Eleven of seventeen are strategy_pillar None. That ratio is correct - do not inflate it.\n- Index 0: a real actionable bug with no strategic pillar. Crashes do not automatically belong to a bet.\n- Indexes 1, 6, 11, 13: actionable false but they keep a REAL Axis 1 category. \"expensive\" is Pricing and must be counted as Pricing.\n- Index 11: \"very flexible\" is a passing adjective, so it does NOT earn Power & Ceiling (tie-break 9). Index 4 does, because flexibility is what the comment is about.\n- Index 5 vs index 10: the same subject splits by tie-break 3. Effort of getting running -> Setup & Activation. The fact of running it yourself -> Self-hosting & Openness.\n- Index 3: an external AI agent driving n8n -> Agents vs Workflows, not AI Building (tie-break 1).\n- Index 14 vs 15: AI authoring the workflow -> AI Building. Seeing inside one workflow -> Visual Auditability.\n- Index 16: the only Other on Axis 1, because governance features have no Axis 1 bucket - and the only Runtime Governance on Axis 2. Both are correct simultaneously.\n- Index 8: doc quality is None on Axis 2 (tie-break 7). The Academy is n8n-produced, not community."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "b2bcec43-b5db-4cf3-8596-6c16f4a7b467",
+      "name": "Classify Batch (Sonnet)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1264,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {
+          "maxTokensToSample": 16000
+        }
+      },
+      "id": "3d380b84-6285-4ec3-8da9-a38dd801a921",
+      "name": "Anthropic Chat Model (Sonnet 4.6)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        1400,
+        344
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "[{ \"index\": 0, \"evidence\": \"the page goes white and I need to refresh\", \"category\": \"Reliability\", \"evidence_secondary\": \"\", \"category_secondary\": \"\", \"is_request\": false, \"actionable\": true, \"sentiment\": \"negative\", \"strategy_pillar\": \"None\" }, { \"index\": 1, \"evidence\": \"the AI assistant builds most of my workflow\", \"category\": \"UX\", \"evidence_secondary\": \"\", \"category_secondary\": \"\", \"is_request\": false, \"actionable\": true, \"sentiment\": \"positive\", \"strategy_pillar\": \"AI Building\" }]"
+      },
+      "id": "ba817651-32d3-479f-ab8a-942e325f35ad",
+      "name": "Sonnet Output Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1272,
+        344
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Same enum clamps as the live \"Zip Batch Results\" node, and the same derived\n// actionable (true when evidence is not empty). Changes from the live node:\n// it keeps exp_id and evidence_secondary, and it writes every field with a\n// sonnet_ prefix so that the Jev fields can sit next to them.\nconst original = $('Build Sonnet Batch Prompt').first().json.items;\nconst classifications = $json.output || [];\n\nconst ALLOWED_CATEGORIES = ['UX', 'Reliability', 'Performance', 'Pricing', 'Integrations', 'Documentation', 'Learning Curve', 'Self-hosting/Deployment', 'Support', 'No Driver Named', 'Other'];\nconst ALLOWED_SENTIMENT = ['positive', 'negative', 'neutral'];\nconst ALLOWED_PILLARS = ['AI Building', 'Visual Auditability', 'Runtime Governance', 'Power & Ceiling', 'Setup & Activation', 'Agents vs Workflows', 'Self-hosting & Openness', 'Community & Ecosystem', 'None'];\n\nconst byIndex = {};\nfor (const c of classifications) {\n  if (c && c.index !== undefined && c.index !== null) byIndex[Number(c.index)] = c;\n}\n\nreturn original.map((item, idx) => {\n  const c = byIndex[idx];\n\n  if (!c) {\n    return { json: {\n      ...item,\n      sonnet_status: 'unmatched',\n      sonnet_category: 'Other', sonnet_category_secondary: '',\n      sonnet_evidence: '', sonnet_evidence_secondary: '',\n      sonnet_is_request: false, sonnet_actionable: false,\n      sonnet_sentiment: 'neutral', sonnet_strategy_pillar: 'None',\n    } };\n  }\n\n  const evidence = typeof c.evidence === 'string' ? c.evidence.trim() : '';\n  let status = 'ok';\n  let category = c.category;\n  if (!ALLOWED_CATEGORIES.includes(category)) {\n    status = `enum_violation(${category})`;\n    category = 'Other';\n  }\n  let categorySecondary = ALLOWED_CATEGORIES.includes(c.category_secondary) ? c.category_secondary : '';\n  if (categorySecondary === category) categorySecondary = '';\n  const sentiment = ALLOWED_SENTIMENT.includes(c.sentiment) ? c.sentiment : 'neutral';\n  let pillar = ALLOWED_PILLARS.includes(c.strategy_pillar) ? c.strategy_pillar : 'None';\n  if (category === 'No Driver Named') pillar = 'None';\n\n  return { json: {\n    ...item,\n    sonnet_status: status,\n    sonnet_category: category,\n    sonnet_category_secondary: categorySecondary,\n    sonnet_evidence: evidence,\n    sonnet_evidence_secondary: typeof c.evidence_secondary === 'string' ? c.evidence_secondary.trim() : '',\n    sonnet_is_request: c.is_request === true,\n    sonnet_actionable: evidence.length > 0,\n    sonnet_sentiment: sentiment,\n    sonnet_strategy_pillar: pillar,\n  } };\n});\n"
+      },
+      "id": "7e364937-559a-443f-9156-da76c4eb78ef",
+      "name": "Zip Sonnet Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        112
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "batchSize": 50,
+        "options": {}
+      },
+      "id": "e40f436e-bc8a-4332-80bd-8145a1727187",
+      "name": "Batch for Sonnet (50 per call)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        752,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Experiment: NPS taxonomy, Jev vs Sonnet\n\nThis workflow is NOT part of the live NPS pipeline. It has a manual trigger only.\n\n- Do not publish this workflow.\n- Do not include it in a Git push to production.\n- It writes nothing: no Supabase, no embeddings, no data tables. The results stay in the execution data.\n- It reads BigQuery (read-only). It calls Anthropic (Sonnet 4.6 with the same prompt as the live workflow) and TypeSafe (Jev).\n\n### Before the first run\n1. Open \"Ask Jev\" and create the \"TypeSafe API\" credential: header `Authorization` with the value `Bearer <your API key>`.\n2. In \"Experiment config\", set the window and `MAX_COMMENTS`. Start with 25.\n\n\"Ask Jev\" is an HTTP Request node that calls `POST https://api.typesafe.ai/v1/systemone`. The TypeSafe community node is not installed on this instance. If you install it, it can replace \"Ask Jev\".\n\"Ask Jev\" sends 10 requests at a time, every 500 ms, to stay below the Jev rate limit (40 requests per second).\n\n### Results\n- One row for each comment: output of \"Compare Sonnet vs Jev\".\n- Totals and agreement: output of \"Summarize Run\".\n- Sonnet tokens and the time of each model: execution data of \"Anthropic Chat Model (Sonnet 4.6)\", \"Classify Batch (Sonnet)\" and \"Ask Jev\".",
+        "height": 216,
+        "color": 3
+      },
+      "id": "63f5724e-6e1f-4eb3-9ab5-95b89e7edb16",
+      "name": "Sticky Note 9e68b806",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Run Experiment": {
+      "main": [
+        [
+          {
+            "node": "Experiment config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Experiment config": {
+      "main": [
+        [
+          {
+            "node": "Fetch NPS Feedback (fixed window)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch NPS Feedback (fixed window)": {
+      "main": [
+        [
+          {
+            "node": "Triage Feedback (copy of live)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Triage Feedback (copy of live)": {
+      "main": [
+        [
+          {
+            "node": "Limit to MAX_COMMENTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit to MAX_COMMENTS": {
+      "main": [
+        [
+          {
+            "node": "Assign Experiment ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Experiment ID": {
+      "main": [
+        [
+          {
+            "node": "Batch for Sonnet (50 per call)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Jev Request": {
+      "main": [
+        [
+          {
+            "node": "Ask Jev",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Jev": {
+      "main": [
+        [
+          {
+            "node": "Map Jev Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Jev Answers": {
+      "main": [
+        [
+          {
+            "node": "Compare Sonnet vs Jev",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Sonnet vs Jev": {
+      "main": [
+        [
+          {
+            "node": "Summarize Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Sonnet Batch Prompt": {
+      "main": [
+        [
+          {
+            "node": "Classify Batch (Sonnet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Batch (Sonnet)": {
+      "main": [
+        [
+          {
+            "node": "Zip Sonnet Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model (Sonnet 4.6)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Batch (Sonnet)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sonnet Output Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Classify Batch (Sonnet)",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zip Sonnet Results": {
+      "main": [
+        [
+          {
+            "node": "Batch for Sonnet (50 per call)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch for Sonnet (50 per call)": {
+      "main": [
+        [
+          {
+            "node": "Build Jev Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Sonnet Batch Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "224135bd-59bd-4bf7-ac4d-711caadfb639",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "sSJsP2ZRjaFCHn95",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "11ea5048-d366-46cb-8964-a6635e566b2d",
+      "name": "Experiment input",
+      "nodeIds": [
+        "8e7b40f3-1e6d-4d0c-875a-d725a0005b75",
+        "fd6095ff-d306-48d8-a7ad-b4cc3f9094e5",
+        "c4607b8d-d150-4a52-85f6-d4980e0c9ca8",
+        "5e489257-6b57-424c-8556-5480933c446a",
+        "b7910e3a-3d55-43c1-9fa9-d946b758fe10"
+      ],
+      "description": "Settings and Jev questions, then a fixed BigQuery window, the live triage rules, and a cap on the number of comments."
+    },
+    {
+      "id": "65e47300-6c8c-44c7-8fbf-45ce9a885559",
+      "name": "Arm A: Sonnet (copy of live)",
+      "nodeIds": [
+        "5ed75b22-727d-4c96-92c3-3c9072a26923",
+        "b2bcec43-b5db-4cf3-8596-6c16f4a7b467",
+        "ba817651-32d3-479f-ab8a-942e325f35ad",
+        "3d380b84-6285-4ec3-8da9-a38dd801a921",
+        "7e364937-559a-443f-9156-da76c4eb78ef"
+      ],
+      "description": "Same prompt, model and enum rules as the live NPS daily swipe, in batches of 50."
+    },
+    {
+      "id": "89d26735-1935-4bba-a10a-90702857a3e4",
+      "name": "Arm B: Jev",
+      "nodeIds": [
+        "9866b804-9ba2-4b4a-9a9a-f66e8e07fde8",
+        "4ca4e8ef-2f99-4314-90a7-dedcdf6daa78",
+        "c6c9c8e8-a9e2-4b76-bcd4-52e2acdea488"
+      ],
+      "description": "One Jev request per comment: one Choice for the category, Nouls for secondary topics and pillars, clause choice for evidence."
+    },
+    {
+      "id": "244e7ea8-2097-45d4-ae05-c29c8b545a4d",
+      "name": "Compare",
+      "nodeIds": [
+        "ab8980e4-4511-4d68-a41c-49561327a0e1",
+        "b98ad7dc-b940-4eaa-a8d8-de952b54de01"
+      ],
+      "description": "Agree flags for each comment, then one summary item. Agreement is not accuracy: adjudicate the disagreements."
+    }
+  ]
+}

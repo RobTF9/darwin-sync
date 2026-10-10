@@ -24,6 +24,7 @@
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "projectId": {
           "__rl": true,
           "mode": "id",
@@ -43,9 +44,9 @@
         0
       ],
       "credentials": {
-        "googleBigQueryOAuth2Api": {
-          "id": "92ZMRuOZEOJHwoRi",
-          "name": "Nik's Big Query"
+        "googleApi": {
+          "id": "0pCOXJXMqCYd7C37",
+          "name": "BigQuery n8n Service Account"
         }
       }
     },
@@ -93,7 +94,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "9242f496-36f8-4f5c-856e-704b93d257e5",
+  "versionId": "970a2659-eb83-4fd5-bee1-0e23c8e30002",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

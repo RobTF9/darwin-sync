@@ -1,0 +1,88 @@
+{
+  "id": "nQn19coh9rJ50aVP",
+  "name": "Qontext Knowledge",
+  "description": "Qontext PoC: retrieval wrapper. Input: query, limit. Calls POST /v1/retrieval with X-API-Key auth and returns synthesized context with sources.",
+  "nodes": [
+    {
+      "id": "e894c8a1-b9a5-4f87-a2c5-d866ed42cb56",
+      "name": "Knowledge Query In",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "query",
+              "type": "string"
+            },
+            {
+              "name": "limit",
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d55f8399-e4bf-4c8f-b72b-27528a3d1375",
+      "name": "Qontext Retrieval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.qontext.ai/v1/retrieval",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qontextApi",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"prompt\": $json.query, \"limit\": $json.limit ? Number($json.limit) : 10, \"includeSources\": true } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "qontextApi": {
+          "id": "hzNNio0zP5yj4Cg5",
+          "name": "Qontext account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Knowledge Query In": {
+      "main": [
+        [
+          {
+            "node": "Qontext Retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "7e802ce4-6572-42d4-a689-6a15493982bb",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

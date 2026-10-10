@@ -1,0 +1,489 @@
+{
+  "id": "lDqNTjEe1soZ8XtH",
+  "name": "SuiteHeadToHead",
+  "description": "Fires the workflow Darwin suite (IntegrationRun) and the agent suite (AgentIntegrationRun) at the same time, polls both, and posts one head-to-head comparison to the shared eval Slack channel. Each runner also posts its own summary.",
+  "nodes": [
+    {
+      "id": "f04bed71-e99c-4e86-81c8-cdeb665c9793",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        128
+      ],
+      "parameters": {
+        "public": false
+      },
+      "webhookId": "faedd808-0e97-4ef6-9056-875e1716035f"
+    },
+    {
+      "id": "06c934c5-4fe6-4ee7-a0d3-b0e4707a8b19",
+      "name": "Start",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        128
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "start-iso",
+              "name": "startIso",
+              "type": "string",
+              "value": "={{ $now.toUTC().toISO() }}"
+            },
+            {
+              "id": "req",
+              "name": "requested_by",
+              "type": "string",
+              "value": "={{ $('When chat message received').item.json.chatInput }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d62d6691-b767-44fe-8f57-0951e223b5e2",
+      "name": "Fire Workflow Suite",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "xs39cdr3D4dEtLOX"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requested_by": "={{ $('Start').item.json.requested_by }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "dff8efe1-7e68-4fb8-9bc6-a3a8398d7fa0",
+      "name": "Fire Agent Suite",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DL3GYWwlyNTaEqQA"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requested_by": "={{ $('Start').item.json.requested_by }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "ef094809-d8e1-4086-9b3a-09a83ce82cde",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        128
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "integration_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "enabled",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "3630ec63-a828-433f-9c31-f3e511ce6157",
+      "name": "Load Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        128
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "integration_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "created_at",
+              "condition": "gte",
+              "keyValue": "={{ $('Start').item.json.startIso }}"
+            }
+          ]
+        },
+        "orderBy": "created_at"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b841d394-e991-4b33-8d95-d8e80423f6ef",
+      "name": "Poll Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        48
+      ],
+      "parameters": {
+        "jsCode": "// Poll both suites' result rows (created since this run started) and report\n// per-surface landed counts. Rows are partitioned by run_id prefix.\nconst expected = $('Load Cases').all().length;\nconst seen = new Set();\nconst rows = [];\nfor (const item of $input.all()) {\n  const r = item.json;\n  if (!r || !r.run_id || !r.case_id) continue;\n  const key = r.run_id + '|' + r.case_id;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(r);\n}\nconst oldRows = rows.filter(function (r) { return String(r.run_id).indexOf('agent-integration-') !== 0; });\nconst newRows = rows.filter(function (r) { return String(r.run_id).indexOf('agent-integration-') === 0; });\nconst distCases = function (arr) { const s = new Set(); for (const r of arr) s.add(r.case_id); return s.size; };\nconst poll = ($runIndex || 0) + 1;\nreturn [{ json: {\n  expected: expected,\n  old_run_id: oldRows.length ? oldRows[0].run_id : '',\n  new_run_id: newRows.length ? newRows[0].run_id : '',\n  old_landed: distCases(oldRows),\n  new_landed: distCases(newRows),\n  polls: poll,\n  complete: distCases(oldRows) >= expected && distCases(newRows) >= expected,\n  timeout: poll >= 25,\n} }];\n"
+      }
+    },
+    {
+      "id": "e464a6da-f130-4560-ad3f-19b57a03edd5",
+      "name": "Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        48
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.complete }}",
+              "operator": {
+                "id": "c1",
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            },
+            {
+              "leftValue": "={{ $json.timeout }}",
+              "operator": {
+                "id": "c2",
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "35697cb8-1e18-4ee3-ae7f-d8c5f35373da",
+      "name": "Compare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Head-to-head comparison: workflow Darwin vs FirstClassDarwin.\n// Rows come from $('Load Results') (created since run start); run ids from Poll Check.\nconst expected = $('Load Cases').all().length;\nconst p = $input.first().json;\nconst slugs = {};\nfor (const c of $('Load Cases').all()) slugs[c.json.id] = c.json.slug;\n\nconst rows = [];\nconst seen = new Set();\nfor (const item of $('Load Results').all()) {\n  const r = item.json;\n  if (!r || !r.run_id || !r.case_id) continue;\n  const key = r.run_id + '|' + r.case_id;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(r);\n}\nconst oldRows = rows.filter(function (r) { return String(r.run_id).indexOf('agent-integration-') !== 0; });\nconst newRows = rows.filter(function (r) { return String(r.run_id).indexOf('agent-integration-') === 0; });\n\nconst byCase = {};\nconst add = function (r, side) {\n  const slug = slugs[r.case_id] || r.case_id;\n  if (!byCase[slug]) byCase[slug] = {};\n  byCase[slug][side] = r;\n};\nfor (const r of oldRows) add(r, 'workflow');\nfor (const r of newRows) add(r, 'agent');\n\nconst count = function (arr, st) { return arr.filter(function (r) { return r.status === st; }).length; };\nconst iconOf = function (st) { return st === 'pass' ? '✅' : (st === 'fail' ? '❌' : (st === 'error' ? '💥' : '—')); };\nconst cell = function (t) { return String(t).replace(/\\|/g, '\\\\|').replace(/\\n+/g, ' '); };\n\nlet totalTokens = 0;\nfor (const r of newRows) {\n  if (r.usage && typeof r.usage.totalTokens === 'number') totalTokens += r.usage.totalTokens;\n}\n\nconst lines = [];\nlines.push('## Head-to-head — workflow Darwin vs FirstClassDarwin', '');\nlines.push('Workflow run: `' + cell(p.old_run_id || 'n/a') + '` · Agent run: `' + cell(p.new_run_id || 'n/a') + '` · ' + expected + ' cases each', '');\nlines.push('| Surface | Landed | ✅ Pass | ❌ Fail | 💥 Error |');\nlines.push('| --- | --- | --- | --- | --- |');\nlines.push('| Workflow Darwin | ' + oldRows.length + ' | ' + count(oldRows, 'pass') + ' | ' + count(oldRows, 'fail') + ' | ' + count(oldRows, 'error') + ' |');\nlines.push('| FirstClassDarwin | ' + newRows.length + ' | ' + count(newRows, 'pass') + ' | ' + count(newRows, 'fail') + ' | ' + count(newRows, 'error') + ' |');\nif (totalTokens) lines.push('', 'Agent token usage: **' + totalTokens.toLocaleString() + '** total (' + newRows.length + ' cases).');\nlines.push('', '### Case-by-case', '');\nlines.push('| Case | Workflow | Agent | Verdict |');\nlines.push('| --- | --- | --- | --- |');\nconst slugsSorted = Object.keys(byCase).sort();\nlet bothPass = 0;\nconst diffs = [];\nfor (const slug of slugsSorted) {\n  const entry = byCase[slug];\n  const wst = entry.workflow ? entry.workflow.status : 'missing';\n  const ast = entry.agent ? entry.agent.status : 'missing';\n  const verdict = (wst === 'pass' && ast === 'pass') ? '✅ match' : '⚠️ ' + wst + ' vs ' + ast;\n  if (wst === 'pass' && ast === 'pass') bothPass += 1; else diffs.push(slug);\n  lines.push('| `' + cell(slug) + '` | ' + iconOf(wst) + ' ' + wst + ' | ' + iconOf(ast) + ' ' + ast + ' | ' + verdict + ' |');\n}\nif (diffs.length) lines.push('', '#### Differences', '', ...diffs.map(function (sl) { return '- `' + sl + '`'; }));\n\nconst generatedAt = new Date().toISOString();\nconst baseUrl = $vars.instance_url || 'https://darwin-staging.app.n8n.cloud';\nconst executionUrl = baseUrl + '/workflow/' + (($workflow && $workflow.id) || 'suite-head-to-head') + '/executions/' + $execution.id;\nlines.push('', '_Generated ' + generatedAt + ' · [Head-to-head execution](' + executionUrl + ')_');\n\nconst markdown = lines.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trimEnd() + '\\n';\nreturn [{ json: {\n  markdown: markdown,\n  generated_at: generatedAt,\n  execution_url: executionUrl,\n  total_cases: expected,\n  both_passed: diffs.length === 0 && bothPass === expected,\n  differing_cases: diffs,\n} }];\n"
+      }
+    },
+    {
+      "id": "052ffe3d-0ca1-40a2-a3c4-13a94f29b857",
+      "name": "format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Build Slack Block Kit markdown blocks from the Summary node's markdown output.\n// Splits long text across multiple mrkdwn blocks (3,000-char limit each),\n// up to ~90KB total serialized JSON payload to stay within Slack API limits.\n// Splits on newlines where possible. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\n\nconst PER_BLOCK = 2900;  // leave margin under Slack's 3000-char limit\nconst MAX_BLOCKS = 50;   // hard cap: Slack max 50 blocks\nconst MAX_PAYLOAD_BYTES = 90000;  // ~90KB budget for serialized { blocks: [...] }\nconst TRUNCATION_NOTE = '\\n\\n_… (truncated: response too long for a single Slack message)_';\n\nlet text = $json.markdown ?? '';\nconst fullText = text;  // preserve original for downstream use\n\n// --- Helper: estimate serialized size of a blocks array ---\nfunction estimatePayloadSize(blocksArr) {\n  // Serialize just the blocks array; the outer { \"blocks\": [...] } wrapper adds ~15 chars\n  return JSON.stringify(blocksArr).length + 20;\n}\n\n// --- Split text into chunks ---\nfunction splitIntoChunks(str, chunkSize, maxBlocks, maxBytes) {\n  const chunks = [];\n  const trialBlocks = [];\n\n  while (str.length > 0 && chunks.length < maxBlocks) {\n    if (str.length <= chunkSize) {\n      chunks.push(str);\n      trialBlocks.push({ type: 'markdown', text: str });\n      if (estimatePayloadSize(trialBlocks) > maxBytes) {\n        const removed = chunks.pop();\n        trialBlocks.pop();\n        const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n        const maxTextLen = Math.max(0, remaining - 60);\n        if (maxTextLen > 50) {\n          chunks.push(removed.slice(0, maxTextLen) + TRUNCATION_NOTE);\n        }\n      }\n      break;\n    }\n\n    // Try to find last newline within the chunk boundary\n    const sliceTarget = str.slice(0, chunkSize);\n    const lastNewline = sliceTarget.lastIndexOf('\\n');\n    let chunk;\n    if (lastNewline > chunkSize - 500) {\n      chunk = str.slice(0, lastNewline);\n      str = str.slice(lastNewline + 1);\n    } else {\n      chunk = sliceTarget;\n      str = str.slice(chunkSize);\n    }\n\n    const tentativeBlocks = [...trialBlocks, { type: 'markdown', text: chunk }];\n    if (estimatePayloadSize(tentativeBlocks) > maxBytes) {\n      const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n      const maxTextLen = Math.max(0, remaining - 60);\n      if (maxTextLen > 50) {\n        chunks.push(chunk.slice(0, maxTextLen) + TRUNCATION_NOTE);\n      }\n      break;\n    }\n\n    chunks.push(chunk);\n    trialBlocks.push({ type: 'markdown', text: chunk });\n  }\n\n  if (str.length > 0 && chunks.length === maxBlocks) {\n    chunks[chunks.length - 1] = chunks[chunks.length - 1].replace(/\\n*$/, '') + TRUNCATION_NOTE;\n  }\n\n  return chunks;\n}\n\nconst chunks = splitIntoChunks(text, PER_BLOCK, MAX_BLOCKS, MAX_PAYLOAD_BYTES);\nconst blocks = chunks.map(t => ({ type: 'markdown', text: t }));\nconst content = { blocks };\n\nreturn [{ json: { blocksJson: JSON.stringify(content), output: fullText } }];"
+      }
+    },
+    {
+      "id": "d85eb974-3c13-456e-a22e-2a8b4942120f",
+      "name": "ChunkBlocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Group the formatted blocks into message-sized chunks so no single Slack\n// message exceeds Slack's cumulative block-text limit (~13k chars, undocumented —\n// see slackapi/bolt-js#2509). Emits one item per message; Send a message then posts\n// one message per item. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\nconst MSG_BUDGET = 8000; // chars of block text per message, safe margin under ~13k\n\nconst blocksJson = $('format').first().json.blocksJson;\n\nlet blocks;\ntry {\n  blocks = JSON.parse(blocksJson).blocks;\n  if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('no blocks');\n} catch (e) {\n  // Fall back to previous single-message behaviour if parsing fails\n  return [{ json: { blocksJson, part: 1, totalParts: 1 } }];\n}\n\nconst messages = [];\nlet current = [];\nlet currentLen = 0;\n\nfor (const block of blocks) {\n  const len = (block.text || '').length;\n  if (current.length > 0 && currentLen + len > MSG_BUDGET) {\n    messages.push(current);\n    current = [];\n    currentLen = 0;\n  }\n  current.push(block);\n  currentLen += len;\n}\nif (current.length > 0) messages.push(current);\n\nreturn messages.map((msgBlocks, i) => ({\n  json: {\n    blocksJson: JSON.stringify({ blocks: msgBlocks }),\n    part: i + 1,\n    totalParts: messages.length,\n  },\n}));"
+      }
+    },
+    {
+      "id": "cbc732b7-039b-4a93-99e3-3e0ac441e35c",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2464,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09DRCJLQCE",
+          "mode": "id"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ $json.blocksJson }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "69eb9ddc-c2b8-472e-bc00-59a1df98e405"
+    },
+    {
+      "id": "443a378d-4294-4332-86b0-302c043f08cc",
+      "name": "Pace Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        224
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "7b179aa4-c3ec-4ee2-a894-b501b1279f33"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Fire Workflow Suite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fire Workflow Suite": {
+      "main": [
+        [
+          {
+            "node": "Fire Agent Suite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fire Agent Suite": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Results": {
+      "main": [
+        [
+          {
+            "node": "Poll Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Check": {
+      "main": [
+        [
+          {
+            "node": "Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete?": {
+      "main": [
+        [
+          {
+            "node": "Compare",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pace Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare": {
+      "main": [
+        [
+          {
+            "node": "format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format": {
+      "main": [
+        [
+          {
+            "node": "ChunkBlocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChunkBlocks": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace Poll": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "triggerCount": 0,
+  "versionId": "dc30739e-e615-4830-98a4-6563aacca336",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

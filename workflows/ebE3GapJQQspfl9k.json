@@ -1,6 +1,7 @@
 {
   "id": "ebE3GapJQQspfl9k",
   "name": "EvalSmokeTest",
+  "description": "Throwaway harness: runs one retrieval eval case (ss-gong-pricing) through the live Darwin agent via RetrievalDispatch. Safe to delete.",
   "nodes": [
     {
       "id": "bc9636a5-4735-4d4d-8960-9ab8c0ab5fe3",

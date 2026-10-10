@@ -1,0 +1,107 @@
+{
+  "id": "tyUnQsnXxEwQ7gb9",
+  "name": "AgentSlackPing [scratch]",
+  "description": "Basic Slack-transport probe: resolves the FirstClassDarwin bot user id via auth.test, then posts an @mention to C0BQH5S6P1P as Rob. First step toward the Slack version of the agent evals (pattern: RetrievalSlackDispatch fZ6oxWLAC7XR0Rb6).",
+  "nodes": [
+    {
+      "id": "700f3914-a8e8-429a-b105-6464490f5c30",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "d5db8a89-d919-44d8-ae55-6a78e19d7a42",
+      "name": "Get Bot Id",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        40,
+        0
+      ],
+      "parameters": {
+        "url": "https://slack.com/api/auth.test",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xp4OF6HOYzDlpIIJ",
+          "name": "n8n - FirstClassDarwin"
+        }
+      }
+    },
+    {
+      "id": "38c99f65-1682-4c2a-99e9-27b7bff510e8",
+      "name": "Tag Darwin",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0BQH5S6P1P"
+        },
+        "text": "=<@{{ $json.user_id }}> What pain points did agencies mention about MCP? Keep the answer to three bullets.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "xyfYErKBBCTrIiMl",
+          "name": "Robs Slack"
+        }
+      },
+      "webhookId": "11f3e152-5771-46d2-983b-cc0ab8c2cd34"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Get Bot Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bot Id": {
+      "main": [
+        [
+          {
+            "node": "Tag Darwin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "05fddf99-a228-4fb9-b6f1-71c4f54556e6",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

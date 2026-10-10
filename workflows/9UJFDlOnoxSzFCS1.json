@@ -1,6 +1,7 @@
 {
   "id": "9UJFDlOnoxSzFCS1",
   "name": "Slack",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -758,7 +759,7 @@
             },
             {
               "id": "031f6d63-dd26-4dec-90a6-f14dbee5f3db",
-              "leftValue": "={{ $('OnEvent').item.json.channel_type === 'im' && !$json.bot_id }}",
+              "leftValue": "={{ $('OnEvent').item.json.channel_type === 'im' && !$json.bot_id && !$json.subtype }}",
               "rightValue": "",
               "operator": {
                 "type": "boolean",
@@ -1228,7 +1229,7 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "triggerCount": 1,
-  "versionId": "db19fff0-752a-4fc2-8ab2-82288492f5f0",
+  "versionId": "700f7818-3e1d-4f1e-b4ac-499cbe52d323",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

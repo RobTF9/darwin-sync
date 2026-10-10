@@ -7,7 +7,7 @@
       "parameters": {
         "authentication": "n8nOAuth2",
         "path": "test-suites",
-        "instructions": "Test suite runners plus Slack usage inspection for the Darwin agent. run_integration_suite checks tool routing and tool results through the agent (integration_cases). run_retrieval_suite scores retrieval quality (retrieval_cases). run_consistency_suite scores cross-attempt agreement (consistency_cases). Suites run synchronously, write results to the shared testing Supabase project, and post reports to Slack; prefer one run at a time. get_darwin_messages lists initial Slack messages that involve Darwin (no replies, eval channels excluded); get_darwin_session fetches one thread's messages. Both are read-only."
+        "instructions": "Test suite runners plus Slack usage inspection for the Darwin agent. run_integration_suite checks tool routing and tool results through the agent (integration_cases). run_retrieval_suite scores retrieval quality (retrieval_cases). run_consistency_suite scores cross-attempt agreement (consistency_cases). run_agent_integration_suite / run_agent_retrieval_suite run the same cases against the FirstClassDarwin n8n Agent via messageAnAgent. run_agent_slack_suite runs the retrieval cases against the agent through the REAL Slack transport (threads in C0BQH5S6P1P; tool calls captured from sub-workflow executions). Suites run synchronously, write results to the shared testing Supabase project, and post reports to Slack; prefer one run at a time. get_darwin_messages lists initial Slack messages that involve Darwin (no replies, eval channels excluded); get_darwin_session fetches one thread's messages. Both are read-only."
       },
       "id": "14538edc-c408-478c-8cd0-fb706b1f2a2b",
       "name": "Test Suites MCP Server",
@@ -298,6 +298,170 @@
           "convertFieldsToString": false
         }
       }
+    },
+    {
+      "id": "7f56d27c-391b-4299-944f-11d9c930349d",
+      "name": "run_agent_integration_suite",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        200,
+        500
+      ],
+      "parameters": {
+        "description": "Runs the FirstClassDarwin agent integration test suite (AgentIntegrationRun). Executes every enabled case in integration_cases through the FirstClassDarwin n8n Agent (messageAnAgent), evaluates the same assertions as run_integration_suite, writes integration_results with agent='firstclassdarwin' plus usage and duration_ms, and posts a summary to Slack (#C09DRCJLQCE). Runs synchronously — a full run takes 2-8 minutes. Input: requested_by (who or what asked for the run).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DL3GYWwlyNTaEqQA"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "requested_by",
+              "id": "requested_by",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "requested_by": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('requested_by', 'Who or what requested this run, e.g. mcp or a user name.') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "0ffb57cc-cce3-4d55-8bcf-11d17129311f",
+      "name": "run_agent_retrieval_suite",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        340,
+        500
+      ],
+      "parameters": {
+        "description": "Runs the FirstClassDarwin agent retrieval eval suite (AgentRetrievalRun). Executes every enabled case in retrieval_cases through the FirstClassDarwin n8n Agent (messageAnAgent), scores with the same retrieval scorer, writes retrieval_results with mechanism='firstclassdarwin' plus usage and duration_ms, posts each case live to Slack (#C0BQH5S6P1P) as it lands, and posts the run summary to the same channel. Runs synchronously — a full run takes 3-10 minutes. Inputs: requested_by (required), category and slug (optional case filters).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "h20llAxIHDYtSF1L"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "requested_by",
+              "id": "requested_by",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "category",
+              "id": "category",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "slug",
+              "id": "slug",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "category": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('category', 'Optional: only run cases in this category. Leave empty for all.') }}",
+            "requested_by": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('requested_by', 'Who or what requested this run, e.g. mcp or a user name.') }}",
+            "slug": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('slug', 'Optional: only run the case with this slug. Leave empty for all.') }}"
+          }
+        }
+      }
+    },
+    {
+      "id": "700082e7-1cd5-4f71-97be-684929ed0dba",
+      "name": "run_agent_slack_suite",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        500
+      ],
+      "parameters": {
+        "description": "Runs the FirstClassDarwin agent retrieval eval suite through the REAL Slack transport (AgentSlackRun). Each case posts as Rob @mentioning the agent in a Slack thread; the dispatch waits for the bot reply, captures tool calls from tool sub-workflow executions via parentAgentRun.threadId, scores with the same retrieval scorer, and writes retrieval_results with mechanism='agent-slack', agent='firstclassdarwin', plus duration_ms. Posts the run summary to Slack (#C0BQH5S6P1P). Runs synchronously — a full run takes 10-30 minutes; one case 2-5 minutes. Note: node tools (get_session, get_project, firecrawl) are invisible to this capture — workflow tools only. Inputs: requested_by (required); category and slug (optional case filters); channel_id (optional, default C0BQH5S6P1P).",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1KbnPfxDRb99wCKA"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requested_by": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('requested_by', 'Who or what requested this run, e.g. mcp or a user name.') }}",
+            "category": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('category', 'Optional: only run cases in this category. Leave empty for all.') }}",
+            "slug": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('slug', 'Optional: only run the case with this slug. Leave empty for all.') }}",
+            "channel_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('channel_id', 'Slack channel for the eval threads. Empty = default C0BQH5S6P1P.') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "slug",
+              "displayName": "slug",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "channel_id",
+              "displayName": "channel_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      }
     }
   ],
   "connections": {
@@ -355,6 +519,39 @@
           }
         ]
       ]
+    },
+    "run_agent_integration_suite": {
+      "ai_tool": [
+        [
+          {
+            "node": "Test Suites MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "run_agent_retrieval_suite": {
+      "ai_tool": [
+        [
+          {
+            "node": "Test Suites MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "run_agent_slack_suite": {
+      "ai_tool": [
+        [
+          {
+            "node": "Test Suites MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -363,7 +560,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "754dc38c-c55d-4fbd-8bba-9c679057348e",
+  "versionId": "adc7cec5-ec9e-4ace-8127-1384c32fb7be",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

@@ -1,0 +1,305 @@
+{
+  "id": "YjXOYGteEjwRHSoN",
+  "name": "FanOutAgent",
+  "description": "fan_out tool for FirstClassDarwin: takes items (≤25), instruction, context; inserts fan_out_item tracking rows; fires one FanOutAgentWorker execution per item (parallel); polls every 10s until done or 15 min; returns per-item results in one payload.",
+  "nodes": [
+    {
+      "id": "f767d9ce-7a2d-4e94-a3a2-a63b587960d2",
+      "name": "Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        128
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "items"
+            },
+            {
+              "name": "instruction"
+            },
+            {
+              "name": "context"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a625e8c2-237d-418a-a2a9-c0341c3bbb8c",
+      "name": "Generate Run ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        128
+      ],
+      "parameters": {
+        "jsCode": "// Validate the batch and stamp a run id + deadline. Mirrors the old Darwin\n// FanOut (6lVlut82xPoebENQ) minus the nesting guard: children are the\n// SonOfFanOut agent, which has no fan_out tool, so nesting is impossible\n// by construction.\nconst crypto = require('crypto');\nconst runId = crypto.randomUUID();\nconst input = $input.first().json;\n\nlet items = input.items;\nif (typeof items === 'string') {\n  try { items = JSON.parse(items); } catch (e) { items = items.trim() ? [items] : []; }\n}\nif (!Array.isArray(items)) items = (items === null || items === undefined) ? [] : [items];\n\nconst MAX_ITEMS = 25;\nif (!items.length) {\n  return [{ json: { run_id: runId, blocked: true, error: 'fan_out requires a non-empty items array.' } }];\n}\nif (items.length > MAX_ITEMS) {\n  return [{ json: { run_id: runId, blocked: true, error: 'fan_out supports at most ' + MAX_ITEMS + ' items per call (got ' + items.length + '). Split into multiple calls or narrow the item list.' } }];\n}\n\nreturn [{\n  json: {\n    run_id: runId,\n    items,\n    instruction: input.instruction,\n    context: input.context || '',\n    deadline: $now.plus({ minutes: 15 }).toISO(),\n    blocked: false\n  }\n}];"
+      }
+    },
+    {
+      "id": "e8679df4-d470-4571-a4e3-8d2b058e4f1f",
+      "name": "Is Blocked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        128
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.blocked }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9aecb5b4-748e-4c15-adb0-28f3f54d650e",
+      "name": "Split Out Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        672,
+        128
+      ],
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "include": "allOtherFields",
+        "options": {
+          "destinationFieldName": "item"
+        }
+      }
+    },
+    {
+      "id": "2666b91a-163d-4f7a-b53b-22c5ba330046",
+      "name": "Insert Tracking Rows",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        128
+      ],
+      "parameters": {
+        "tableId": "fan_out_item",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "item_index",
+              "fieldValue": "={{ $itemIndex }}"
+            },
+            {
+              "fieldId": "item",
+              "fieldValue": "={{ $json.item }}"
+            },
+            {
+              "fieldId": "instruction",
+              "fieldValue": "={{ $json.instruction }}"
+            },
+            {
+              "fieldId": "context",
+              "fieldValue": "={{ $json.context }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "a39d62a7-05c7-41ae-b211-0220d5074a07",
+      "name": "Collect",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Aggregate the inserted rows into one item so the dispatcher fires ONCE.\nconst rows = $input.all();\nreturn [{ json: { run_id: $('Generate Run ID').first().json.run_id, dispatched: rows.length } }];"
+      }
+    },
+    {
+      "id": "05aa9076-7e7a-4816-92ac-ff4283af28cb",
+      "name": "Call Dispatcher",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1340,
+        0
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rSNQtJm4MSYsYUku",
+          "cachedResultName": "FanOutDispatcher"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.run_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      }
+    },
+    {
+      "id": "8d999cb6-06fa-4115-9045-a220d5676408",
+      "name": "Dispatch Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Instant tool return: the agent collects results later via fan_out_results.\nconst c = $('Collect').first().json;\nreturn [{ json: {\n  run_id: c.run_id,\n  status: 'dispatched',\n  items_dispatched: c.dispatched,\n  next_step: 'Items are processing in parallel in the background. Call wait for 90 seconds, then call fan_out_results with run_id=' + c.run_id + '. If it reports pending > 0, wait 60 more seconds and call fan_out_results again.'\n} }];"
+      }
+    }
+  ],
+  "connections": {
+    "Input": {
+      "main": [
+        [
+          {
+            "node": "Generate Run ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Run ID": {
+      "main": [
+        [
+          {
+            "node": "Is Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Blocked?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Split Out Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Items": {
+      "main": [
+        [
+          {
+            "node": "Insert Tracking Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Tracking Rows": {
+      "main": [
+        [
+          {
+            "node": "Collect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect": {
+      "main": [
+        [
+          {
+            "node": "Call Dispatcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Dispatcher": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "de99fc71-ecf9-4e3f-92ee-13c0b31aa7ba",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "NCt4R7psjj0OsNSk",
+  "isArchived": false,
+  "nodeGroups": []
+}

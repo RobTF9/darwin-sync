@@ -1,6 +1,7 @@
 {
   "id": "MLxaOYbzMS9DFoIv",
   "name": "Slack Error",
+  "description": "Error handler for the Slack trigger workflow. Fetches the failed execution's custom data (channel, thread ts, message ts), swaps the :loading: reaction for :x:, and replies in the correct thread as the bot with a link to the failed execution.",
   "nodes": [
     {
       "parameters": {},
@@ -182,7 +183,8 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
   "versionId": "90f00a65-6cc1-4372-8cc2-0a59443e0405",

@@ -1,0 +1,503 @@
+{
+  "id": "oNOnkmEJ0gW7CVyt",
+  "name": "RetrievalHeadToHead",
+  "description": "Fires the workflow Darwin retrieval suite (RetrievalRun, direct transport) and the agent retrieval suite (AgentRetrievalRun) at the same time, polls retrieval_results, and posts a case-by-case comparison with mrr and hit counts to C0BQH5S6P1P.",
+  "nodes": [
+    {
+      "id": "6176e8db-9d5b-438a-8572-a78b04986eae",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        128
+      ],
+      "parameters": {
+        "public": false
+      },
+      "webhookId": "b0e9f8fd-1d79-4f3d-8e8d-a744b152bc3e"
+    },
+    {
+      "id": "6ce5db0f-9574-464a-91ed-71015948368a",
+      "name": "Start",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        128
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "start-iso",
+              "name": "startIso",
+              "value": "={{ $now.toUTC().toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "req",
+              "name": "requested_by",
+              "value": "={{ $('When chat message received').item.json.chatInput }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "be55503a-764b-46e0-b090-c9104d1cfe68",
+      "name": "Fire Workflow Suite",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "9aoqb4qULHyuLs1K"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requested_by": "={{ $('Start').item.json.requested_by }}",
+            "transport": "direct"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "transport",
+              "displayName": "transport",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        },
+        "parameters": {
+          "workflowInputs": {
+            "value": {
+              "transport": "slack"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "7a94da06-d38c-4256-bc03-e4bca274b2c6",
+      "name": "Fire Agent Suite",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        128
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "h20llAxIHDYtSF1L"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "requested_by": "={{ $('Start').item.json.requested_by }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "requested_by",
+              "displayName": "requested_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "271f4cc5-67cf-4e58-bd3f-8d5e52e0a412",
+      "name": "Load Cases",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        128
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "retrieval_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "enabled",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "62fc4a14-efc7-40cc-8296-2151eb00e796",
+      "name": "Load Results",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        128
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "retrieval_results",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "created_at",
+              "condition": "gte",
+              "keyValue": "={{ $('Start').item.json.startIso }}"
+            }
+          ]
+        },
+        "orderBy": "created_at"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "3c023357-a1d6-4d90-b643-3316bdea2d8c",
+      "name": "Poll Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        48
+      ],
+      "parameters": {
+        "jsCode": "// Poll both retrieval suites' result rows (created since this run started).\n// Partition by run_id prefix: 'agent-retrieval-' = agent suite, else workflow suite.\nconst expected = $('Load Cases').all().length;\nconst seen = new Set();\nconst rows = [];\nfor (const item of $input.all()) {\n  const r = item.json;\n  if (!r || !r.run_id || !r.case_id) continue;\n  const key = r.run_id + '|' + r.case_id;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(r);\n}\nconst oldRows = rows.filter(function (r) { return String(r.run_id).indexOf('agent-retrieval-') !== 0; });\nconst newRows = rows.filter(function (r) { return String(r.run_id).indexOf('agent-retrieval-') === 0; });\nconst distCases = function (arr) { const set = new Set(); for (const r of arr) set.add(r.case_id); return set.size; };\nconst poll = ($runIndex || 0) + 1;\nreturn [{ json: {\n  expected: expected,\n  old_run_id: oldRows.length ? oldRows[0].run_id : '',\n  new_run_id: newRows.length ? newRows[0].run_id : '',\n  old_landed: distCases(oldRows),\n  new_landed: distCases(newRows),\n  polls: poll,\n  complete: distCases(oldRows) >= expected && distCases(newRows) >= expected,\n  timeout: poll >= 25,\n} }];\n"
+      }
+    },
+    {
+      "id": "80ede81c-c2c0-43c3-8aea-f817700b40ce",
+      "name": "Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        48
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.complete }}",
+              "operator": {
+                "id": "c1",
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            },
+            {
+              "leftValue": "={{ $json.timeout }}",
+              "operator": {
+                "id": "c2",
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0ff025dd-9403-438e-bcd7-b9bd199b3250",
+      "name": "Compare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Head-to-head retrieval comparison: workflow Darwin vs FirstClassDarwin.\nconst expected = $('Load Cases').all().length;\nconst p = $input.first().json;\nconst slugs = {};\nfor (const c of $('Load Cases').all()) slugs[c.json.id] = c.json.slug;\n\nconst rows = [];\nconst seen = new Set();\nfor (const item of $('Load Results').all()) {\n  const r = item.json;\n  if (!r || !r.run_id || !r.case_id) continue;\n  const key = r.run_id + '|' + r.case_id;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(r);\n}\nconst oldRows = rows.filter(function (r) { return String(r.run_id).indexOf('agent-retrieval-') !== 0; });\nconst newRows = rows.filter(function (r) { return String(r.run_id).indexOf('agent-retrieval-') === 0; });\n\nconst byCase = {};\nconst add = function (r, side) {\n  const slug = slugs[r.case_id] || r.case_slug || r.case_id;\n  if (!byCase[slug]) byCase[slug] = {};\n  byCase[slug][side] = r;\n};\nfor (const r of oldRows) add(r, 'workflow');\nfor (const r of newRows) add(r, 'agent');\n\nconst count = function (arr, st) { return arr.filter(function (r) { return r.status === st; }).length; };\nconst iconOf = function (st) { return st === 'pass' ? '✅' : (st === 'fail' ? '❌' : (st === 'error' ? '💥' : '—')); };\nconst cell = function (t) { return String(t).replace(/|/g, '\\|').replace(/\n+/g, ' '); };\nconst fmtNum = function (v) { return (v === null || v === undefined) ? '-' : Number(v).toFixed(2); };\nconst metricsOf = function (r) {\n  let m = r && r.metrics;\n  if (typeof m === 'string') { try { m = JSON.parse(m); } catch (e) { m = null; } }\n  return m || {};\n};\n\nlet totalTokens = 0;\nfor (const r of newRows) {\n  if (r.usage && typeof r.usage.totalTokens === 'number') totalTokens += r.usage.totalTokens;\n}\n\nconst lines = [];\nlines.push('## Retrieval head-to-head — workflow Darwin vs FirstClassDarwin', '');\nlines.push('Workflow run: `' + cell(p.old_run_id || 'n/a') + '` · Agent run: `' + cell(p.new_run_id || 'n/a') + '` · ' + expected + ' cases each', '');\nlines.push('| Surface | Landed | ✅ Pass | ❌ Fail | 💥 Error |');\nlines.push('| --- | --- | --- | --- | --- |');\nlines.push('| Workflow Darwin | ' + oldRows.length + ' | ' + count(oldRows, 'pass') + ' | ' + count(oldRows, 'fail') + ' | ' + count(oldRows, 'error') + ' |');\nlines.push('| FirstClassDarwin | ' + newRows.length + ' | ' + count(newRows, 'pass') + ' | ' + count(newRows, 'fail') + ' | ' + count(newRows, 'error') + ' |');\nif (totalTokens) lines.push('', 'Agent token usage: **' + totalTokens.toLocaleString() + '** total (' + newRows.length + ' cases).');\nlines.push('', '### Case-by-case', '');\nlines.push('| Case | Workflow | Agent | mrr wf → agent | hits wf → agent | Reason (agent) |');\nlines.push('| --- | --- | --- | --- | --- | --- |');\nconst slugsSorted = Object.keys(byCase).sort();\nlet bothPass = 0;\nconst diffs = [];\nfor (const slug of slugsSorted) {\n  const entry = byCase[slug];\n  const wst = entry.workflow ? entry.workflow.status : 'missing';\n  const ast = entry.agent ? entry.agent.status : 'missing';\n  if (wst === 'pass' && ast === 'pass') bothPass += 1; else diffs.push(slug);\n  const wm = metricsOf(entry.workflow);\n  const am = metricsOf(entry.agent);\n  const wMrr = wm.retrieval ? fmtNum(wm.retrieval.mrr) : '-';\n  const aMrr = am.retrieval ? fmtNum(am.retrieval.mrr) : '-';\n  const wHits = wm.retrieval_hits != null ? wm.retrieval_hits : '-';\n  const aHits = am.retrieval_hits != null ? am.retrieval_hits : '-';\n  const reason = am.reason && ast !== 'pass' ? cell(am.reason) : '—';\n  lines.push('| `' + cell(slug) + '` | ' + iconOf(wst) + ' ' + wst + ' | ' + iconOf(ast) + ' ' + ast + ' | ' + wMrr + ' → ' + aMrr + ' | ' + wHits + ' → ' + aHits + ' | ' + reason + ' |');\n}\nif (diffs.length) lines.push('', '#### Status differences', '', ...diffs.map(function (sl) { return '- `' + sl + '`'; }));\n\nconst generatedAt = new Date().toISOString();\nconst baseUrl = $vars.instance_url || 'https://darwin-staging.app.n8n.cloud';\nconst executionUrl = baseUrl + '/workflow/' + (($workflow && $workflow.id) || 'retrieval-head-to-head') + '/executions/' + $execution.id;\nlines.push('', '_Generated ' + generatedAt + ' · [Head-to-head execution](' + executionUrl + ')_');\n\nconst markdown = lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';\nreturn [{ json: {\n  markdown: markdown,\n  generated_at: generatedAt,\n  execution_url: executionUrl,\n  total_cases: expected,\n  both_passed: diffs.length === 0 && bothPass === expected,\n  differing_cases: diffs,\n} }];\n"
+      }
+    },
+    {
+      "id": "6844c12a-c5bf-4e33-af2b-b7ab9adcac96",
+      "name": "format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Build Slack Block Kit markdown blocks from the Summary node's markdown output.\n// Splits long text across multiple mrkdwn blocks (3,000-char limit each),\n// up to ~90KB total serialized JSON payload to stay within Slack API limits.\n// Splits on newlines where possible. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\n\nconst PER_BLOCK = 2900;  // leave margin under Slack's 3000-char limit\nconst MAX_BLOCKS = 50;   // hard cap: Slack max 50 blocks\nconst MAX_PAYLOAD_BYTES = 90000;  // ~90KB budget for serialized { blocks: [...] }\nconst TRUNCATION_NOTE = '\n\n_… (truncated: response too long for a single Slack message)_';\n\nlet text = $json.markdown ?? '';\nconst fullText = text;  // preserve original for downstream use\n\n// --- Helper: estimate serialized size of a blocks array ---\nfunction estimatePayloadSize(blocksArr) {\n  // Serialize just the blocks array; the outer { \"blocks\": [...] } wrapper adds ~15 chars\n  return JSON.stringify(blocksArr).length + 20;\n}\n\n// --- Split text into chunks ---\nfunction splitIntoChunks(str, chunkSize, maxBlocks, maxBytes) {\n  const chunks = [];\n  const trialBlocks = [];\n\n  while (str.length > 0 && chunks.length < maxBlocks) {\n    if (str.length <= chunkSize) {\n      chunks.push(str);\n      trialBlocks.push({ type: 'markdown', text: str });\n      if (estimatePayloadSize(trialBlocks) > maxBytes) {\n        const removed = chunks.pop();\n        trialBlocks.pop();\n        const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n        const maxTextLen = Math.max(0, remaining - 60);\n        if (maxTextLen > 50) {\n          chunks.push(removed.slice(0, maxTextLen) + TRUNCATION_NOTE);\n        }\n      }\n      break;\n    }\n\n    // Try to find last newline within the chunk boundary\n    const sliceTarget = str.slice(0, chunkSize);\n    const lastNewline = sliceTarget.lastIndexOf('\\n');\n    let chunk;\n    if (lastNewline > chunkSize - 500) {\n      chunk = str.slice(0, lastNewline);\n      str = str.slice(lastNewline + 1);\n    } else {\n      chunk = sliceTarget;\n      str = str.slice(chunkSize);\n    }\n\n    const tentativeBlocks = [...trialBlocks, { type: 'markdown', text: chunk }];\n    if (estimatePayloadSize(tentativeBlocks) > maxBytes) {\n      const remaining = maxBytes - estimatePayloadSize(trialBlocks);\n      const maxTextLen = Math.max(0, remaining - 60);\n      if (maxTextLen > 50) {\n        chunks.push(chunk.slice(0, maxTextLen) + TRUNCATION_NOTE);\n      }\n      break;\n    }\n\n    chunks.push(chunk);\n    trialBlocks.push({ type: 'markdown', text: chunk });\n  }\n\n  if (str.length > 0 && chunks.length === maxBlocks) {\n    chunks[chunks.length - 1] = chunks[chunks.length - 1].replace(/\\n*$/, '') + TRUNCATION_NOTE;\n  }\n\n  return chunks;\n}\n\nconst chunks = splitIntoChunks(text, PER_BLOCK, MAX_BLOCKS, MAX_PAYLOAD_BYTES);\nconst blocks = chunks.map(t => ({ type: 'markdown', text: t }));\nconst content = { blocks };\n\nreturn [{ json: { blocksJson: JSON.stringify(content), output: fullText } }];"
+      }
+    },
+    {
+      "id": "3e818b0f-857a-4b4e-9d0e-fe69b73f6992",
+      "name": "ChunkBlocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Group the formatted blocks into message-sized chunks so no single Slack\n// message exceeds Slack's cumulative block-text limit (~13k chars, undocumented —\n// see slackapi/bolt-js#2509). Emits one item per message; Send a message then posts\n// one message per item. Ported from the \"Slack\" workflow (9UJFDlOnoxSzFCS1).\nconst MSG_BUDGET = 8000; // chars of block text per message, safe margin under ~13k\n\nconst blocksJson = $('format').first().json.blocksJson;\n\nlet blocks;\ntry {\n  blocks = JSON.parse(blocksJson).blocks;\n  if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('no blocks');\n} catch (e) {\n  // Fall back to previous single-message behaviour if parsing fails\n  return [{ json: { blocksJson, part: 1, totalParts: 1 } }];\n}\n\nconst messages = [];\nlet current = [];\nlet currentLen = 0;\n\nfor (const block of blocks) {\n  const len = (block.text || '').length;\n  if (current.length > 0 && currentLen + len > MSG_BUDGET) {\n    messages.push(current);\n    current = [];\n    currentLen = 0;\n  }\n  current.push(block);\n  currentLen += len;\n}\nif (current.length > 0) messages.push(current);\n\nreturn messages.map((msgBlocks, i) => ({\n  json: {\n    blocksJson: JSON.stringify({ blocks: msgBlocks }),\n    part: i + 1,\n    totalParts: messages.length,\n  },\n}));"
+      }
+    },
+    {
+      "id": "1a8429ea-2ddf-45ee-8e07-daff70098250",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        2464,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BQH5S6P1P",
+          "mode": "id"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ $json.blocksJson }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "e06c8c47-d2d8-4285-84d3-211bb592c86c"
+    },
+    {
+      "id": "0a205933-d3e9-4bf2-8136-42a14ea78084",
+      "name": "Pace Poll",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        224
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "36e2413e-4dd7-4650-91eb-1fb630e207da"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Fire Workflow Suite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fire Workflow Suite": {
+      "main": [
+        [
+          {
+            "node": "Fire Agent Suite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fire Agent Suite": {
+      "main": [
+        [
+          {
+            "node": "Load Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Cases": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Results": {
+      "main": [
+        [
+          {
+            "node": "Poll Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Check": {
+      "main": [
+        [
+          {
+            "node": "Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete?": {
+      "main": [
+        [
+          {
+            "node": "Compare",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pace Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare": {
+      "main": [
+        [
+          {
+            "node": "format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format": {
+      "main": [
+        [
+          {
+            "node": "ChunkBlocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChunkBlocks": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pace Poll": {
+      "main": [
+        [
+          {
+            "node": "Load Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "130e8187-b9ea-409c-8208-d7a66ef99d68",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

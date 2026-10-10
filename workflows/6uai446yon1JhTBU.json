@@ -1,6 +1,7 @@
 {
   "id": "6uai446yon1JhTBU",
   "name": "UnitRead",
+  "description": "Reads Unit suite cases or results. Inputs: table (cases|results), optional case_id and run_id filters.",
   "nodes": [
     {
       "id": "18285309-8d31-4c1f-96ad-685855171725",

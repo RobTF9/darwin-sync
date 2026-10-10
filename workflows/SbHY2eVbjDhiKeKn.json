@@ -1,6 +1,7 @@
 {
   "id": "SbHY2eVbjDhiKeKn",
   "name": "TEMP - Backfill NPS Embeddings",
+  "description": "One-off backfill of embedding on the 3,779 existing nps_open_text_insights rows so they surface in search_all's nps branch. Delete after running.",
   "nodes": [
     {
       "id": "bbda27d1-0163-427b-a9f6-8405d395024a",

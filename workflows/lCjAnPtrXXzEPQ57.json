@@ -1,0 +1,73 @@
+{
+  "id": "lCjAnPtrXXzEPQ57",
+  "name": "BigQuery Credential Test",
+  "description": "One-off test: runs SELECT 1 against BigQuery with the 'BigQuery n8n Service Account' credential to check whether its service account key is valid. Safe to archive after the test.",
+  "nodes": [
+    {
+      "id": "5f4d4391-9db6-466b-bf1a-112c971922df",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "05ec67b0-172f-46bd-841a-34439e462b60",
+      "name": "BigQuery Credential Test",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "database",
+        "operation": "executeQuery",
+        "projectId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "n8n-telemetry"
+        },
+        "sqlQuery": "SELECT 1 AS ok",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "0pCOXJXMqCYd7C37",
+          "name": "BigQuery n8n Service Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "BigQuery Credential Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "ac751c57-2391-41de-81ac-e52136a480ee",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

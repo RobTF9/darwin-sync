@@ -1,0 +1,242 @@
+{
+  "id": "6qCBKpT1uBDgCnjt",
+  "name": "Linear GitHub Sync",
+  "description": "DWN-57: GitHub to Linear sync for pidgeon-head PRs. Draft PR -> In Progress, open/ready PR -> In Review, merged PR -> Done. Attaches the PR URL to the issue.",
+  "nodes": [
+    {
+      "id": "105c2a47-568a-4904-a806-3fb81f5f028c",
+      "name": "PR Events (pidgeon-head)",
+      "type": "n8n-nodes-base.githubTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "authentication": "accessToken",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "RobTF9"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "pidgeon-head"
+        },
+        "events": [
+          "pull_request"
+        ]
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "lFB4MWdiVny3tXiF",
+          "name": "Rob Github PAT"
+        }
+      },
+      "webhookId": "913a0a89-482b-4eb8-9bc2-6cb702beb8be"
+    },
+    {
+      "id": "c65ca512-6f6f-4e15-b360-896abe9c242e",
+      "name": "Map PR Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Map a GitHub pull_request event to a Linear action.\n// Output is empty when no action is needed.\nconst event = $input.first().json;\nconst body = event.body ?? event;\nconst pr = body.pull_request;\nif (!pr) return [];\nconst action = body.action;\nconst branch = (pr.head && pr.head.ref) || '';\nconst title = pr.title || '';\nconst match = branch.match(/dwn-(\\d+)/i) || title.match(/\\bDWN-(\\d+)\\b/i);\nif (!match) return [];\nconst issueNumber = Number(match[1]);\nlet targetState = null;\nif (action === 'opened' || action === 'reopened') targetState = pr.draft ? 'In Progress' : 'In Review';\nelse if (action === 'ready_for_review') targetState = 'In Review';\nelse if (action === 'converted_to_draft') targetState = 'In Progress';\nelse if (action === 'closed' && pr.merged) targetState = 'Done';\nif (!targetState) return [];\nconst graphqlQuery =\n  'query { issues(filter: { team: { key: { eq: \"DWN\" } }, number: { eq: ' + issueNumber + ' } }) ' +\n  '{ nodes { id identifier team { states { nodes { id name } } } } } }';\nreturn [{ json: { issueNumber, targetState, prUrl: pr.html_url, prTitle: title, action, graphqlQuery } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "ed43218c-f24d-47b6-bc5f-5d7596107d80",
+      "name": "Find Linear Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "linearApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.graphqlQuery }) }}"
+      },
+      "credentials": {
+        "linearApi": {
+          "id": "BwNCb3qx6rfICggx",
+          "name": "Rob Linear API"
+        }
+      }
+    },
+    {
+      "id": "2f481a73-e2d5-443b-a65f-750992074bcc",
+      "name": "Resolve Issue And State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Pick the issue UUID and the target state UUID from the GraphQL response.\nconst plan = $('Map PR Event').first().json;\nconst resp = $input.first().json;\nconst issues = (resp.data && resp.data.issues && resp.data.issues.nodes) || [];\nif (!issues.length) return [];\nconst issue = issues[0];\nconst states = (issue.team && issue.team.states && issue.team.states.nodes) || [];\nconst state = states.find((s) => s.name === plan.targetState);\nif (!state) return [];\nreturn [{ json: { issueId: issue.id, identifier: issue.identifier, stateId: state.id, prUrl: plan.prUrl, prTitle: plan.prTitle, targetState: plan.targetState } }];",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "8c608cc2-b2dd-4f3b-bdb9-4cb2dd9a3997",
+      "name": "Attach PR Link",
+      "type": "n8n-nodes-base.linear",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "addLink",
+        "authentication": "apiToken",
+        "issueId": "={{ $json.issueId }}",
+        "link": "={{ $json.prUrl }}"
+      },
+      "credentials": {
+        "linearApi": {
+          "id": "BwNCb3qx6rfICggx",
+          "name": "Rob Linear API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "be7be244-e633-4f09-9148-cf922965a61a",
+      "name": "Set Issue State",
+      "type": "n8n-nodes-base.linear",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "update",
+        "authentication": "apiToken",
+        "issueId": "={{ $('Resolve Issue And State').item.json.issueId }}",
+        "updateFields": {
+          "stateId": "={{ $('Resolve Issue And State').item.json.stateId }}"
+        }
+      },
+      "credentials": {
+        "linearApi": {
+          "id": "BwNCb3qx6rfICggx",
+          "name": "Rob Linear API"
+        }
+      }
+    },
+    {
+      "id": "0e73f644-f865-4e6f-bd00-eba0a4415256",
+      "name": "Sticky Note d652ccba",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        -96
+      ],
+      "parameters": {
+        "content": "## Linear GitHub Sync (DWN-57)\n\nGitHub -> Linear, one direction.\n\n- PR opened as draft -> In Progress\n- PR opened / ready for review -> In Review\n- PR merged -> Done\n- PR closed without merge -> no change\n- No dwn-<n> in the branch or title -> no change\n\nAlso attaches the PR URL to the issue.\nStaging stays unpublished except for the one DWN-57 test window.",
+        "color": 4,
+        "width": 608,
+        "height": 224
+      }
+    }
+  ],
+  "connections": {
+    "PR Events (pidgeon-head)": {
+      "main": [
+        [
+          {
+            "node": "Map PR Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map PR Event": {
+      "main": [
+        [
+          {
+            "node": "Find Linear Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Linear Issue": {
+      "main": [
+        [
+          {
+            "node": "Resolve Issue And State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Issue And State": {
+      "main": [
+        [
+          {
+            "node": "Attach PR Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach PR Link": {
+      "main": [
+        [
+          {
+            "node": "Set Issue State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "9d203ee6-cae4-4a72-ae12-46fbe136d143",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "1e2ec5bf-0878-472d-8fa3-8ad1d2be8a33",
+      "name": "GitHub to Linear sync",
+      "nodeIds": [
+        "c65ca512-6f6f-4e15-b360-896abe9c242e",
+        "ed43218c-f24d-47b6-bc5f-5d7596107d80",
+        "2f481a73-e2d5-443b-a65f-750992074bcc",
+        "8c608cc2-b2dd-4f3b-bdb9-4cb2dd9a3997",
+        "be7be244-e633-4f09-9148-cf922965a61a"
+      ],
+      "description": "Maps the PR event, resolves the Linear issue and state ids, attaches the PR link, sets the state"
+    }
+  ]
+}

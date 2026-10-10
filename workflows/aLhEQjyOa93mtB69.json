@@ -1,6 +1,7 @@
 {
   "id": "aLhEQjyOa93mtB69",
   "name": "UnitDispatch",
+  "description": "Unit suite worker: runs one deterministic case against a non-agent workflow (SanitizeMemory) and evaluates exact/shape assertions. Writes to Darwin Unit Results.",
   "nodes": [
     {
       "id": "76b80113-dd9a-4237-8f6f-5532fccf82dc",

@@ -1,6 +1,7 @@
 {
   "id": "YNe5hxSg68xMHmR9",
   "name": "UnitCreate",
+  "description": "Adds a case to the Darwin Unit Cases table. Inputs: case_id, target, description, inputs (JSON string), assertions (JSON string).",
   "nodes": [
     {
       "id": "96d12cc6-5122-49aa-8bf3-c2c7c4bcef1f",

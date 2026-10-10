@@ -1,0 +1,95 @@
+{
+  "id": "hPgKEHAYkl9isFsR",
+  "name": "MessageAgent Probe [scratch]",
+  "description": null,
+  "nodes": [
+    {
+      "id": "b51aa91f-d221-432a-8bf5-8e4c6933a1cb",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        16
+      ],
+      "parameters": {
+        "public": false
+      },
+      "webhookId": "64df9920-8ef5-4ead-81ba-9e8b7956f10e"
+    },
+    {
+      "id": "57c48136-04e3-4f9c-8e77-3af61ef34c20",
+      "name": "Ask Agent",
+      "type": "n8n-nodes-base.messageAnAgent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "agentSource": "referenced",
+        "agentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "MIlKy1gduEWAKJmt"
+        },
+        "message": "={{ $json.chatInput }}",
+        "advanced": {
+          "enableStreaming": false
+        }
+      }
+    },
+    {
+      "id": "3a03ce41-4602-4aa4-88d3-779e1faa8b8e",
+      "name": "Dump Shape",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        16
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const out = $input.first().json;\nconst keys = Object.keys(out);\nconst shapes = {};\nfor (const k of keys) {\n  const v = out[k];\n  if (Array.isArray(v)) { shapes[k] = 'array(' + v.length + ')'; }\n  else if (v !== null && typeof v === 'object') { shapes[k] = 'object(' + Object.keys(v).join(',') + ')'; }\n  else { shapes[k] = typeof v + ':' + String(v).slice(0, 200); }\n}\nreturn [{ json: { shapeSummary: shapes, full: out } }];"
+      }
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Ask Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Agent": {
+      "main": [
+        [
+          {
+            "node": "Dump Shape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "2941faa6-1c7c-470e-a0f7-14dc48ceff10",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

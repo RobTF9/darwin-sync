@@ -1,6 +1,7 @@
 {
   "id": "JtymOyL4Xb8feBkv",
-  "name": "MessageDarwin",
+  "name": "MessageDarwinAsync",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -198,8 +199,8 @@
             {
               "id": "ebe76eaa-5135-4122-8e71-592ecf290bc1",
               "name": "id",
-              "value": "queryId",
-              "type": "string"
+              "value": "={{ $json.id }}",
+              "type": "number"
             }
           ]
         },
@@ -336,7 +337,7 @@
     "availableInMCP": false
   },
   "triggerCount": 1,
-  "versionId": "7ad879a9-ba5a-4cd2-bf70-4fffd883200b",
+  "versionId": "019f079e-fff1-4684-9935-c87e934f7c3e",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

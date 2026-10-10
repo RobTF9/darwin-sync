@@ -1,7 +1,7 @@
 {
   "id": "NUxq8qIjfsYM4IaY",
   "name": "Wait",
-  "description": "Sub-workflow that pauses execution for a given number of seconds (capped at 300 for safety) and returns a JSON confirmation. Called as the Builder Agent's 'wait' tool.",
+  "description": "Sub-workflow that pauses execution for a given number of seconds (capped at 300 for safety) and returns a JSON confirmation. Called as Darwin's 'wait' tool.",
   "nodes": [
     {
       "parameters": {

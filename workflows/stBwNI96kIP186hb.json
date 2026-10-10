@@ -1,0 +1,383 @@
+{
+  "id": "stBwNI96kIP186hb",
+  "name": "Weekly Pain Point Sync — Darwin to Journey Mapper",
+  "description": "Reads the past week's Agents Darwin Summary Notion entries, classifies pain points per journey step with Claude, and patches index.html on GitHub",
+  "nodes": [
+    {
+      "id": "5616248c-dd48-4cc2-9910-2ad7ada1784c",
+      "name": "Weekly Friday Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                5
+              ],
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2a4b5c00-0e14-43fe-9a73-822bcbfce3c6",
+      "name": "Get Darwin Summary Child Pages",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "resource": "block",
+        "operation": "getAll",
+        "blockId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "3cc5b6e0c94f80adbe93d0aacb7d0e35",
+          "cachedResultName": "Agents Darwin Summary"
+        },
+        "returnAll": true,
+        "simplifyOutput": false
+      }
+    },
+    {
+      "id": "3fa7d655-6fd5-40c5-89a3-9d6572876d79",
+      "name": "Filter Recent Entries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst withMeta = items.map((item) => {\n  const json = item.json;\n  const title = (json.child_page && json.child_page.title) || json.content || '';\n  return { id: json.id, title: title, created_time: json.created_time || null };\n});\nconst dated = withMeta.filter((entry) => entry.created_time);\nconst sourceList = dated.length > 0 ? dated : withMeta;\nsourceList.sort((a, b) => (a.created_time && b.created_time) ? new Date(a.created_time) - new Date(b.created_time) : 0);\nconst recent = sourceList.slice(-7);\nreturn recent.map((entry) => ({ json: entry }));"
+      }
+    },
+    {
+      "id": "86e02574-f29f-453e-aa70-076282e1bfd5",
+      "name": "Get Daily Summary Markdown",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "resource": "page",
+        "operation": "getMarkdown",
+        "pageId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        }
+      }
+    },
+    {
+      "id": "b27a9c3e-6625-490b-b67e-445798a16aa5",
+      "name": "Aggregate Weekly Notes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const markdownItems = $input.all();\nconst meta = $('Filter Recent Entries').all();\nconst sections = markdownItems.map((item, idx) => {\n  const title = (meta[idx] && meta[idx].json.title) || 'Untitled';\n  const markdown = item.json.markdown || '';\n  return '## ' + title + '\\n\\n' + markdown;\n});\nconst combined = sections.join('\\n\\n---\\n\\n');\nreturn [{ json: { combinedMarkdown: combined, entryCount: sections.length } }];"
+      }
+    },
+    {
+      "id": "223c660d-b9c2-4c1c-9c06-c81855c003fd",
+      "name": "Classify Pain Points by Journey Step",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        1740,
+        300
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-3-5-sonnet-20241022"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "={{ $json.combinedMarkdown }}"
+            }
+          ]
+        },
+        "options": {
+          "system": "You are analyzing a week of daily research summaries about n8n's Agents feature, gathered from user research sessions, Slack discussions, sales calls, support tickets, and forum posts. Each summary is labeled by its date.\n\nYour job: identify the current pain points users have with the Agents feature, and map each one to the correct step of the user's journey. The six journey steps are:\n1. Discovery\n2. Create\n3. Configure\n4. Test\n5. Publish\n6. Activate\n\nFor each step (1-6), write a short pain-point summary (1-2 terse, third-person sentences, in the style of: \"Users want preview chat to show both test and production agent sessions, plus read-only access to external sessions.\") ONLY if the week's notes contain a real, specific pain point for that step. If no pain point is mentioned for a step, use an empty string for it.\n\nRespond with ONLY a raw JSON object, no markdown code fences, no commentary, in exactly this shape:\n{\"1\": \"...\", \"2\": \"...\", \"3\": \"...\", \"4\": \"...\", \"5\": \"...\", \"6\": \"...\"}",
+          "maxTokens": 1024,
+          "temperature": 0.3
+        }
+      }
+    },
+    {
+      "id": "ff53ddf2-c6b9-4972-b624-679dc3c57411",
+      "name": "Build HTML Snippets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const raw = $input.first().json;\nlet text = raw.content || raw.text || raw.output || raw.completion || '';\nif (Array.isArray(text)) {\n  text = text.map((block) => (block && block.text) || '').join('');\n}\ntext = String(text).trim();\nif (text.startsWith('```')) {\n  text = text.replace(/^```[a-zA-Z]*\\n/, '').replace(/```$/, '').trim();\n}\nlet parsed = {};\ntry {\n  parsed = JSON.parse(text);\n} catch (e) {\n  parsed = {};\n}\nconst escapeHtml = (str) => String(str)\n  .replace(/&/g, '&amp;')\n  .replace(/</g, '&lt;')\n  .replace(/>/g, '&gt;');\nconst buildCell = (stepNum, value) => {\n  if (!value || !String(value).trim()) {\n    return '<div class=\"cell empty\" data-pain-step=\"' + stepNum + '\">&mdash;</div>';\n  }\n  const safe = escapeHtml(String(value).trim());\n  return '<div class=\"cell pain\" data-pain-step=\"' + stepNum + '\">\\n' +\n    '  <div class=\"cell-tag\"><span class=\"emoji\">\\uD83D\\uDE23</span>Pain point</div>\\n' +\n    '  <div class=\"clamp\">\\n    <ul>\\n      <li>' + safe + '</li>\\n    </ul>\\n  </div>\\n' +\n    '  <button class=\"more-btn\" type=\"button\">More</button>\\n</div>';\n};\nconst cells = {};\nfor (let i = 1; i <= 6; i++) {\n  cells['painCell' + i] = buildCell(i, parsed[String(i)] || '');\n}\nconst now = new Date();\nconst lastIngested = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });\nconst next = new Date(now);\nconst daysUntilFriday = (5 - now.getDay() + 7) % 7 || 7;\nnext.setDate(now.getDate() + daysUntilFriday);\nconst weekday = next.toLocaleDateString('en-US', { weekday: 'short' });\nconst nextUpdate = weekday + ' ' + next.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });\nconst result = { lastIngested: lastIngested, nextUpdate: nextUpdate };\nfor (const key in cells) { result[key] = cells[key]; }\nreturn [{ json: result }];"
+      }
+    },
+    {
+      "id": "535d24ac-d987-4bd9-91be-8abcedf4820c",
+      "name": "Get Current index.html",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        2340,
+        300
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "martinan8n"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "User-Journey-Mapper"
+        },
+        "filePath": "index.html",
+        "asBinaryProperty": false,
+        "authentication": "accessToken"
+      },
+      "webhookId": "8362dfba-d88c-4af5-a827-6c12ff6ccd20"
+    },
+    {
+      "id": "ac8ad1f4-a878-4499-bfb5-816878847404",
+      "name": "Patch Pain Cells and Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const fileJson = $input.first().json;\nconst encoded = fileJson.content || '';\nconst decoded = Buffer.from(encoded, 'base64').toString('utf-8');\nconst snippets = $('Build HTML Snippets').first().json;\nlet html = decoded;\nfor (let i = 1; i <= 6; i++) {\n  const marker = 'PAIN_CELL:' + i;\n  const pattern = new RegExp('<!-- ' + marker + ' -->[\\\\s\\\\S]*?<!-- /' + marker + ' -->', 'm');\n  const replacement = '<!-- ' + marker + ' -->' + snippets['painCell' + i] + '<!-- /' + marker + ' -->';\n  html = html.replace(pattern, replacement);\n}\nconst lastPattern = /<!-- LAST_INGESTED -->[\\s\\S]*?<!-- \\/LAST_INGESTED -->/m;\nhtml = html.replace(lastPattern, '<!-- LAST_INGESTED --><b>' + snippets.lastIngested + '</b><!-- /LAST_INGESTED -->');\nconst nextPattern = /<!-- NEXT_UPDATE -->[\\s\\S]*?<!-- \\/NEXT_UPDATE -->/m;\nhtml = html.replace(nextPattern, '<!-- NEXT_UPDATE --><b>' + snippets.nextUpdate + '</b><!-- /NEXT_UPDATE -->');\nreturn [{ json: { newContent: html } }];"
+      }
+    },
+    {
+      "id": "5908d6d0-12e7-462d-8bd2-f590ffe6386f",
+      "name": "Commit Updated index.html",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        2940,
+        300
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "martinan8n"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "User-Journey-Mapper"
+        },
+        "filePath": "index.html",
+        "fileContent": "={{ $json.newContent }}",
+        "commitMessage": "=Weekly pain-point sync from Agents Darwin Summary ({{ $now.toFormat(\"dd MMM yyyy\") }})",
+        "authentication": "accessToken"
+      },
+      "webhookId": "ea86e271-0254-4f5d-8819-2ba48ae6025e"
+    },
+    {
+      "id": "78fb97c7-46b8-46ac-a338-f46b9ba562dc",
+      "name": "Sticky Note 0428bfbe",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ],
+      "parameters": {
+        "content": "## Weekly Pain Point Sync\nReads the past week's daily entries from the \"Agents Darwin Summary\" Notion page (filled by the \"Daily Agent Insights from Darwin\" workflow), classifies pain points per journey step with Claude, and patches the 6 pain-point cells + header dates directly into index.html on GitHub.\n\n**Setup needed:** attach a GitHub credential (Personal Access Token with repo write scope) to the two GitHub nodes before activating.",
+        "color": 4
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Friday Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Darwin Summary Child Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Darwin Summary Child Pages": {
+      "main": [
+        [
+          {
+            "node": "Filter Recent Entries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Recent Entries": {
+      "main": [
+        [
+          {
+            "node": "Get Daily Summary Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Daily Summary Markdown": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Weekly Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Weekly Notes": {
+      "main": [
+        [
+          {
+            "node": "Classify Pain Points by Journey Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Pain Points by Journey Step": {
+      "main": [
+        [
+          {
+            "node": "Build HTML Snippets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build HTML Snippets": {
+      "main": [
+        [
+          {
+            "node": "Get Current index.html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current index.html": {
+      "main": [
+        [
+          {
+            "node": "Patch Pain Cells and Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patch Pain Cells and Dates": {
+      "main": [
+        [
+          {
+            "node": "Commit Updated index.html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "3cf33548-f53b-4f38-90c1-79e7f1a10e16",
+  "owner": {
+    "type": "personal",
+    "projectId": "LmJG224lgqtgbrOT",
+    "projectName": "martina.perez@n8n.io Martina <martina.perez@n8n.io>",
+    "personalEmail": "martina.perez@n8n.io"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": [
+    {
+      "id": "6aeb3090-8758-489c-a8d3-20a63b3a2d6d",
+      "name": "Fetch & Aggregate Weekly Notes",
+      "nodeIds": [
+        "2a4b5c00-0e14-43fe-9a73-822bcbfce3c6",
+        "3fa7d655-6fd5-40c5-89a3-9d6572876d79",
+        "86e02574-f29f-453e-aa70-076282e1bfd5",
+        "b27a9c3e-6625-490b-b67e-445798a16aa5"
+      ],
+      "description": "Pulls the past week's daily Darwin summary pages from Notion and combines their markdown into one text block"
+    },
+    {
+      "id": "d87b5bc5-4d45-45da-a810-d692b2caefb4",
+      "name": "Classify & Build HTML",
+      "nodeIds": [
+        "223c660d-b9c2-4c1c-9c06-c81855c003fd",
+        "ff53ddf2-c6b9-4972-b624-679dc3c57411"
+      ],
+      "description": "Uses Claude to map the week's insights to journey steps, then builds the replacement pain-cell markup"
+    },
+    {
+      "id": "26c35e16-cd13-4965-a957-8a895c5055c2",
+      "name": "Patch & Commit to GitHub",
+      "nodeIds": [
+        "535d24ac-d987-4bd9-91be-8abcedf4820c",
+        "ac8ad1f4-a878-4499-bfb5-816878847404",
+        "5908d6d0-12e7-462d-8bd2-f590ffe6386f"
+      ],
+      "description": "Fetches index.html, replaces the marked pain-cell and date sections, and commits the update"
+    }
+  ]
+}

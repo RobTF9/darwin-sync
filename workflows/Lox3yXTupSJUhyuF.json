@@ -1,0 +1,96 @@
+{
+  "id": "Lox3yXTupSJUhyuF",
+  "name": "Darwin Sessions Ingest: Calendly Trigger",
+  "description": "Calendly org-scope trigger for Darwin Sessions Ingest. Production only, never publish on staging. DWN-6.",
+  "nodes": [
+    {
+      "parameters": {
+        "scope": "organization",
+        "events": [
+          "invitee.created",
+          "invitee.canceled"
+        ]
+      },
+      "id": "92b1f60f-ee0b-42b4-b351-7f6af896ceca",
+      "name": "Calendly Invitee Events",
+      "type": "n8n-nodes-base.calendlyTrigger",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "1fefa7c6-a46d-4ee0-b150-256124871bf3",
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "ijutlu3XwjDml6uu",
+          "name": "Calendly account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BroGfMZ821FTfWSE",
+          "cachedResultName": "Darwin Sessions Ingest (Calendly)"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "5f35bf05-6774-41a9-ae5a-1733c2b194d4",
+      "name": "Run Sessions Ingest",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Darwin Sessions Ingest: Calendly Trigger\nReceives every invitee.created / invitee.canceled in the research Calendly organization and passes it to **Darwin Sessions Ingest (Calendly)**.\n\n**Production only. Never publish on staging** (AGENTS.md: no live ingestion on staging). Publishing registers an organization-scope Calendly webhook.\n\nAt go-live: run next to Darwin CD Ingest (Calendly) for a few days, compare rows, then retire the old one.",
+        "height": 304,
+        "color": 3
+      },
+      "id": "eb9c9c9c-7047-4cac-b289-dfa0764aad51",
+      "name": "Sticky Note fdecbfca",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        48,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "Calendly Invitee Events": {
+      "main": [
+        [
+          {
+            "node": "Run Sessions Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "9efb5cfb-691d-4c58-a248-5bf69314f6f4",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,6 +1,7 @@
 {
   "id": "mkmatZZHcWjQBZLF",
   "name": "TEMP - Research Calls",
+  "description": "TEMP workflow: fetches last year of Slack messages from channel C035KDLD6MP, filters for gong.io/pidgeonhead links, counts per user and computes percentage, outputs an HTML table.",
   "nodes": [
     {
       "id": "26c4bb22-6be3-471f-ae5d-ad2826462df4",

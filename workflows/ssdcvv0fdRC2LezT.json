@@ -1,0 +1,541 @@
+{
+  "id": "ssdcvv0fdRC2LezT",
+  "name": "Qontext Fold",
+  "description": "Qontext PoC: fold agent. Session record -> topic choice (LLM, firm strictness) -> hybrid-search read -> fold (LLM) -> PUT /v1/files/{id}/content.",
+  "nodes": [
+    {
+      "id": "1307569c-6784-476a-9a95-c57c899fd2af",
+      "name": "Start Fold",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "5dd0decd-fa77-4669-a6ae-bd5338bfcd08",
+      "name": "Fetch Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        420,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, participant_name, role, company_type, session_summary, created_at FROM session WHERE approved = true AND session_summary IS NOT NULL ORDER BY created_at DESC LIMIT 1"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "1dabc085-1015-417d-b702-b4e47650f5f0",
+      "name": "List Topic Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        620,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.qontext.ai/v1/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qontextApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "path_prefix",
+              "value": "/Product-Design/Topics"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "qontextApi": {
+          "id": "hzNNio0zP5yj4Cg5",
+          "name": "Qontext account"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "2f73bd54-0441-4578-af9f-8a5d0d44e62d",
+      "name": "Build Fold Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const session = $('Fetch Session').first().json;\nconst list = $input.first().json;\nconst files = (list.data || []).filter(f => f.name && !f.name.startsWith('.'));\nconst topics = files.map(f => ({ id: f.id, path: f.path, name: f.name, lastChangeId: f.lastChangeId }));\nif (topics.length === 0) { throw new Error('No topic files found under /Product-Design/Topics'); }\nconst deepLink = 'https://pidgeonhead.netlify.app/sessions/' + session.id;\nconst recordText = [\n  'Participant: ' + (session.participant_name || 'Unknown'),\n  'Role: ' + (session.role || 'Unknown'),\n  'Company type: ' + (session.company_type || 'Unknown'),\n  'Session date: ' + session.created_at,\n  'Deep link (copy exactly): ' + deepLink,\n  'Session summary: ' + session.session_summary\n].join('\\n');\nconst topicsText = topics.map(t => '- ' + t.path).join('\\n');\nreturn [{ json: { topics, recordText, topicsText } }];"
+      }
+    },
+    {
+      "id": "212590b3-7b1f-41ab-b6b3-c7b4331038d8",
+      "name": "Choose Topic",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1040,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "hasOutputParser": true,
+        "text": "=You are the placement step for a research knowledge base.\nThe folder /Product-Design/Topics has firm strictness: act only when the fit is unambiguous.\nOne file exists for each topic. You must not invent a new topic.\n\nTopic files:\n{{ $json.topicsText }}\n\nNew record:\n{{ $json.recordText }}\n\nTask: choose the one topic file that this record clearly belongs to.\nIf no file is an unambiguous fit, return decision \"skip\" with an empty path and the reason.\nIf one file fits, return decision \"update\", the exact path, and the reason."
+      }
+    },
+    {
+      "id": "4585efef-0b78-4222-985c-efde3825bbd4",
+      "name": "Choose Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        960,
+        520
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "id": "83bc1d6a-cdc2-413d-a99d-5c36a98a3200",
+      "name": "Choose Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        520
+      ],
+      "parameters": {
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{ \"decision\": \"update\", \"path\": \"/Product-Design/Topics/error-handling.md\", \"reason\": \"short reason\" }"
+      }
+    },
+    {
+      "id": "ee38b194-025e-421e-9a19-de3e92488832",
+      "name": "Is Update",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1260,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output.decision }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "update"
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d2cfe761-a7c0-4ff8-999f-e9e73c833b0e",
+      "name": "Fetch Current Body",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.qontext.ai/v1/search/hybrid",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qontextApi",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"query\": $(\"Choose Topic\").item.json.output.path.split(\"/\").pop().replace(\".md\", \"\").split(\"-\").join(\" \"), \"limit\": 10, \"includeSources\": true } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "qontextApi": {
+          "id": "hzNNio0zP5yj4Cg5",
+          "name": "Qontext account"
+        }
+      }
+    },
+    {
+      "id": "fd2923e0-cb0e-4c60-aa96-b5e0728b7dd4",
+      "name": "Assemble Fold Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const chosen = $('Choose Topic').first().json.output;\nconst build = $('Build Fold Input').first().json;\nconst search = $input.first().json;\nconst hit = (search.data || []).find(r => r.source && r.source.path === chosen.path);\nif (!hit) { throw new Error('Hybrid search did not return the chosen file: ' + chosen.path); }\nconst topic = build.topics.find(t => t.path === chosen.path);\nif (!topic) { throw new Error('Chosen path is not a listed topic file: ' + chosen.path); }\nreturn [{ json: { fileId: topic.id, baseChangeId: topic.lastChangeId, chosenPath: chosen.path, currentBody: hit.text, recordText: build.recordText } }];"
+      }
+    },
+    {
+      "id": "1a172b41-12cc-4605-a3b9-aa5fdbdbd6fc",
+      "name": "Fold Record",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1920,
+        180
+      ],
+      "parameters": {
+        "promptType": "define",
+        "hasOutputParser": true,
+        "text": "=You maintain a topic file in a research knowledge base.\nRules:\n- Keep the four sections: Summary, What we've heard, Key evidence, Open questions.\n- Fold the new record into the sections. Do not append the raw record.\n- Copy the deep link exactly. Do not change any existing link.\n- Do not delete existing evidence or links.\n- Replace \"None recorded yet.\" when you add the first content to a section.\n- Where sources do not agree, keep the newest fact and record the conflict.\n\nCurrent file content:\n{{ $json.currentBody }}\n\nNew record:\n{{ $json.recordText }}\n\nReturn the full new Markdown body of the file in the newBody field."
+      }
+    },
+    {
+      "id": "a2d83f51-c9bd-4eab-8079-6de6261ac269",
+      "name": "Fold Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        1840,
+        420
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "maxTokensToSample": 8192
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "KjwErAoYcKCgdksp",
+          "name": "Anthropic"
+        }
+      }
+    },
+    {
+      "id": "fa92ca55-3835-4359-83b7-d02fad7bf4bd",
+      "name": "Fold Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2000,
+        420
+      ],
+      "parameters": {
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{ \"newBody\": \"# Topic\\n\\n## Summary\\nText\" }"
+      }
+    },
+    {
+      "id": "320d9f72-78bc-459a-a5d1-3ab5667f6a83",
+      "name": "Write File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2140,
+        180
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.qontext.ai/v1/files/{{ $(\"Assemble Fold Context\").item.json.fileId }}/content",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qontextApi",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"baseChangeId\": $(\"Assemble Fold Context\").item.json.baseChangeId, \"content\": $json.output.newBody } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "qontextApi": {
+          "id": "hzNNio0zP5yj4Cg5",
+          "name": "Qontext account"
+        }
+      }
+    },
+    {
+      "id": "ce505480-294c-45eb-81cf-09f7189aeb9a",
+      "name": "Report Update",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2360,
+        180
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "u1",
+              "name": "result",
+              "value": "updated",
+              "type": "string"
+            },
+            {
+              "id": "u2",
+              "name": "path",
+              "value": "={{ $(\"Assemble Fold Context\").item.json.chosenPath }}",
+              "type": "string"
+            },
+            {
+              "id": "u3",
+              "name": "newChangeId",
+              "value": "={{ $json.file ? $json.file.lastChangeId : \"blocked\" }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "30af8da0-33a0-4514-b8eb-8fe25a232a66",
+      "name": "Report Skip",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1480,
+        460
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "result",
+              "value": "skip",
+              "type": "string"
+            },
+            {
+              "id": "r2",
+              "name": "reason",
+              "value": "={{ $json.output.reason }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Fold": {
+      "main": [
+        [
+          {
+            "node": "Fetch Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Session": {
+      "main": [
+        [
+          {
+            "node": "List Topic Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Topic Files": {
+      "main": [
+        [
+          {
+            "node": "Build Fold Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Fold Input": {
+      "main": [
+        [
+          {
+            "node": "Choose Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Topic": {
+      "main": [
+        [
+          {
+            "node": "Is Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Choose Topic",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Choose Topic",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Update": {
+      "main": [
+        [
+          {
+            "node": "Fetch Current Body",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Current Body": {
+      "main": [
+        [
+          {
+            "node": "Assemble Fold Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Fold Context": {
+      "main": [
+        [
+          {
+            "node": "Fold Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fold Record": {
+      "main": [
+        [
+          {
+            "node": "Write File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fold Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Fold Record",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fold Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Fold Record",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write File": {
+      "main": [
+        [
+          {
+            "node": "Report Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "48ed170b-e36f-49df-8ee0-630dd2854a0a",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": true,
+  "nodeGroups": []
+}

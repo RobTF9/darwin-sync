@@ -1,6 +1,7 @@
 {
   "id": "rumdVx3DhGQfUtgy",
   "name": "TEMP - Slack Research Call Links Per User",
+  "description": "TEMP diagnostic workflow: fetches ~1 year of messages from Slack channel C035KDLD6MP, filters for research call links, counts per user, outputs percentage distribution. Manual trigger only, not activated.",
   "nodes": [
     {
       "id": "eb12285c-31d6-4fa9-9380-c7ea53bdeb4e",

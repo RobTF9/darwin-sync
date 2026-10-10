@@ -103,8 +103,8 @@
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
       "typeVersion": 1.4,
       "position": [
-        -1896,
-        -488
+        -1904,
+        -496
       ],
       "credentials": {
         "postgres": {
@@ -152,8 +152,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -872,
-        -488
+        -880,
+        -496
       ]
     },
     {
@@ -169,8 +169,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -1768,
-        -488
+        -1776,
+        -496
       ],
       "credentials": {
         "postgres": {
@@ -192,8 +192,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.6,
       "position": [
-        -1640,
-        -488
+        -1648,
+        -496
       ],
       "credentials": {
         "postgres": {
@@ -241,8 +241,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1512,
-        -488
+        -1520,
+        -496
       ]
     },
     {
@@ -284,8 +284,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1384,
-        -488
+        -1392,
+        -496
       ]
     },
     {
@@ -382,8 +382,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1256,
-        -488
+        -1264,
+        -496
       ]
     },
     {
@@ -456,8 +456,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1128,
-        -488
+        -1136,
+        -496
       ]
     },
     {
@@ -519,8 +519,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -1000,
-        -488
+        -1008,
+        -496
       ]
     },
     {
@@ -560,9 +560,10 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -744,
-        -488
-      ]
+        -752,
+        -496
+      ],
+      "disabled": true
     },
     {
       "parameters": {
@@ -603,8 +604,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -616,
-        -488
+        -624,
+        -496
       ]
     },
     {
@@ -723,8 +724,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -488,
-        -488
+        -496,
+        -496
       ]
     },
     {
@@ -786,8 +787,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -360,
-        -488
+        -368,
+        -496
       ]
     },
     {
@@ -846,8 +847,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -232,
-        -488
+        -240,
+        -496
       ]
     },
     {
@@ -1002,8 +1003,8 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        -104,
-        -488
+        -112,
+        -496
       ]
     },
     {
@@ -1098,8 +1099,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.5,
       "position": [
-        -2024,
-        -488
+        -2032,
+        -496
       ],
       "id": "6bfe6118-fefa-43b6-8506-81478753a5e1",
       "name": "Fallback",
@@ -1118,8 +1119,8 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
       "typeVersion": 1,
       "position": [
-        -2152,
-        -488
+        -2160,
+        -496
       ],
       "id": "55df5ffa-4f9d-445a-9ffe-4b35d5fea2bf",
       "name": "Main",
@@ -1143,8 +1144,8 @@
       "type": "n8n-nodes-base.postgresTool",
       "typeVersion": 2.7,
       "position": [
-        24,
-        -488
+        32,
+        -496
       ],
       "credentials": {
         "postgres": {
@@ -1167,8 +1168,8 @@
       "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
       "typeVersion": 1,
       "position": [
-        152,
-        -488
+        160,
+        -496
       ],
       "credentials": {
         "firecrawlApi": {
@@ -1198,8 +1199,8 @@
       "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
       "typeVersion": 1,
       "position": [
-        280,
-        -488
+        288,
+        -496
       ],
       "credentials": {
         "firecrawlApi": {
@@ -1223,8 +1224,8 @@
       "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
       "typeVersion": 1,
       "position": [
-        408,
-        -488
+        416,
+        -496
       ],
       "credentials": {
         "firecrawlApi": {
@@ -1252,8 +1253,8 @@
       "type": "@mendable/n8n-nodes-firecrawl.firecrawlTool",
       "typeVersion": 1,
       "position": [
-        536,
-        -488
+        544,
+        -496
       ],
       "credentials": {
         "firecrawlApi": {
@@ -1264,18 +1265,19 @@
     },
     {
       "parameters": {
-        "description": "Closes a research project: runs the full project analysis pipeline (per-session question extraction, per-question insights, project-level insight synthesis) and then DMs the requester a PidgeonHead review link. Long-running (10-60 min) and costly - it starts async and this tool returns immediately with a status message.\n\nUse ONLY when the user explicitly asks to close, finalise, or wrap up a research project. NEVER call it twice for the same request. If the project name is ambiguous, the tool returns the candidate list - ask the user to pick one, do not guess.\n\nParameters:\n- project_name (string): name of the project to close (exact or partial). Preferred.\n- project_id (string, optional): exact project UUID if already known.\nSlack context (requester, channel, thread) attaches automatically - never ask for it.\n\nReturns { success, message, run_id? }. Relay the message to the user in one short sentence.",
+        "description": "Closes a research project: runs the full project analysis pipeline (per-session question extraction, per-question insights, project-level insight synthesis) and then DMs the requester a PidgeonHead review link. Long-running (10-60 min) and costly - it starts async and this tool returns immediately with a status message.\n\nUse ONLY when the user explicitly asks to close, finalise, or wrap up a research project. NEVER call it twice for the same request.\n\nYou MUST resolve the project to its exact UUID BEFORE calling this tool. Use ls (projects) or get_project to find the project and read its id. If you cannot find an unambiguous match, ask the user to clarify - never guess an id and never pass a name through project_id.\n\nParameters:\n- project_id (string, required): the exact project UUID, resolved beforehand via ls or get_project. Never a name.\n- project_name (string, optional): the name as shown in the corpus, for confirmation context only. Not used for matching.\nSlack context (requester, channel, thread) attaches automatically - never ask for it.\n\nReturns { success, message, run_id? }. Relay the message to the user in one short sentence.",
         "workflowId": {
           "__rl": true,
           "value": "8Ed1uK8SZkKaXNLo",
           "mode": "list",
-          "cachedResultName": "Darwin — ProjectClose"
+          "cachedResultUrl": "/workflow/8Ed1uK8SZkKaXNLo",
+          "cachedResultName": "Darwin - ProjectClose"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "project_id": "={{ $fromAI('project_id', 'Exact project UUID, only if already known. Otherwise leave empty and use project_name.', 'string') }}",
-            "project_name": "={{ $fromAI('project_name', 'Name of the research project to close (exact or partial).', 'string') }}",
+            "project_id": "={{ $fromAI('project_id', 'The exact project UUID, resolved beforehand via ls or get_project. Never a name. Never guessed.', 'string') }}",
+            "project_name": "={{ $fromAI('project_name', 'The project name from the corpus, for confirmation context only. Not used for matching.', 'string') }}",
             "slack_user_id": "={{ $('Sub').item.json.user }}",
             "slack_channel_id": "={{ $('Sub').item.json.channel }}",
             "slack_thread_ts": "={{ $('Sub').item.json.thread_ts }}"
@@ -1285,7 +1287,7 @@
             {
               "id": "project_id",
               "displayName": "project_id",
-              "required": false,
+              "required": true,
               "defaultMatch": false,
               "display": true,
               "canBeUsedToMatch": true,
@@ -1340,19 +1342,11 @@
       "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
       "typeVersion": 2.2,
       "position": [
-        664,
-        -488
+        672,
+        -496
       ]
     },
     {
-      "id": "d2525beb-3abd-4c2c-8f26-52060282f299",
-      "name": "session_followup",
-      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
-      "typeVersion": 2.2,
-      "position": [
-        880,
-        -488
-      ],
       "parameters": {
         "description": "Manual path for post-session follow-up (participant attendance and rewards). Use when the user wants to send a reward for a past research session, says they forgot to answer Darwin about a session, or wants to confirm whether a participant joined a session. The Slack user attaches automatically: never ask for it.\n\nCall it first WITHOUT session_number. If it returns action \"list\", show the numbered list exactly as given and ask which one; then call it again with session_number set to the number the user picked. If it returns action \"followup\" or \"reward\", the DM has already been sent.\n\nParameters:\n- session_number (number, optional): the number from the list the tool returned. Leave empty on the first call.\n\nReturns { response, action, sessions }. Relay the response to the user in one short sentence (or the list as given). Never invent sessions.",
         "workflowId": {
@@ -1401,7 +1395,15 @@
             }
           ]
         }
-      }
+      },
+      "id": "d2525beb-3abd-4c2c-8f26-52060282f299",
+      "name": "session_followup",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        -496
+      ]
     }
   ],
   "connections": {
@@ -1762,7 +1764,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "cf198c2e-a4b5-43ef-aba7-bb456ee67066",
+  "versionId": "edd0c549-1c79-4fb1-b8a8-ec7c7964134f",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

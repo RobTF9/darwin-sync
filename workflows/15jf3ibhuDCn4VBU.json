@@ -1,0 +1,108 @@
+{
+  "id": "15jf3ibhuDCn4VBU",
+  "name": "PF Mock Booking",
+  "description": "Creates fake Calendly bookings (host Aniol, participants aniol.moner+pN) through PF Calendly Capture. Manual only. DWN-6.",
+  "nodes": [
+    {
+      "id": "fc06f388-a3e0-4448-972d-297222f550d8",
+      "name": "Create Mock Bookings",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9460437b-706f-4d3a-8cc4-b0f06b48e88b",
+      "name": "Mock Booking Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// PF Mock Booking: edit the list below, then run the workflow.\n// Each entry makes one fake Calendly booking and sends it through PF Calendly Capture.\n//   p:        participant number -> email aniol.moner+p<N>@n8n.io, name \"<first name> Mock\"\n//   startIn:  minutes from now until the session starts\n//   duration: session length in minutes\n//   kind:     'research' | 'continuous_discovery' | 'uxr_recruiting'\nconst bookings = [\n  { p: 5, startIn: -2, duration: 4, kind: 'continuous_discovery' },\n];\n\nconst RR = 'https://api.calendly.com/event_types/ebd64db8-7c09-4e31-bc2e-339065fbb930';\nconst RESEARCH_ET = 'https://api.calendly.com/event_types/MOCK-ET-RESEARCH';\nconst runId = $now.toFormat('yyyyLLdd-HHmmss');\nconst names = ['Alex', 'Bea', 'Cris', 'Dani', 'Eli', 'Fran', 'Gal', 'Hugo', 'Iris', 'Jon'];\n\nreturn bookings.map((b) => {\n  const code = `${runId}-P${b.p}`;\n  const start = $now.plus({ minutes: b.startIn }).startOf('second');\n  const end = start.plus({ minutes: b.duration });\n  const first = names[(b.p - 1) % names.length];\n  const tracking = b.kind === 'uxr_recruiting'\n    ? { utm_source: 'uxr_recruiting', utm_medium: 'email', utm_campaign: `batch_mock-${runId}` }\n    : {};\n  return {\n    json: {\n      event: 'invitee.created',\n      payload: {\n        uri: `https://api.calendly.com/scheduled_events/MOCK-EVT-${code}/invitees/MOCK-INV-${code}`,\n        email: `aniol.moner+p${b.p}@n8n.io`,\n        name: `${first} Mock`, first_name: first, last_name: 'Mock',\n        status: 'active', timezone: 'Europe/Madrid',\n        rescheduled: false, old_invitee: null, new_invitee: null,\n        reschedule_url: `https://calendly.com/reschedulings/MOCK-${code}`,\n        cancel_url: `https://calendly.com/cancellations/MOCK-${code}`,\n        cancellation: null, no_show: null, tracking,\n        scheduled_event: {\n          uri: `https://api.calendly.com/scheduled_events/MOCK-EVT-${code}`,\n          name: b.kind === 'research' ? 'Mock research session' : 'Research with n8n',\n          event_type: b.kind === 'research' ? RESEARCH_ET : RR,\n          start_time: start.toUTC().toISO(), end_time: end.toUTC().toISO(), status: 'active',\n          event_memberships: [{ user: 'https://api.calendly.com/users/MOCK-HOST', user_email: 'aniol.moner@n8n.io', user_name: 'Aniol Moner' }],\n        },\n      },\n    },\n  };\n});\n"
+      }
+    },
+    {
+      "id": "8730b0e7-4481-47e0-814c-b4d09b16c5b1",
+      "name": "Send Each To Capture",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "each",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "OTRuMi0PTM6NYO97",
+          "cachedResultName": "PF Calendly Capture"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "6fb2492e-1310-41c9-8a9f-51e0af2cf1da",
+      "name": "Sticky Note 787d5e90",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        0
+      ],
+      "parameters": {
+        "content": "## PF Mock Booking\nMakes fake Calendly bookings with Aniol as host and sends them through **PF Calendly Capture**, the same path a real booking takes.\n\nEdit the `bookings` list in **Mock Booking Settings**, then run. Default: one session that starts in 2 min and lasts 3 min.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Create Mock Bookings": {
+      "main": [
+        [
+          {
+            "node": "Mock Booking Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Booking Settings": {
+      "main": [
+        [
+          {
+            "node": "Send Each To Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "ccdbffbf-7ef2-4373-80ee-a4a4dd5a7941",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

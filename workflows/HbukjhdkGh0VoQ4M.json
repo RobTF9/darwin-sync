@@ -1,6 +1,7 @@
 {
   "id": "HbukjhdkGh0VoQ4M",
   "name": "SearchTest",
+  "description": "Throwaway test harness for the Search/Browse tool sub-workflows. Safe to delete.",
   "nodes": [
     {
       "id": "61b01b32-3bd4-454c-821c-5a4e4367d0ab",

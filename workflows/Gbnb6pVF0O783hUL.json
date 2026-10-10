@@ -1,0 +1,616 @@
+{
+  "id": "Gbnb6pVF0O783hUL",
+  "name": "PF Darwin Tool: Session Follow-up",
+  "description": "Manual path for Darwin: finds the host's open sessions, starts the did-they-join DM or PF Reward, or returns a numbered list. Sub-workflow. DWN-6.",
+  "nodes": [
+    {
+      "id": "5f435f66-8c30-4414-811d-5ba0e4fc44b7",
+      "name": "When Called By Darwin",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "user_id",
+              "type": "string"
+            },
+            {
+              "name": "session_number",
+              "type": "number"
+            },
+            {
+              "name": "invitee_uri",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b7e36413-de54-4316-9960-f0b59946015f",
+      "name": "Resolve Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// One input shape for both entry points: Darwin's tool call or the manual test run.\nlet input = {};\ntry { input = $('When Called By Darwin').first().json; } catch (e) { input = {}; }\nif (!input.user_id) {\n  try { input = $('Test Input').first().json; } catch (e) { input = {}; }\n}\nreturn [{\n  json: {\n    user_id: input.user_id || '',\n    session_number: input.session_number ? Number(input.session_number) : null,\n    invitee_uri: input.invitee_uri || null,\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "46c01ddc-fe8f-425b-8b8e-b9330d4a830f",
+      "name": "Manual Test Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "1bccb197-b538-4f99-a3d7-b9832e2f4727",
+      "name": "Test Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ti-user",
+              "name": "user_id",
+              "value": "U0BC48TEV2Q",
+              "type": "string"
+            },
+            {
+              "id": "ti-num",
+              "name": "session_number",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "ti-uri",
+              "name": "invitee_uri",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4f2d79d9-eb23-4d26-a23e-8be8ef28dc26",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        720,
+        192
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HfYVjOSLtPqfeYJb",
+          "cachedResultName": "PF Config"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "957895aa-71bd-40c7-8179-99a136fa856d",
+      "name": "Find Host By Slack Id",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        944,
+        192
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.info",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user",
+              "value": "={{ $('Resolve Input').first().json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "74f450fa-bdec-4f19-b00c-a574f4d8b6fc",
+      "name": "Get Host Sessions",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1168,
+        192
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "host_email",
+              "condition": "eq",
+              "keyValue": "={{ ($json.user?.profile?.email || 'none').toLowerCase() }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "abb111de-60d7-4575-8213-1a105279e004",
+      "name": "Pick Session",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Finds the host's open sessions and decides what to start.\nconst input = $('Resolve Input').first().json;\nconst cfg = $('Load Config').first().json;\nconst tz = cfg.timezone;\nconst host = $('Find Host By Slack Id').first().json;\nconst hostEmail = (host.user?.profile?.email || '').toLowerCase();\n\nconst say = (action, response, extra = {}) => [{ json: { action, response, host_email: hostEmail, ...extra } }];\n\nif (!host.ok || !hostEmail) {\n  return say('none', 'I could not find your email address in Slack, so I cannot look up your sessions.');\n}\nif (cfg.mockMode && !cfg.allowedHostEmails.includes(hostEmail)) {\n  return say('none', 'Test mode: this feature only works for the test host right now.');\n}\n\nconst OPEN = {\n  unanswered: 'not confirmed yet',\n  showed_up: 'joined, no reward yet',\n  reward_blocked: 'reward blocked, balance was too low',\n};\nconst now = $now.toMillis();\nconst since = $now.minus({ days: cfg.manualLookbackDays }).toMillis();\nconst rows = $('Get Host Sessions').all().map((i) => i.json).filter((r) => r.id);\nconst open = rows\n  .filter((r) => r.booking_status === 'active' && OPEN[r.followup_status])\n  .filter((r) => { const t = DateTime.fromISO(r.starts_at).toMillis(); return t <= now && t >= since; })\n  .sort((a, b) => DateTime.fromISO(b.starts_at).toMillis() - DateTime.fromISO(a.starts_at).toMillis());\n\nconst label = (r, i) => `${i + 1}. ${r.participant_name || r.participant_email}, ${DateTime.fromISO(r.starts_at).setZone(tz).toFormat('ccc d LLL, HH:mm')} (${OPEN[r.followup_status]})`;\n\nif (open.length === 0) {\n  return say('none', `You have no open sessions from the last ${cfg.manualLookbackDays} days. Every session is rewarded, declined or marked as a no-show.`);\n}\n\nlet chosen = null;\nif (input.invitee_uri) chosen = open.find((r) => r.invitee_uri === input.invitee_uri) || null;\nelse if (input.session_number) chosen = open[Number(input.session_number) - 1] || null;\nelse if (open.length === 1) chosen = open[0];\n\nif (!chosen) {\n  const wrongPick = input.session_number || input.invitee_uri ? 'I could not find that session. ' : '';\n  return say('list', `${wrongPick}You have ${open.length} open sessions:\\n${open.map(label).join('\\n')}\\nWhich one do you mean? Reply with the number.`, {\n    sessions: open.map((r, i) => ({ number: i + 1, invitee_uri: r.invitee_uri, participant: r.participant_name, starts_at: r.starts_at, status: r.followup_status })),\n  });\n}\n\nconst who = chosen.participant_name || chosen.participant_email;\nconst day = DateTime.fromISO(chosen.starts_at).setZone(tz).toFormat('ccc d LLL');\nif (chosen.followup_status === 'unanswered') {\n  return say('followup', `OK. I sent you a DM to confirm if ${who} joined your session on ${day}. If yes, I will then ask about the reward.`, { invitee_uri: chosen.invitee_uri });\n}\nreturn say('reward', `OK. I sent you a DM to choose the reward for ${who} (session on ${day}).`, { invitee_uri: chosen.invitee_uri });\n"
+      }
+    },
+    {
+      "id": "32965b4e-ba6a-4962-939a-37a9080b1865",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1200,
+        64
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "followup",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "followup",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "reward",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "reward",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Only answer"
+        }
+      }
+    },
+    {
+      "id": "a951f08d-332e-4a2d-a044-90e5d909c94d",
+      "name": "Follow-up Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        192
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fu-uri",
+              "name": "invitee_uri",
+              "value": "={{ $('Pick Session').first().json.invitee_uri }}",
+              "type": "string"
+            },
+            {
+              "id": "fu-mode",
+              "name": "mode",
+              "value": "manual",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5ba0fbb8-1490-4c25-9b5f-36077a8a60fb",
+      "name": "Start Follow-up",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1696,
+        192
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "643dtPVMcVtTZ2LH",
+          "cachedResultName": "PF Session Follow-up"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "fceb92af-a3da-499e-a83b-e4a5311aaea8",
+      "name": "Tool Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1952,
+        80
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "tr-resp",
+              "name": "response",
+              "value": "={{ $('Pick Session').first().json.response }}",
+              "type": "string"
+            },
+            {
+              "id": "tr-act",
+              "name": "action",
+              "value": "={{ $('Pick Session').first().json.action }}",
+              "type": "string"
+            },
+            {
+              "id": "tr-sessions",
+              "name": "sessions",
+              "value": "={{ $('Pick Session').first().json.sessions ?? [] }}",
+              "type": "array"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5ab8dad4-3358-40a9-b3ad-af747c79bb91",
+      "name": "Reward Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        384
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rw-uri",
+              "name": "invitee_uri",
+              "value": "={{ $('Pick Session').first().json.invitee_uri }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "70510d1b-0720-4a1b-b939-732821f85c1f",
+      "name": "Start Reward",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1696,
+        384
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YKTgyYkJwppQZXGT",
+          "cachedResultName": "PF Reward"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "5a8fe93e-a92c-4368-b32f-e569465ada60",
+      "name": "Sticky Note 982ab4bb",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        912,
+        384
+      ],
+      "parameters": {
+        "content": "## PF Darwin Tool: Session Follow-up\nManual path: the host tells Darwin \"I want to send the reward for my last session\".\n\nInput from Darwin: `user_id` (Slack), optional `session_number` (from the list) or `invitee_uri`.\n\nOpen sessions (last 30 days, started): `unanswered` goes to the did-they-join DM; `showed_up` and `reward_blocked` go straight to PF Reward. Rewarded, declined and no-show sessions are never offered. More than one: returns a numbered list for Darwin to show.\n\nTest without Darwin: edit **Test Input**, then run **Manual Test Run**.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "When Called By Darwin": {
+      "main": [
+        [
+          {
+            "node": "Resolve Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Input": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Test Run": {
+      "main": [
+        [
+          {
+            "node": "Test Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Input": {
+      "main": [
+        [
+          {
+            "node": "Resolve Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Find Host By Slack Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Host By Slack Id": {
+      "main": [
+        [
+          {
+            "node": "Get Host Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Host Sessions": {
+      "main": [
+        [
+          {
+            "node": "Pick Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Session": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Follow-up Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reward Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tool Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow-up Input": {
+      "main": [
+        [
+          {
+            "node": "Start Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Tool Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reward Input": {
+      "main": [
+        [
+          {
+            "node": "Start Reward",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Reward": {
+      "main": [
+        [
+          {
+            "node": "Tool Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "f9d72bf2-1948-47ae-840a-f81a22818d7f",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "0a8e01dc-3970-4e7b-970c-fbdb5f1d6f8b",
+      "name": "Find open sessions",
+      "nodeIds": [
+        "4f2d79d9-eb23-4d26-a23e-8be8ef28dc26",
+        "957895aa-71bd-40c7-8179-99a136fa856d",
+        "74f450fa-bdec-4f19-b00c-a574f4d8b6fc",
+        "abb111de-60d7-4575-8213-1a105279e004"
+      ],
+      "description": "Loads config, finds the host email from the Slack id, reads the host sessions, picks one or builds a list."
+    },
+    {
+      "id": "4f86104c-114a-426b-ab9d-aa76d216ed03",
+      "name": "Start follow-up",
+      "nodeIds": [
+        "a951f08d-332e-4a2d-a044-90e5d909c94d",
+        "5ba0fbb8-1490-4c25-9b5f-36077a8a60fb"
+      ],
+      "description": "Unanswered session: starts the did-they-join DM in manual mode."
+    },
+    {
+      "id": "8d1b2732-c61c-4b3a-ada1-8e0b7dc4aa51",
+      "name": "Start reward",
+      "nodeIds": [
+        "5ab8dad4-3358-40a9-b3ad-af747c79bb91",
+        "70510d1b-0720-4a1b-b939-732821f85c1f"
+      ],
+      "description": "Joined or blocked session: starts PF Reward."
+    }
+  ]
+}

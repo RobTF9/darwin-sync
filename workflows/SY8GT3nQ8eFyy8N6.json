@@ -1,6 +1,7 @@
 {
   "id": "SY8GT3nQ8eFyy8N6",
   "name": "CostDigest",
+  "description": "Calculates daily AI cost across all AI-using Darwin workflows by reading token usage from execution data, and posts a morning cost report to Slack at 06:30 UTC.",
   "nodes": [
     {
       "id": "6a1146bc-f013-484a-bc97-229351bd2a67",
@@ -447,7 +448,8 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
   "versionId": "9983d882-54d9-4e3f-a439-591ae6639dae",

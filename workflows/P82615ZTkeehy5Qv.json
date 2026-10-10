@@ -1,6 +1,7 @@
 {
   "id": "P82615ZTkeehy5Qv",
   "name": "Darwin — FanOutWorker",
+  "description": "Worker for the fan_out tool: builds a scoped task from one item + the shared instruction, invokes Darwin itself (recursive sub-agent call) for that one item, and writes the result back to fan_out_item.",
   "nodes": [
     {
       "id": "a88d5b08-9ea4-4168-8b54-9964e54e6379",

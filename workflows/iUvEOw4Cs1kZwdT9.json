@@ -1,0 +1,44 @@
+{
+  "id": "iUvEOw4Cs1kZwdT9",
+  "name": "My workflow 4",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://darwin-staging.app.n8n.cloud/webhook/a520bd20-9072-4b1b-9f9d-9f4ac7c66856",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -128,
+        -16
+      ],
+      "id": "e69b167a-5ca2-4f91-84e3-3550b1b849af",
+      "name": "HTTP Request",
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "b732cf01-bdc9-4270-8a46-9605b57c1182",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}

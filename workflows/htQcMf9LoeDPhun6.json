@@ -1,5 +1,5 @@
 {
-  "id": "P2ytPVZarg6tKuZg",
+  "id": "htQcMf9LoeDPhun6",
   "name": "Darwin All Research Sessions Swipe - daily",
   "description": null,
   "nodes": [
@@ -21,13 +21,13 @@
           ]
         }
       },
-      "id": "c737b610-4dc2-4c50-ae5d-98cff98f32a8",
+      "id": "398f36a9-67b3-470b-a14e-b8524dfcecf1",
       "name": "Daily 8am Trigger (Mon-Fri)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.4,
       "position": [
-        2160,
-        352
+        0,
+        0
       ]
     },
     {
@@ -45,13 +45,13 @@
           "orderBy": "startTime"
         }
       },
-      "id": "e18b8d27-f6a8-401e-9cbe-752d63931777",
+      "id": "17339e8e-0591-4d99-9075-6d1d18b2931b",
       "name": "Get Tomorrow Events",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.3,
       "position": [
-        2832,
-        352
+        784,
+        0
       ],
       "credentials": {
         "googleCalendarOAuth2Api": {
@@ -117,13 +117,13 @@
         },
         "options": {}
       },
-      "id": "af0761ed-a4a6-4c7f-a661-031866a4e14e",
+      "id": "29d1a833-26a2-4662-9aea-74489ecb8e12",
       "name": "Extract Event Info (Daily)",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        3056,
-        352
+        1040,
+        0
       ]
     },
     {
@@ -168,26 +168,26 @@
         },
         "options": {}
       },
-      "id": "5195fd2b-6eac-4492-aa54-476891ba4492",
+      "id": "fbf4688d-40e9-4439-9671-be5c8b1dadf9",
       "name": "Match Research Sessions (Daily)",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.3,
       "position": [
-        3280,
-        352
+        1312,
+        0
       ]
     },
     {
       "parameters": {
         "jsCode": "const resp = $input.first().json; const people = resp.people || []; const results = []; for (const p of people) { const orgs = p.organizations || []; if (orgs.length === 0) { continue; } const email = (p.emailAddresses && p.emailAddresses[0] && p.emailAddresses[0].value) || ''; const name = (p.names && p.names[0] && p.names[0].displayName) || ''; if (email) { results.push({ json: { name: name, email: email } }); } } return results;"
       },
-      "id": "c3c52069-4b13-4a81-9372-8aa6861f5a01",
+      "id": "6affd706-b6ff-439a-b4d8-1ed3ac205093",
       "name": "Normalize Employee Info (Daily)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2608,
-        352
+        512,
+        0
       ],
       "retryOnFail": true
     },
@@ -215,18 +215,18 @@
         },
         "options": {}
       },
-      "id": "8d58701c-09b8-42c9-99d7-834ad21b8ccb",
+      "id": "45b00c3e-6e2d-41f2-a29c-de3eca0f39b6",
       "name": "Get Active Employees (Daily)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        2384,
-        352
+        272,
+        0
       ],
       "credentials": {
         "oAuth2Api": {
-          "id": "9qOBTlGp0nmv5Nbn",
-          "name": "Aniol's n8n directory"
+          "id": "y6R5ugkxH6Qrns6W",
+          "name": "Aniol's directory"
         }
       }
     },
@@ -234,13 +234,13 @@
       "parameters": {
         "jsCode": "const items = $input.all();\nconst groups = {};\nfor (const item of items) {\n  const uid = item.json.eventICalUID || (item.json.eventTitle + '|' + item.json.eventStart);\n  const isOrganizer = !!item.json.colleagueEmail && !!item.json.organizerEmail &&\n    item.json.colleagueEmail.toLowerCase() === item.json.organizerEmail.toLowerCase();\n  const candidate = { ...item.json, externalId: uid, _isOrganizer: isOrganizer };\n  const existing = groups[uid];\n  if (!existing || (isOrganizer && !existing._isOrganizer)) {\n    groups[uid] = candidate;\n  }\n}\nreturn Object.values(groups).map(g => {\n  const { _isOrganizer, ...json } = g;\n  return { json };\n});"
       },
-      "id": "2e9a8365-0f1d-4d72-9e21-3cc21269a263",
+      "id": "1ac2300d-ec7a-40ab-9c7b-1f1e9e371431",
       "name": "Dedupe by iCalUID (Organizer Only)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3728,
-        352
+        1568,
+        208
       ]
     },
     {
@@ -251,13 +251,13 @@
           "queryReplacement": "={{ [$json.externalId, $json.organizerName, $json.organizerEmail, $json.eventTitle, $json.eventDescription, $json.eventStart] }}"
         }
       },
-      "id": "53e2987d-177e-47cf-8073-39e73823f3ac",
+      "id": "a4ce54ba-1615-40ee-a47e-41885644a289",
       "name": "Upsert Research Session",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3952,
-        352
+        1824,
+        208
       ],
       "credentials": {
         "postgres": {
@@ -274,13 +274,13 @@
           "queryReplacement": "={{ [$json.colleagueName, $json.colleagueEmail, $json.eventTitle, $json.eventStart, $json.eventDescription, $json.eventICalUID, $json.organizerEmail, $json.organizerName] }}"
         }
       },
-      "id": "abe2508d-dd72-4f51-8cc6-711ff107b797",
+      "id": "1013da05-a140-43d3-b3c7-3aeffd21575e",
       "name": "Check Not Continuous Discovery",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3504,
-        352
+        1312,
+        208
       ],
       "credentials": {
         "postgres": {
@@ -325,17 +325,6 @@
         ]
       ]
     },
-    "Match Research Sessions (Daily)": {
-      "main": [
-        [
-          {
-            "node": "Check Not Continuous Discovery",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Normalize Employee Info (Daily)": {
       "main": [
         [
@@ -369,6 +358,17 @@
         ]
       ]
     },
+    "Match Research Sessions (Daily)": {
+      "main": [
+        [
+          {
+            "node": "Check Not Continuous Discovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Check Not Continuous Discovery": {
       "main": [
         [
@@ -383,16 +383,17 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "availableInMCP": true
   },
   "triggerCount": 1,
-  "versionId": "f16beec0-a13f-4342-bb38-921b61c61f65",
+  "versionId": "af170da6-f012-46e7-809e-da93f76d9eaa",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
     "teamName": "Darwin"
   },
-  "parentFolderId": "boYztb3YTl3q49Fk",
+  "parentFolderId": "ofTK7eVY3QhieRZY",
   "isArchived": false,
   "nodeGroups": []
 }

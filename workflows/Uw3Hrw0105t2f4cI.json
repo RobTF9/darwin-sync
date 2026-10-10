@@ -1,0 +1,284 @@
+{
+  "id": "Uw3Hrw0105t2f4cI",
+  "name": "AgentDispatch",
+  "description": "Agent-side twin of IntegrationDispatch: runs one integration case through FirstClassDarwin (messageAnAgent), maps toolCalls[] to observations, evaluates with the same assertion grammar, and saves with agent='firstclassdarwin'.",
+  "nodes": [
+    {
+      "id": "0ffe65c6-b0ca-492d-b045-02c9e344b271",
+      "name": "Case Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        16
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "run_id"
+            },
+            {
+              "name": "case_id"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3446ba5c-79be-455e-9dfb-ebc1bcd42fa5",
+      "name": "Load Case",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        224,
+        16
+      ],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "integration_cases",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Case Input').item.json.case_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "85310908-bdd3-4cb2-89e6-0a2b3cf24c02",
+      "name": "Ask Agent",
+      "type": "n8n-nodes-base.messageAnAgent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "agentSource": "referenced",
+        "agentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "MIlKy1gduEWAKJmt"
+        },
+        "message": "={{ $('Load Case').item.json.prompt }}",
+        "advanced": {
+          "enableStreaming": false,
+          "sessionId": "={{ 'agent-case-' + $('Load Case').item.json.id + '-' + $('Case Input').item.json.run_id }}"
+        }
+      }
+    },
+    {
+      "id": "754a984d-393e-4fa0-8480-1dfa5b3005cc",
+      "name": "Build Observations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        16
+      ],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst toolCalls = Array.isArray(r.toolCalls) ? r.toolCalls : [];\n\nconst nestedCounts = function (obj, prefix, depth, acc) {\n  if (depth > 2 || !obj || typeof obj !== 'object' || Array.isArray(obj)) return acc;\n  for (const k of Object.keys(obj)) {\n    const v = obj[k];\n    const path = prefix ? prefix + '.' + k : k;\n    if (Array.isArray(v)) {\n      if (Object.keys(acc).length < 20) acc[path] = { kind: 'array', count: v.length };\n    } else if (v && typeof v === 'object') {\n      nestedCounts(v, path, depth + 1, acc);\n    }\n  }\n  return acc;\n};\n\nconst shapeOfParsed = function (parsed) {\n  if (Array.isArray(parsed)) {\n    const first = parsed[0];\n    const shape = {\n      kind: 'array',\n      count: parsed.length,\n      itemKeys: first && typeof first === 'object' && !Array.isArray(first) ? Object.keys(first) : null,\n    };\n    if (first && typeof first === 'object' && !Array.isArray(first)) shape.nested = nestedCounts(first, '', 0, {});\n    return shape;\n  }\n  if (parsed && typeof parsed === 'object') return { kind: 'object', keys: Object.keys(parsed), nested: nestedCounts(parsed, '', 0, {}) };\n  return { kind: typeof parsed };\n};\n\n// Normalise messageAnAgent tool results to the observation shape the\n// evaluator already understands (array of row objects, like the old\n// intermediateSteps observations). Workflow tool results arrive wrapped\n// under the sub-workflow's FINAL NODE NAME (e.g. data['Shape Output'] =\n// [{results, meta}]); node tools arrive as [{json, pairedItem}] items.\nconst normalizeData = function (data) {\n  if (data == null) return null;\n  let env = data;\n  if (env && typeof env === 'object' && !Array.isArray(env) && !Array.isArray(env.results)) {\n    const keys = Object.keys(env);\n    if (keys.length === 1) env = env[keys[0]];\n  }\n  if (Array.isArray(env)) {\n    const items = env.map(function (x) { return (x && typeof x === 'object' && x.json !== undefined) ? x.json : x; });\n    if (items.length === 1 && items[0] && typeof items[0] === 'object' && Array.isArray(items[0].results)) {\n      return items[0].results;\n    }\n    return items;\n  }\n  if (env && typeof env === 'object') {\n    if (Array.isArray(env.results)) return env.results;\n    return [env];\n  }\n  return env;\n};\n\nconst toolsUsed = [];\nconst outcomes = [];\nfor (const t of toolCalls) {\n  const name = t && t.toolName;\n  if (!name) continue;\n  if (!toolsUsed.includes(name)) toolsUsed.push(name);\n  const res = t.result;\n  let ok = false;\n  let shape = { kind: 'null' };\n  if (res && typeof res === 'object' && !Array.isArray(res)) {\n    ok = res.status === undefined || res.status === 'success';\n    const norm = normalizeData(res.data);\n    shape = norm === null ? { kind: 'null' } : shapeOfParsed(norm);\n  } else if (typeof res === 'string' && res.trim() !== '') {\n    ok = true;\n    try { shape = shapeOfParsed(JSON.parse(res)); } catch (e) { shape = { kind: 'string' }; }\n  } else if (res !== undefined && res !== null) {\n    ok = true;\n    shape = shapeOfParsed(res);\n  }\n  outcomes.push({ tool: name, ok, shape });\n}\n\nconst startedAt = Number($('Stamp Start').item.json.started_at_ms) || null;\nreturn [{ json: {\n  output: typeof r.text === 'string' ? r.text : (r.output || ''),\n  tools_used: toolsUsed,\n  tool_outcomes: outcomes,\n  usage: r.usage || null,\n  session_id: r.session && r.session.sessionId ? r.session.sessionId : '',\n  finish_reason: r.finishReason || null,\n  duration_ms: startedAt ? (Date.now() - startedAt) : null,\n} }];\n",
+        "mode": "runOnceForAllItems"
+      }
+    },
+    {
+      "id": "5f8b055b-f222-4556-ae0c-0c0002397c54",
+      "name": "Evaluate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        16
+      ],
+      "parameters": {
+        "jsCode": "const c = $('Load Case').item.json;\nconst runId = $('Case Input').item.json.run_id;\nconst r = $input.first().json;\nlet status = 'pass';\nlet answer = '';\nlet called = [];\n\nif (r && r.error) {\n  status = 'error';\n  answer = typeof r.error === 'string' ? r.error : JSON.stringify(r.error);\n} else {\n  if (typeof r.output === 'string') {\n    answer = r.output;\n  } else if (r.output !== undefined) {\n    answer = JSON.stringify(r.output);\n  } else {\n    answer = JSON.stringify(r);\n  }\n  if (Array.isArray(r.tools_used)) {\n    called = r.tools_used;\n  } else if (Array.isArray(r.intermediateSteps)) {\n    for (const s of r.intermediateSteps) {\n      const t = s && s.action && s.action.tool;\n      if (t) called.push(t);\n    }\n  }\n  if (!answer) status = 'error';\n}\n\nconst norm = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); };\nconst calledN = [];\nfor (const t of called) { const n = norm(t); if (!calledN.includes(n)) calledN.push(n); }\n\n// Tool observations arrive in one of two shapes:\n// - Builder: compact tool_outcomes[] computed by its Format Output node\n// - Darwin: raw intermediateSteps[] (the agent output is forwarded unmodified)\nconst steps = Array.isArray(r.intermediateSteps) ? r.intermediateSteps : [];\nconst outcomes = Array.isArray(r.tool_outcomes) ? r.tool_outcomes : null;\n\nconst isErrorObs = function (obs) {\n  if (obs == null) return true;\n  const s = String(obs).trim();\n  if (s === '') return true;\n  let parsed;\n  try { parsed = JSON.parse(s); } catch (e) { return false; }\n  const arr = Array.isArray(parsed) ? parsed : [parsed];\n  return arr.length > 0 && arr.every(x => x && typeof x === 'object' && 'error' in x);\n};\n\nconst nestedCounts = function (obj, prefix, depth, acc) {\n  if (depth > 2 || !obj || typeof obj !== 'object' || Array.isArray(obj)) return acc;\n  for (const k of Object.keys(obj)) {\n    const v = obj[k];\n    const path = prefix ? prefix + '.' + k : k;\n    if (Array.isArray(v)) {\n      if (Object.keys(acc).length < 20) acc[path] = { kind: 'array', count: v.length };\n    } else if (v && typeof v === 'object') {\n      nestedCounts(v, path, depth + 1, acc);\n    }\n  }\n  return acc;\n};\n\nconst shapeOfParsed = function (parsed) {\n  if (Array.isArray(parsed)) {\n    const first = parsed[0];\n    const shape = {\n      kind: 'array',\n      count: parsed.length,\n      itemKeys: first && typeof first === 'object' && !Array.isArray(first) ? Object.keys(first) : null,\n    };\n    if (first && typeof first === 'object' && !Array.isArray(first)) shape.nested = nestedCounts(first, '', 0, {});\n    return shape;\n  }\n  if (parsed && typeof parsed === 'object') return { kind: 'object', keys: Object.keys(parsed), nested: nestedCounts(parsed, '', 0, {}) };\n  return { kind: typeof parsed };\n};\n\nconst shapeOfObs = function (obs) {\n  if (obs == null) return { kind: 'null' };\n  const s = String(obs).trim();\n  if (s === '') return { kind: 'empty' };\n  try { return shapeOfParsed(JSON.parse(s)); } catch (e) { return { kind: 'string' }; }\n};\n\n// 'ok' | 'failed' | 'not_called' — ok if ANY call to the tool returned real output.\nconst toolOutcome = function (toolRaw) {\n  const n = norm(toolRaw);\n  if (outcomes) {\n    const hit = outcomes.find(o => norm(o.tool) === n);\n    if (!hit) return 'not_called';\n    return hit.ok ? 'ok' : 'failed';\n  }\n  const hits = steps.filter(s => s && s.action && norm(s.action.tool) === n);\n  if (!hits.length) return 'not_called';\n  return hits.every(s => isErrorObs(s.observation)) ? 'failed' : 'ok';\n};\n\n// Shape summary for a tool, from tool_outcomes (Builder) or intermediateSteps (Darwin).\nconst obsForTool = function (toolRaw) {\n  const n = norm(toolRaw);\n  if (outcomes) {\n    const hit = outcomes.find(o => norm(o.tool) === n);\n    return hit ? hit.shape : null;\n  }\n  const hits = steps.filter(s => s && s.action && norm(s.action.tool) === n);\n  if (!hits.length) return null;\n  return shapeOfObs(hits[hits.length - 1].observation);\n};\n\n// Structural predicate match. pred: { kind, minItems, maxItems, hasKeys, missingKeys,\n// nested: { path, kind, minItems, maxItems } }\nconst matchShape = function (shape, pred) {\n  if (!shape) return false;\n  if (pred.kind && shape.kind !== pred.kind) return false;\n  if (pred.minItems != null && (shape.count == null || shape.count < pred.minItems)) return false;\n  if (pred.maxItems != null && (shape.count == null || shape.count > pred.maxItems)) return false;\n  const keys = shape.itemKeys || shape.keys || [];\n  if (Array.isArray(pred.hasKeys) && !pred.hasKeys.every(k => keys.includes(k))) return false;\n  if (Array.isArray(pred.missingKeys) && pred.missingKeys.some(k => keys.includes(k))) return false;\n  if (pred.nested && pred.nested.path) {\n    const n = shape.nested ? shape.nested[pred.nested.path] : undefined;\n    if (!n) return false;\n    if (pred.nested.kind && n.kind !== pred.nested.kind) return false;\n    if (pred.nested.minItems != null && (n.count == null || n.count < pred.nested.minItems)) return false;\n    if (pred.nested.maxItems != null && (n.count == null || n.count > pred.nested.maxItems)) return false;\n  }\n  return true;\n};\n\nlet assertions = [];\ntry {\n  assertions = typeof c.assertions === 'string' ? JSON.parse(c.assertions) : (c.assertions || []);\n} catch (e) {\n  status = 'error';\n}\n\nconst answerN = answer.toLowerCase();\nconst results = [];\nif (status !== 'error') {\n  for (const a of assertions) {\n    let pass = false;\n    let known = true;\n    if (a.type === 'tool_called') pass = calledN.includes(norm(a.value));\n    else if (a.type === 'tool_not_called') pass = !calledN.includes(norm(a.value));\n    else if (a.type === 'contains') pass = answerN.includes(String(a.value).toLowerCase());\n    else if (a.type === 'not_contains') pass = !answerN.includes(String(a.value).toLowerCase());\n    else if (a.type === 'tool_succeeded') pass = toolOutcome(a.value) === 'ok';\n    else if (a.type === 'tool_failed') pass = toolOutcome(a.value) === 'failed';\n    else if (a.type === 'response_shape') pass = matchShape(obsForTool(a.tool || a.value), a.shape || {});\n    else known = false;\n    if (!known) {\n      // Unknown assertion types are a case-authoring bug — mark the case errored, not failed.\n      status = 'error';\n      results.push({ type: a.type, value: a.value, tool: a.tool, pass: false, error: 'unknown assertion type' });\n      continue;\n    }\n    if (!pass) status = 'fail';\n    results.push({ type: a.type, value: a.value, tool: a.tool, pass: pass });\n  }\n}\n\nreturn [{ json: {\n  run_id: runId,\n  case_id: c.id,\n  slug: c.slug,\n  status: status,\n  called_tools: calledN,\n  output: answer.slice(0, 4000),\n  assertion_results: results,\n  session_id: 'integration-' + runId + '-' + c.id\n} }];\n"
+      }
+    },
+    {
+      "id": "28988990-7a82-4db2-ae68-5824e21455b9",
+      "name": "Save Result",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        16
+      ],
+      "parameters": {
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "run_id",
+              "fieldValue": "={{ $json.run_id }}"
+            },
+            {
+              "fieldId": "case_id",
+              "fieldValue": "={{ $json.case_id }}"
+            },
+            {
+              "fieldId": "instance",
+              "fieldValue": "={{ $vars.env }}"
+            },
+            {
+              "fieldId": "agent",
+              "fieldValue": "firstclassdarwin"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "called_tools",
+              "fieldValue": "={{ $json.called_tools }}"
+            },
+            {
+              "fieldId": "assertion_results",
+              "fieldValue": "={{ $json.assertion_results }}"
+            },
+            {
+              "fieldId": "output",
+              "fieldValue": "={{ $json.output }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.session_id }}"
+            },
+            {
+              "fieldId": "usage",
+              "fieldValue": "={{ $('Build Observations').item.json.usage }}"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "={{ $('Build Observations').item.json.duration_ms }}"
+            }
+          ]
+        },
+        "tableId": "integration_results"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "gjrMKYK5nCbL3TLf",
+          "name": "Supabase Tests"
+        }
+      }
+    },
+    {
+      "id": "98a10943-fea3-4abb-a23e-e7d0221a42c8",
+      "name": "Stamp Start",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        620,
+        128
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "stamp",
+              "name": "started_at_ms",
+              "type": "number",
+              "value": "={{ Date.now() }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Case Input": {
+      "main": [
+        [
+          {
+            "node": "Load Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Agent": {
+      "main": [
+        [
+          {
+            "node": "Build Observations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Observations": {
+      "main": [
+        [
+          {
+            "node": "Evaluate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Case": {
+      "main": [
+        [
+          {
+            "node": "Stamp Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp Start": {
+      "main": [
+        [
+          {
+            "node": "Ask Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "executionTimeout": 900
+  },
+  "triggerCount": 0,
+  "versionId": "074209d5-e321-475a-9ca6-509e4f667757",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "U1hoqp33rsBJ5M2X",
+  "isArchived": false,
+  "nodeGroups": []
+}

@@ -1,6 +1,7 @@
 {
   "id": "wyNafb6mqOy3MWHV",
   "name": "ErrorHarnessSlack",
+  "description": "Chaos-test harness for the Slack Error handler (MLxaOYbzMS9DFoIv). Webhook sets execution custom data (channel/sessionId/msgTs) then throws, so the error workflow fires in production mode. Called by ErrorRun.",
   "nodes": [
     {
       "id": "7b6b9678-07e8-45f2-80a7-2cfa589645d5",

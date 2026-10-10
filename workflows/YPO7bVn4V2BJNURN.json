@@ -1,0 +1,332 @@
+{
+  "id": "YPO7bVn4V2BJNURN",
+  "name": "PF Show-up Check",
+  "description": "Every 5 min (not published): claims due sessions and starts PF Session Follow-up. Manual run for tests. DWN-6.",
+  "nodes": [
+    {
+      "id": "725339ca-d556-49f1-ba25-4e9707e036d4",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "32a56844-fa3d-4bb7-a596-c96567130405",
+      "name": "Load Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        272,
+        224
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "HfYVjOSLtPqfeYJb",
+          "cachedResultName": "PF Config"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "23c5ff7c-e4b6-4b47-9e33-cf7d01d14c95",
+      "name": "Get Due Sessions",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        224
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "booking_status",
+              "condition": "eq",
+              "keyValue": "active"
+            },
+            {
+              "keyName": "followup_status",
+              "condition": "eq",
+              "keyValue": "pending"
+            },
+            {
+              "keyName": "starts_at",
+              "condition": "lte",
+              "keyValue": "={{ $now.minus({ minutes: $('Load Config').first().json.askDelayMinutes }).toUTC().toISO() }}"
+            },
+            {
+              "keyName": "starts_at",
+              "condition": "gte",
+              "keyValue": "={{ $now.minus({ hours: $('Load Config').first().json.showupWindowHours }).toUTC().toISO() }}"
+            }
+          ]
+        },
+        "returnAll": true
+      }
+    },
+    {
+      "id": "c8b75836-cfe1-4bed-adf2-8870376dd384",
+      "name": "Claim Session",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        224
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "L3Sa3FfY5RtqeUgk",
+          "cachedResultName": "MOCK - PF Sessions"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            },
+            {
+              "keyName": "followup_status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "followup_status": "asked",
+            "showup_asked_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "followup_status",
+              "displayName": "followup_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "showup_asked_at",
+              "displayName": "showup_asked_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "063cd71c-5be2-4d88-958b-d39aa96d47a1",
+      "name": "Follow-up Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        944,
+        224
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fi-uri",
+              "name": "invitee_uri",
+              "value": "={{ $('Get Due Sessions').item.json.invitee_uri }}",
+              "type": "string"
+            },
+            {
+              "id": "fi-mode",
+              "name": "mode",
+              "value": "auto",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "465ca4ba-c244-46c2-8cef-899be400f3f6",
+      "name": "Start Follow-up",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1168,
+        224
+      ],
+      "parameters": {
+        "mode": "each",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "643dtPVMcVtTZ2LH",
+          "cachedResultName": "PF Session Follow-up"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      }
+    },
+    {
+      "id": "c77560e3-d826-4905-9e43-216a9c3f24e8",
+      "name": "Run Check Now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "4a10e19e-b269-413d-984a-4e2732460c16",
+      "name": "Sticky Note 5fd24288",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        512,
+        224
+      ],
+      "parameters": {
+        "content": "## PF Show-up Check\nEvery 5 minutes: finds sessions that are `active`, `pending`, started at least `askDelayMinutes` ago (mock 1, real 15) and not more than 6 h ago.\n\nClaims each one (`pending` to `asked`) so two runs cannot ask twice, then starts **PF Session Follow-up** without waiting.\n\n**Not published.** Publishing needs a yes from Aniol (DWN-6 gate). Use **Run Check Now** until then.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Get Due Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Due Sessions": {
+      "main": [
+        [
+          {
+            "node": "Claim Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Session": {
+      "main": [
+        [
+          {
+            "node": "Follow-up Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Follow-up Input": {
+      "main": [
+        [
+          {
+            "node": "Start Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Check Now": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 1,
+  "versionId": "99091f9c-0a7f-4aeb-94ce-81052baa91d6",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "dbff3efd-1345-4f9a-8d24-1d82fa21641d",
+      "name": "Find and claim due sessions",
+      "nodeIds": [
+        "32a56844-fa3d-4bb7-a596-c96567130405",
+        "23c5ff7c-e4b6-4b47-9e33-cf7d01d14c95",
+        "c8b75836-cfe1-4bed-adf2-8870376dd384",
+        "063cd71c-5be2-4d88-958b-d39aa96d47a1",
+        "465ca4ba-c244-46c2-8cef-899be400f3f6"
+      ],
+      "description": "Reads config, selects due pending sessions, marks each asked, starts one follow-up per session."
+    }
+  ]
+}

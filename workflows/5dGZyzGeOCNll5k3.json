@@ -1,0 +1,40 @@
+{
+  "id": "5dGZyzGeOCNll5k3",
+  "name": "My workflow 3",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "a520bd20-9072-4b1b-9f9d-9f4ac7c66856",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        -208
+      ],
+      "id": "44446514-3210-4678-aee8-9a6ba147e5f7",
+      "name": "Webhook",
+      "webhookId": "a520bd20-9072-4b1b-9f9d-9f4ac7c66856"
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "triggerCount": 1,
+  "versionId": "24407e52-81a3-4e21-adf5-79f829a0e346",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": null,
+  "isArchived": false,
+  "nodeGroups": []
+}
