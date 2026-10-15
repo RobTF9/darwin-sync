@@ -386,7 +386,9 @@
         "genericAuthType": "httpHeaderAuth",
         "inputDataFieldName": "data",
         "method": "POST",
-        "options": {},
+        "options": {
+          "timeout": 3600000
+        },
         "queryParameters": {
           "parameters": [
             {
@@ -563,7 +565,9 @@
         },
         "inputDataFieldName": "data",
         "method": "PUT",
-        "options": {},
+        "options": {
+          "timeout": 3600000
+        },
         "sendBody": true,
         "sendHeaders": true,
         "url": "={{ $('Create Mux Upload').item.json.data.url }}"
@@ -886,7 +890,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
-  "versionId": "59bc9bff-f814-495a-9f92-c41558a6b91d",
+  "versionId": "0b768ef0-dcbc-4014-ace8-d3b1ea3842b7",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

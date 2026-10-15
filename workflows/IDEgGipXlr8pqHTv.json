@@ -1,6 +1,7 @@
 {
   "id": "IDEgGipXlr8pqHTv",
   "name": "Analysis",
+  "description": null,
   "nodes": [
     {
       "parameters": {
@@ -144,7 +145,9 @@
         "sendBody": true,
         "contentType": "binaryData",
         "inputDataFieldName": "data",
-        "options": {}
+        "options": {
+          "timeout": 3600000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -275,218 +278,6 @@
       "name": "Execution Data"
     },
     {
-      "parameters": {},
-      "type": "n8n-nodes-base.errorTrigger",
-      "typeVersion": 1,
-      "position": [
-        368,
-        272
-      ],
-      "id": "c44ed5ef-84b3-476f-a9ec-441851e4dddf",
-      "name": "Error Trigger"
-    },
-    {
-      "parameters": {
-        "resource": "execution",
-        "operation": "get",
-        "executionId": "={{ $json.execution.id }}",
-        "options": {
-          "activeWorkflows": true
-        },
-        "requestOptions": {}
-      },
-      "type": "n8n-nodes-base.n8n",
-      "typeVersion": 1,
-      "position": [
-        592,
-        272
-      ],
-      "id": "e9b52d48-b97a-4eac-a28a-643b52a23cef",
-      "name": "Get an execution",
-      "credentials": {
-        "n8nApi": {
-          "id": "3v9sCEKD7Zp28oE8",
-          "name": "n8n account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "ZMyr5DWlrfXlhhKs",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/ZMyr5DWlrfXlhhKs",
-          "cachedResultName": "Darwin — Builder"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "task": "={{ $('Build Error Summary').item.json.task }}",
-            "session_id": "=error-{{ $('Post Error to Slack').item.json.message.ts }}"
-          },
-          "schema": [
-            {
-              "id": "task",
-              "displayName": "task",
-              "type": "string",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "defaultMatch": false,
-              "removed": false
-            },
-            {
-              "id": "session_id",
-              "displayName": "session_id",
-              "type": "string",
-              "required": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "defaultMatch": false,
-              "removed": false
-            }
-          ],
-          "matchingColumns": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {
-          "waitForSubWorkflow": true
-        }
-      },
-      "id": "ae698d31-dcbe-4abe-861e-4338c3dec1d1",
-      "name": "Call Builder Agent",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        1280,
-        272
-      ]
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "d1",
-              "name": "task",
-              "value": "=You are being asked to DIAGNOSE a failed n8n workflow execution. Do NOT make any changes — do NOT create, update, publish, or modify any workflow. Only inspect, diagnose the root cause, and suggest a concrete fix in your reply.\n\nFailure details:\n- Workflow name: {{ $json.workflowData?.name || $json.name || 'unknown' }}\n- Workflow ID: {{ $json.workflowId }}\n- Execution ID: {{ $json.id }}\n- Execution URL: https://internal.users.n8n.cloud/workflow/{{ $json.workflowId }}/executions/{{ $json.id }}\n- Error message: {{ $json.data?.resultData?.error?.message || 'n/a' }}\n- Failed node: {{ $json.data?.resultData?.lastNodeExecuted || 'n/a' }}\n- Error stack / details: {{ $json.data?.resultData?.error?.stack || $json.data?.resultData?.error?.description || 'n/a' }}\n\nPlease use the n8n MCP tools to inspect workflow {{ $json.workflowId }}, identify the root cause of this failure, and describe a specific suggested fix. Remember: DIAGNOSE ONLY — do not apply any changes.",
-              "type": "string"
-            },
-            {
-              "id": "d3",
-              "name": "wfName",
-              "value": "={{ $json.workflowData?.name || $json.name || 'unknown' }}",
-              "type": "string"
-            },
-            {
-              "id": "d4",
-              "name": "wfId",
-              "value": "={{ $json.workflowId }}",
-              "type": "string"
-            },
-            {
-              "id": "d5",
-              "name": "execId",
-              "value": "={{ $json.id }}",
-              "type": "string"
-            },
-            {
-              "id": "d6",
-              "name": "execUrl",
-              "value": "=https://internal.users.n8n.cloud/workflow/{{ $json.workflowId }}/executions/{{ $json.id }}",
-              "type": "string"
-            },
-            {
-              "id": "d7",
-              "name": "errMsg",
-              "value": "={{ $json.data?.resultData?.error?.message || 'n/a' }}",
-              "type": "string"
-            },
-            {
-              "id": "d8",
-              "name": "failedNode",
-              "value": "={{ $json.data?.resultData?.lastNodeExecuted || 'n/a' }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "c25cc33b-f7c7-4cf8-a6e4-d2a879dbbe49",
-      "name": "Build Error Summary",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        832,
-        272
-      ]
-    },
-    {
-      "parameters": {
-        "select": "channel",
-        "channelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "C09DRCJLQCE"
-        },
-        "text": "=🚨 <@U07S2V7RH6K> — Workflow failure detected.\n\n*Workflow:* {{ $json.wfName }} (`{{ $json.wfId }}`)\n*Execution:* {{ $json.execUrl }}\n*Failed node:* {{ $json.failedNode }}\n*Error:* {{ $json.errMsg }}",
-        "otherOptions": {
-          "link_names": true
-        }
-      },
-      "id": "22e6c2b7-d0d2-497a-aaa9-a4744bd04ee6",
-      "name": "Post Error to Slack",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.3,
-      "position": [
-        1056,
-        272
-      ],
-      "webhookId": "f998f6b9-296d-48db-9aae-4bb933a49348",
-      "credentials": {
-        "slackApi": {
-          "id": "BBkWcmrv3sWmNe1t",
-          "name": "Slack Bot"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "select": "channel",
-        "channelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "C09DRCJLQCE"
-        },
-        "messageType": "block",
-        "blocksUi": "={{ $('format').item.json.blocksJson }}",
-        "otherOptions": {
-          "thread_ts": {
-            "replyValues": {
-              "thread_ts": "={{ $('Post Error to Slack').item.json.message.ts }}"
-            }
-          }
-        }
-      },
-      "id": "78f1d701-594b-4c28-9bfa-9d26e4587495",
-      "name": "Post Diagnosis Reply",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.3,
-      "position": [
-        1696,
-        272
-      ],
-      "webhookId": "f100246f-9799-4c79-bd48-caa334633f74",
-      "credentials": {
-        "slackApi": {
-          "id": "BBkWcmrv3sWmNe1t",
-          "name": "Slack Bot"
-        }
-      }
-    },
-    {
       "parameters": {
         "workflowId": {
           "__rl": true,
@@ -611,7 +402,9 @@
         "sendBody": true,
         "contentType": "binaryData",
         "inputDataFieldName": "data",
-        "options": {}
+        "options": {
+          "timeout": 3600000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -787,20 +580,6 @@
       ],
       "id": "e59090f8-ee7c-4203-ad2f-b3af8b6d6430",
       "name": "opportunity_analysis"
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "// Same format step as the `format` Code node in the Slack workflow: wrap the\n// Builder agent's raw markdown diagnosis in a Block Kit markdown block — Slack\n// renders standard markdown natively (headers, tables, code fences, mentions).\n// Cumulative markdown-block limit is 12,000 chars per message.\nconst LIMIT = 12000;\nconst header = '*Builder diagnosis & suggested fix:*\\n';\nconst footer = '\\n\\n_Reply in this thread to continue the conversation with the Builder._';\nlet body = $json.output ?? '';\nconst budget = LIMIT - header.length - footer.length;\nif (body.length > budget) {\n  body = body.slice(0, budget - 120) + '\\n\\n_…truncated — reply exceeded Slack’s 12,000-character markdown block limit_';\n}\nconst text = header + body + footer;\n// blocksUi must be an object shaped { blocks: [...] } — a bare array spreads\n// into the request body without a `blocks` key, and Slack rejects\n// chat.postMessage with \"no_text\".\nconst content = { blocks: [{ type: 'markdown', text }] };\nreturn { json: { blocksJson: JSON.stringify(content), output: text } };"
-      },
-      "id": "4ef0cb52-dd43-469c-96f9-ba11fd3a24dd",
-      "name": "format",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1392,
-        272
-      ]
     }
   ],
   "connections": {
@@ -908,50 +687,6 @@
         ]
       ]
     },
-    "Error Trigger": {
-      "main": [
-        [
-          {
-            "node": "Get an execution",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get an execution": {
-      "main": [
-        [
-          {
-            "node": "Build Error Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Error Summary": {
-      "main": [
-        [
-          {
-            "node": "Post Error to Slack",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Post Error to Slack": {
-      "main": [
-        [
-          {
-            "node": "Call Builder Agent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "update": {
       "main": [
         [
@@ -988,28 +723,6 @@
           }
         ]
       ]
-    },
-    "Call Builder Agent": {
-      "main": [
-        [
-          {
-            "node": "format",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "format": {
-      "main": [
-        [
-          {
-            "node": "Post Diagnosis Reply",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "settings": {
@@ -1017,10 +730,11 @@
     "availableInMCP": true,
     "binaryMode": "separate",
     "timeSavedMode": "fixed",
-    "callerPolicy": "workflowsFromSameOwner"
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "5fd746bc-df72-4dfa-8f30-9187d76468a5",
+  "versionId": "e541da5e-f0a4-4a1e-92ca-3c4be3932316",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
