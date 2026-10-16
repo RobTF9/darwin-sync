@@ -1,0 +1,17 @@
+{
+  "id": "Py7hqwdBxOVryIR8",
+  "name": "GitHub account",
+  "type": "githubOAuth2Api",
+  "data": {
+    "allowedHttpRequestDomains": ""
+  },
+  "ownedBy": {
+    "type": "personal",
+    "projectId": "gaAiXT3wHyNP6mrE",
+    "projectName": "Robert Squires <robert+darwin@n8n.io>",
+    "personalEmail": "robert+darwin@n8n.io"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}
