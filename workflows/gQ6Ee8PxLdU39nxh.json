@@ -81,7 +81,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=# Type\n{{ $json.type }}\n\n# Script\n{{ $json.script }}\n\n# Transcript\n{{ $(\"get_session\").item.json.transcript }}\n",
+        "text": "=# Type\n{{ $json.type }}\n\n# Script\n{{ $json.script }}\n\n# Transcript\n{{ $json.transcript }}\n",
         "hasOutputParser": true,
         "options": {
           "systemMessage": "# Role\n\nYou are a user research analyst for n8n. Extract structured participant and session information from interview transcripts.\n\n## Inputs\n\nYou will receive:\n- The interview transcript\n- The project type: `usability_test` or `discovery_interview`\n- (Optionally) The interview script used during the session\n\nUse the script to understand the interviewer's intent behind questions, distinguish planned topics from emergent ones, and identify areas the participant avoided or expanded on beyond what was asked.\n\n## Output Fields\n\n### title\n\nThe title for the session, the format is always 'FirstName, Role e.g. 'Rob, Product Designer\n\n### participant_name\n\nThe participant's name if mentioned. Use \"Unknown\" if not stated.\n\n### role\n\nTheir job title and primary responsibilities. Be specific: \"Freelance automation consultant\" not just \"Consultant\".\n\n### company_type\n\nClassify based on their **n8n usage context**, not just their employer:\n\n| Type               | Indicators                                                                       |\n| ------------------ | -------------------------------------------------------------------------------- |\n| **Enterprise**     | Large company, multiple departments, compliance requirements, thousands of users |\n| **SMB**            | Small/medium business, teams of 10-500, growth focus, resource constraints       |\n| **Education**      | Universities, schools, students, academic contexts                               |\n| **Freelance/solo** | One-person operation, independent consultant, solo business                      |\n| **Agency**         | Builds for multiple clients, service provider, consulting firm                   |\n| **Hobbyist**       | Personal projects, learning, non-commercial use                                  |\n| **Unknown**        | Insufficient information                                                         |\n\n### technical_ability\n\nDescribe their technical capability in 1-2 sentences. Include:\n\n- What they're comfortable with (languages, tools, concepts)\n- Where their limits are\n- How they approach technical problems\n\nExamples:\n\n- \"Strong with REST APIs, JavaScript, and relational databases. Comfortable writing custom queries and debugging integration issues independently.\"\n- \"Can follow along with code but doesn't write it. Relies on templates and pre-built nodes. Gets stuck when workflows break.\"\n- \"Non-technical. Uses n8n through templates only. Needs visual guidance for troubleshooting.\"\n\n### technical_ability_clips\n\nProvide 1-3 verbatim transcript clips that best support the technical_ability assessment. Each clip should be a direct quote showing the participant's technical capability, comfort level, or limitations. Use the nearest timestamp markers to define clip ranges.\n\n### ai_usage\n\nHow they use AI tools when building workflows:\n\n| Category                                 | Indicators                                                                            |\n| ---------------------------------------- | ------------------------------------------------------------------------------------- |\n| **Heavy reliance without understanding** | Copies AI output blindly, doesn't understand generated code, AI does the thinking     |\n| **Tool use with understanding**          | Uses AI for syntax help, reviews and modifies suggestions, demonstrates comprehension |\n| **Minimal or no AI use**                 | Rarely mentions AI, works independently                                               |\n| **Not mentioned**                        | AI usage not discussed                                                                |\n\n### ai_usage_evidence\n\nA brief quote or observation supporting the ai_usage classification.\n\n### using_n8n_for\n\nHow long they've been using n8n:\n\n- **Never used before** (first time in this session)\n- **< 6 months**\n- **6 months - 1.5 years**\n- **1.5 years - 2.5 years**\n- **> 2.5 years**\n- **Unknown**\n\nLook for: explicit timeframes, references to version changes, depth of knowledge, \"just started\" vs \"been using for years\".\n\n### profile_summary\n\n2-3 sentences describing:\n\n- Who they are and what they do\n- How they use n8n\n- Their technical context\n\n### profile_summary_clips\n\nProvide 1-3 verbatim transcript clips that best support the profile_summary. Each clip should be a direct quote where the participant describes who they are, what they do, or how they use n8n. Use the nearest timestamp markers to define clip ranges.\n\n### session_summary\n\n2-3 sentences. Adapt focus based on project type:\n\n- **usability_test**: Focus on task outcomes. What tasks were attempted, where the participant succeeded or struggled, and what blocked them.\n- **discovery_interview**: Focus on understanding the participant. Main topics discussed, key workflows or features explored, and the purpose of the conversation.\n\n## Transcript Format\n\nThe transcript contains inline timestamp markers like `[12.50]` — these are seconds into the recording. Each speaker turn starts with `S0 [0.08]:` (speaker number and start time).\n\nWhen quoting evidence for clips, use the nearest timestamp markers to define clip ranges. Each clip should have `quote`, `start_time`, and `end_time`.\n\n## Rules\n\n1. Base all classifications on evidence in the transcript only\n2. When uncertain, choose \"Unknown\" over guessing\n3. Be specific in summaries—avoid generic descriptions\n4. The ai_usage classification is critical for understanding technical capability\n5. company_type is about their n8n usage context, not just their employer\n6. Evidence clips must be verbatim quotes from the transcript with accurate timestamp ranges\n7. Each evidence clip array (technical_ability_clips, profile_summary_clips) should contain 1-3 clips\n\n## Example Output\n\n```json\n{\n  \"participant_name\": \"Belto\",\n  \"role\": \"Freelance automation consultant, ex-Atlassian senior support engineer\",\n  \"company_type\": \"Agency\",\n  \"technical_ability\": \"Strong with REST APIs, JavaScript, Python, and relational databases. Comfortable building complex webhook routing and data pipelines. Approaches problems systematically with debugging and custom HTTP requests when nodes don't exist.\",\n  \"ai_usage\": \"Tool use with understanding\",\n  \"ai_usage_evidence\": \"Uses the built-in AI assistant for help but demonstrates deep understanding of APIs, webhooks, and data transformations\",\n  \"using_n8n_for\": \"< 6 months\",\n  \"profile_summary\": \"Recently transitioned from senior support engineer at Atlassian to freelance automation consulting. Builds operational workflows for e-commerce clients, handling webhook routing, platform integrations, and data syncing. Strong technical background in REST APIs, JavaScript, Python, and databases.\",\n  \"session_summary\": \"Explored workflows built for an e-commerce client including webhook routing for Intercom, case review automation, and Shopify order monitoring. Discussed pain points around limited node coverage for Shopify/Intercom and frustrations with feature request visibility.\",\n  \"technical_ability_clips\": [\n    {\n      \"quote\": \"I usually just go straight to the HTTP Request node and build it myself, I'm comfortable with REST APIs\",\n      \"start_time\": 125.30,\n      \"end_time\": 132.10\n    },\n    {\n      \"quote\": \"I wrote a custom Python script to handle the webhook transformation before it hits n8n\",\n      \"start_time\": 345.50,\n      \"end_time\": 352.80\n    }\n  ],\n  \"profile_summary_clips\": [\n    {\n      \"quote\": \"I left Atlassian about six months ago and started doing automation consulting for e-commerce companies\",\n      \"start_time\": 45.20,\n      \"end_time\": 53.40\n    }\n  ]\n}\n```\n"
@@ -304,7 +304,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const output = $('summarizer').first().json.output;\nconst sessionId = $('sub_trigger').first().json.id;\nconst clips = [];\n\nif (output.technical_ability_clips && output.technical_ability_clips.length) {\n  for (const c of output.technical_ability_clips) {\n    clips.push({\n      session_id: sessionId,\n      text: c.quote,\n      start_time: c.start_time,\n      end_time: c.end_time,\n      evidence_field: 'technical_ability'\n    });\n  }\n}\n\nif (output.profile_summary_clips && output.profile_summary_clips.length) {\n  for (const c of output.profile_summary_clips) {\n    clips.push({\n      session_id: sessionId,\n      text: c.quote,\n      start_time: c.start_time,\n      end_time: c.end_time,\n      evidence_field: 'profile_summary'\n    });\n  }\n}\n\nif (!clips.length) return [];\nreturn clips.map(c => ({ json: c }));"
+        "jsCode": "const output = $('summarizer').first().json.output;\nconst sessionId = $('sub_trigger').first().json.id;\nconst clips = [];\n\n// Collect clips. Drop unusable timestamps - never write 0/0 rows.\nfunction collect(list, field) {\n  for (const c of list ?? []) {\n    const start = Number(c.start_time);\n    const end = Number(c.end_time);\n    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;\n    if (start < 0) continue;\n    if (end <= start) continue;\n    clips.push({\n      session_id: sessionId,\n      text: c.quote,\n      start_time: start,\n      end_time: end,\n      evidence_field: field\n    });\n  }\n}\n\ncollect(output.technical_ability_clips, 'technical_ability');\ncollect(output.profile_summary_clips, 'profile_summary');\n\n// Dedupe on the clip_evidence_unique key (evidence_field, start, end).\nconst seen = new Set();\nconst unique = clips.filter((c) => {\n  const key = `${c.evidence_field}|${c.start_time}|${c.end_time}`;\n  if (seen.has(key)) return false;\n  seen.add(key);\n  return true;\n});\n\nif (!unique.length) return [];\nreturn unique.map((c) => ({ json: c }));"
       },
       "id": "a703e333-2b2a-451a-b2a4-51d027cee830",
       "name": "prepare_clips",
@@ -361,6 +361,19 @@
           "name": "Supabase API"
         }
       }
+    },
+    {
+      "id": "c1e0de2d-1485-4f0d-9b99-3b2821b43614",
+      "name": "prime",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        736
+      ],
+      "parameters": {
+        "jsCode": "// Build a transcript with inline timestamp markers from transcript_object.\n// Same pattern as the prime node in JobAnalysis / OpportunityAnalysis.\nconst session = $('get_session').first().json;\nconst project = $input.first().json;\nconst words = session.transcript_object;\n\nlet transcript = session.transcript;\nlet duration = null;\n\nif (Array.isArray(words) && words.length) {\n  const MARKER_EVERY = 20; // timestamp marker every N words\n  const lines = [];\n  let currentSpeaker = null;\n  let wordCount = 0;\n  let lineWords = [];\n\n  for (const w of words) {\n    if (w.speaker !== currentSpeaker) {\n      if (lineWords.length) {\n        lines.push(lineWords.join(' '));\n      }\n      currentSpeaker = w.speaker;\n      wordCount = 0;\n      lineWords = [`\\nS${w.speaker} [${w.start.toFixed(2)}]:`];\n    }\n\n    if (wordCount > 0 && wordCount % MARKER_EVERY === 0) {\n      lineWords.push(`[${w.start.toFixed(2)}]`);\n    }\n\n    lineWords.push(w.punctuated_word);\n    wordCount++;\n  }\n\n  if (lineWords.length) {\n    lines.push(lineWords.join(' '));\n  }\n\n  transcript = lines.join('').trim();\n  duration = words[words.length - 1].end;\n}\n\nreturn [{ json: { type: project.type, script: project.script, transcript, duration } }];"
+      }
     }
   ],
   "connections": {
@@ -380,17 +393,6 @@
         [
           {
             "node": "get_project",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "get_project": {
-      "main": [
-        [
-          {
-            "node": "summarizer",
             "type": "main",
             "index": 0
           }
@@ -483,6 +485,28 @@
           }
         ]
       ]
+    },
+    "get_project": {
+      "main": [
+        [
+          {
+            "node": "prime",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prime": {
+      "main": [
+        [
+          {
+            "node": "summarizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -492,7 +516,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "107b9425-6005-4203-b339-481dc47ccf69",
+  "versionId": "1bd55391-e3b3-48c9-9a1d-dcf1bd7eafdb",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

@@ -4,21 +4,20 @@
   "description": "App-facing webhook (DWN-39, DWN-41). Drops the old analysis (reanalyse_drop_old RPC), then re-runs the analysis chain. Rebuilds transcript and Mux asset from Drive when missing. Shared-secret auth. Responds immediately; runs async.",
   "nodes": [
     {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reanalyse-session",
+        "authentication": "headerAuth",
+        "options": {}
+      },
       "id": "1010a44b-0995-43cc-b4cf-3ddd827d64da",
       "name": "Re-analyse",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        0,
-        0
+        -112,
+        -96
       ],
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "reanalyse-session",
-        "authentication": "headerAuth",
-        "responseMode": "onReceived",
-        "options": {}
-      },
       "webhookId": "18a60e87-128e-4e97-9279-b9ce27a509a2",
       "credentials": {
         "httpHeaderAuth": {
@@ -28,14 +27,6 @@
       }
     },
     {
-      "id": "00fee4a7-5eb3-4495-8662-2c45751e3c62",
-      "name": "Get Session",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        224,
-        0
-      ],
       "parameters": {
         "operation": "get",
         "tableId": "session",
@@ -48,6 +39,14 @@
           ]
         }
       },
+      "id": "00fee4a7-5eb3-4495-8662-2c45751e3c62",
+      "name": "Get Session",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        112,
+        -96
+      ],
       "credentials": {
         "supabaseApi": {
           "id": "gBIPPKjo4dshypxE",
@@ -56,14 +55,6 @@
       }
     },
     {
-      "id": "2c707906-04e7-4d55-adb0-24a8cb8ecce8",
-      "name": "Session Exists?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        448,
-        0
-      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -84,20 +75,18 @@
           "combinator": "and"
         },
         "options": {}
-      }
+      },
+      "id": "2c707906-04e7-4d55-adb0-24a8cb8ecce8",
+      "name": "Session Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        336,
+        -96
+      ]
     },
     {
-      "id": "5f24dcb8-4e92-47bb-bb79-023c697e05e8",
-      "name": "Run SessionAnalysis",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        1792,
-        0
-      ],
       "parameters": {
-        "mode": "once",
-        "source": "database",
         "workflowId": {
           "__rl": true,
           "mode": "id",
@@ -130,20 +119,18 @@
           "waitForSubWorkflow": true
         }
       },
-      "alwaysOutputData": true
-    },
-    {
-      "id": "bc9cb3f7-e6ca-49af-8055-fd7aa7180856",
-      "name": "Run JobAnalysis",
+      "id": "5f24dcb8-4e92-47bb-bb79-023c697e05e8",
+      "name": "Run SessionAnalysis",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        2016,
-        0
+        1824,
+        -64
       ],
+      "alwaysOutputData": true
+    },
+    {
       "parameters": {
-        "mode": "once",
-        "source": "database",
         "workflowId": {
           "__rl": true,
           "mode": "id",
@@ -176,20 +163,18 @@
           "waitForSubWorkflow": true
         }
       },
-      "alwaysOutputData": true
-    },
-    {
-      "id": "9755bc6a-10bf-4707-bc25-bff48b8f4764",
-      "name": "Run OpportunityAnalysis",
+      "id": "bc9cb3f7-e6ca-49af-8055-fd7aa7180856",
+      "name": "Run JobAnalysis",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        2240,
-        0
+        2048,
+        -64
       ],
+      "alwaysOutputData": true
+    },
+    {
       "parameters": {
-        "mode": "once",
-        "source": "database",
         "workflowId": {
           "__rl": true,
           "mode": "id",
@@ -221,22 +206,30 @@
         "options": {
           "waitForSubWorkflow": true
         }
-      }
+      },
+      "id": "9755bc6a-10bf-4707-bc25-bff48b8f4764",
+      "name": "Run OpportunityAnalysis",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2272,
+        -64
+      ]
     },
     {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from public.reanalyse_drop_old('{{ $('Get Session').item.json.id }}'::uuid)",
+        "options": {}
+      },
       "id": "3d4278c5-41a0-41bf-a2a9-289f8b33208f",
       "name": "Drop Old Analysis",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        672,
-        0
+        560,
+        -96
       ],
-      "parameters": {
-        "operation": "executeQuery",
-        "options": {},
-        "query": "select * from public.reanalyse_drop_old('{{ $('Get Session').item.json.id }}'::uuid)"
-      },
       "credentials": {
         "postgres": {
           "id": "Av2ehn3RdLrlzohO",
@@ -245,14 +238,6 @@
       }
     },
     {
-      "id": "f139ccf3-f383-40c7-8f35-1a85843d7573",
-      "name": "Has Transcript?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        896,
-        0
-      ],
       "parameters": {
         "conditions": {
           "combinator": "and",
@@ -273,17 +258,17 @@
           }
         },
         "options": {}
-      }
-    },
-    {
-      "id": "2d75bce1-c6fb-4450-97c9-7a787a27e933",
-      "name": "Has Drive File?",
+      },
+      "id": "f139ccf3-f383-40c7-8f35-1a85843d7573",
+      "name": "Has Transcript?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1120,
-        420
-      ],
+        784,
+        -96
+      ]
+    },
+    {
       "parameters": {
         "conditions": {
           "combinator": "and",
@@ -304,41 +289,49 @@
           }
         },
         "options": {}
-      }
+      },
+      "id": "2d75bce1-c6fb-4450-97c9-7a787a27e933",
+      "name": "Has Drive File?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        416
+      ]
     },
     {
+      "parameters": {
+        "errorMessage": "=Cannot re-analyse session {{ $('Get Session').item.json.id }}: it has no transcript and no Google Drive recording."
+      },
       "id": "3db885cf-f30f-4c34-bac4-e667850a2671",
       "name": "Cannot Repair",
       "type": "n8n-nodes-base.stopAndError",
       "typeVersion": 1,
       "position": [
-        1344,
-        640
-      ],
-      "parameters": {
-        "errorMessage": "=Cannot re-analyse session {{ $('Get Session').item.json.id }}: it has no transcript and no Google Drive recording."
-      }
+        1296,
+        512
+      ]
     },
     {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mux.com/video/v1/uploads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"new_asset_settings\":{\"playback_policy\":[\"signed\"],\"passthrough\":\"{{ $('Get Session').item.json.id }}\",\"static_renditions\":[{\"resolution\":\"audio-only\"}]},\"cors_origin\":\"*\"}",
+        "options": {}
+      },
       "id": "ab16c88f-0e8b-4b57-a754-373f9199ff10",
       "name": "Create Mux Upload",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1344,
-        420
+        1296,
+        320
       ],
-      "parameters": {
-        "authentication": "genericCredentialType",
-        "body": "={\"new_asset_settings\":{\"playback_policy\":[\"signed\"],\"passthrough\":\"{{ $('Get Session').item.json.id }}\"},\"cors_origin\":\"*\"}",
-        "contentType": "raw",
-        "genericAuthType": "httpBasicAuth",
-        "method": "POST",
-        "options": {},
-        "rawContentType": "application/json",
-        "sendBody": true,
-        "url": "https://api.mux.com/video/v1/uploads"
-      },
       "credentials": {
         "httpBasicAuth": {
           "id": "5x6NsEhRpJiFmxHV",
@@ -347,23 +340,23 @@
       }
     },
     {
-      "id": "62e84912-bd9e-44eb-98e7-5f9b3abbf960",
-      "name": "Download Recording",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        1568,
-        420
-      ],
       "parameters": {
+        "operation": "download",
         "fileId": {
           "__rl": true,
           "mode": "id",
           "value": "={{ $('Get Session').item.json.google_drive_id }}"
         },
-        "operation": "download",
         "options": {}
       },
+      "id": "62e84912-bd9e-44eb-98e7-5f9b3abbf960",
+      "name": "Download Recording",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1520,
+        320
+      ],
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "bXwaLvJM3XTPyBDr",
@@ -372,23 +365,12 @@
       }
     },
     {
-      "id": "46d9e32f-1f8c-47ab-b769-1acfdb15f175",
-      "name": "Transcribe",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        1792,
-        420
-      ],
       "parameters": {
-        "authentication": "genericCredentialType",
-        "contentType": "binaryData",
-        "genericAuthType": "httpHeaderAuth",
-        "inputDataFieldName": "data",
         "method": "POST",
-        "options": {
-          "timeout": 3600000
-        },
+        "url": "https://api.deepgram.com/v1/listen",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
         "queryParameters": {
           "parameters": [
             {
@@ -414,9 +396,21 @@
           ]
         },
         "sendBody": true,
-        "sendQuery": true,
-        "url": "https://api.deepgram.com/v1/listen"
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"url\": \"https://stream.mux.com/{{ $('Get Asset').first().json.data.playback_ids[0].id }}/audio.m4a?token={{ $json.token }}\"}",
+        "options": {
+          "timeout": 3600000
+        }
       },
+      "id": "46d9e32f-1f8c-47ab-b769-1acfdb15f175",
+      "name": "Transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3312,
+        112
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "FpZWv77fELD2tvF3",
@@ -425,15 +419,18 @@
       }
     },
     {
-      "id": "5ea499c7-d694-4e8f-8e7c-2c2d42cf47f3",
-      "name": "Save Transcript",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        2016,
-        420
-      ],
       "parameters": {
+        "operation": "update",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Session').item.json.id }}"
+            }
+          ]
+        },
         "fieldsUi": {
           "fieldValues": [
             {
@@ -445,19 +442,16 @@
               "fieldValue": "={{ $json.results.channels[0].alternatives[0].words }}"
             }
           ]
-        },
-        "filters": {
-          "conditions": [
-            {
-              "condition": "eq",
-              "keyName": "id",
-              "keyValue": "={{ $('Get Session').item.json.id }}"
-            }
-          ]
-        },
-        "operation": "update",
-        "tableId": "session"
+        }
       },
+      "id": "5ea499c7-d694-4e8f-8e7c-2c2d42cf47f3",
+      "name": "Save Transcript",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        -128
+      ],
       "credentials": {
         "supabaseApi": {
           "id": "gBIPPKjo4dshypxE",
@@ -466,18 +460,7 @@
       }
     },
     {
-      "id": "024ac5a5-53bf-4572-a20e-d182903e392d",
-      "name": "Build Session Vectors",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        2240,
-        540
-      ],
       "parameters": {
-        "options": {
-          "waitForSubWorkflow": false
-        },
         "workflowId": {
           "__rl": true,
           "mode": "id",
@@ -510,51 +493,25 @@
             "session_id": "={{ $('Get Session').item.json.id }}",
             "words": "={{ $('Transcribe').item.json.results.channels[0].alternatives[0].words }}"
           }
-        }
-      }
-    },
-    {
-      "id": "c60e095d-48ae-4a5c-8ff8-dcc36d33cd54",
-      "name": "Needs Mux Upload?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        1792,
-        660
-      ],
-      "parameters": {
-        "conditions": {
-          "combinator": "and",
-          "conditions": [
-            {
-              "leftValue": "={{ $('Get Session').item.json.mux_playback_id }}",
-              "operator": {
-                "operation": "notExists",
-                "type": "string"
-              }
-            }
-          ],
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          }
         },
-        "options": {}
-      }
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "024ac5a5-53bf-4572-a20e-d182903e392d",
+      "name": "Build Session Vectors",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1536,
+        64
+      ]
     },
     {
-      "id": "dd0082d6-3327-465e-8d78-b72d8cfa68fc",
-      "name": "Upload to Mux",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        2016,
-        660
-      ],
       "parameters": {
-        "contentType": "binaryData",
+        "method": "PUT",
+        "url": "={{ $('Create Mux Upload').item.json.data.url }}",
+        "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
@@ -563,46 +520,51 @@
             }
           ]
         },
+        "sendBody": true,
+        "contentType": "binaryData",
         "inputDataFieldName": "data",
-        "method": "PUT",
         "options": {
           "timeout": 3600000
-        },
-        "sendBody": true,
-        "sendHeaders": true,
-        "url": "={{ $('Create Mux Upload').item.json.data.url }}"
-      }
+        }
+      },
+      "id": "dd0082d6-3327-465e-8d78-b72d8cfa68fc",
+      "name": "Upload to Mux",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1744,
+        320
+      ]
     },
     {
+      "parameters": {
+        "amount": 60
+      },
       "id": "239b1f9a-1f44-45a2-89d4-6c5ba585204e",
       "name": "Wait for Asset",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2240,
-        660
+        1968,
+        320
       ],
-      "parameters": {
-        "amount": 60
-      },
       "webhookId": "a6e77620-22cd-402f-8961-aa5bacc21d24"
     },
     {
+      "parameters": {
+        "url": "=https://api.mux.com/video/v1/uploads/{{ $('Create Mux Upload').first().json.data.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
       "id": "58716945-9308-4faf-9fe9-4a1eee7ae906",
       "name": "Get Upload",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2464,
-        660
+        2192,
+        320
       ],
-      "parameters": {
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "method": "GET",
-        "options": {},
-        "url": "=https://api.mux.com/video/v1/uploads/{{ $('Create Mux Upload').first().json.data.id }}"
-      },
       "credentials": {
         "httpBasicAuth": {
           "id": "5x6NsEhRpJiFmxHV",
@@ -611,21 +573,20 @@
       }
     },
     {
+      "parameters": {
+        "url": "=https://api.mux.com/video/v1/assets/{{ $('Get Upload').first().json.data.asset_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
       "id": "0a0325c4-0652-4008-bc1f-c3e2e0ffe9a6",
       "name": "Get Asset",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2688,
-        660
+        2416,
+        320
       ],
-      "parameters": {
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "method": "GET",
-        "options": {},
-        "url": "=https://api.mux.com/video/v1/assets/{{ $json.data.asset_id }}"
-      },
       "credentials": {
         "httpBasicAuth": {
           "id": "5x6NsEhRpJiFmxHV",
@@ -634,15 +595,18 @@
       }
     },
     {
-      "id": "527c105a-8fcc-4027-ab12-3490c7150b29",
-      "name": "Save Playback ID",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        2912,
-        660
-      ],
       "parameters": {
+        "operation": "update",
+        "tableId": "session",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Session').item.json.id }}"
+            }
+          ]
+        },
         "fieldsUi": {
           "fieldValues": [
             {
@@ -650,23 +614,152 @@
               "fieldValue": "={{ $json.data.playback_ids[0].id }}"
             }
           ]
-        },
-        "filters": {
-          "conditions": [
-            {
-              "condition": "eq",
-              "keyName": "id",
-              "keyValue": "={{ $('Get Session').item.json.id }}"
-            }
-          ]
-        },
-        "operation": "update",
-        "tableId": "session"
+        }
       },
+      "id": "527c105a-8fcc-4027-ab12-3490c7150b29",
+      "name": "Save Playback ID",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2864,
+        112
+      ],
       "credentials": {
         "supabaseApi": {
           "id": "gBIPPKjo4dshypxE",
           "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.status }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "ready"
+            },
+            {
+              "leftValue": "={{ ($json.data.static_renditions?.files ?? []).some(f => f.name === 'audio.m4a' && f.status === 'ready') }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          }
+        },
+        "options": {},
+        "looseTypeValidation": true
+      },
+      "id": "0bebf7a0-a6de-45e6-982e-dc538e1cd0fa",
+      "name": "Asset and Rendition Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.status }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "errored"
+            },
+            {
+              "leftValue": "={{ ($json.data.static_renditions?.files ?? []).some(f => f.status === 'errored' || f.status === 'skipped') }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          }
+        },
+        "options": {},
+        "looseTypeValidation": true
+      },
+      "id": "7917b5ad-d1b3-42d4-a90f-f2d901cca19a",
+      "name": "Rendition Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2864,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "id": "b4b58ab3-0621-4510-9b39-40b8c01c04aa",
+      "name": "Wait Rendition",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3088,
+        512
+      ],
+      "webhookId": "b6c6b6d2-1371-4354-82a3-5d642cf58a0f"
+    },
+    {
+      "parameters": {
+        "errorMessage": "=Mux audio rendition failed for session {{ $('Get Session').first().json.id }}. Asset: {{ $json.data.id }}."
+      },
+      "id": "3415afaf-a71e-43e5-a0a2-b7b4274eb71e",
+      "name": "Rendition Failed",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        3088,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sign",
+        "useJson": true,
+        "claimsJson": "={{ JSON.stringify({ sub: $('Get Asset').first().json.data.playback_ids[0].id, aud: \"v\", exp: Math.floor(Date.now() / 1000) + 7200 }) }}",
+        "options": {
+          "kid": "02nvQ6ppSjC701U72TOE3CLuxtcy6DEWiky35HTiuujp00",
+          "algorithm": "RS256"
+        }
+      },
+      "id": "4e1ac286-655c-41a5-97b9-0a4c5a9533cf",
+      "name": "Sign Playback URL",
+      "type": "n8n-nodes-base.jwt",
+      "typeVersion": 1,
+      "position": [
+        3088,
+        112
+      ],
+      "credentials": {
+        "jwtAuth": {
+          "id": "FJ6eJ1ireXWHmACj",
+          "name": "Mux Playback Signing"
         }
       }
     }
@@ -785,22 +878,6 @@
         ]
       ]
     },
-    "Download Recording": {
-      "main": [
-        [
-          {
-            "node": "Transcribe",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Needs Mux Upload?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Transcribe": {
       "main": [
         [
@@ -822,17 +899,6 @@
         [
           {
             "node": "Run SessionAnalysis",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Needs Mux Upload?": {
-      "main": [
-        [
-          {
-            "node": "Upload to Mux",
             "type": "main",
             "index": 0
           }
@@ -872,11 +938,91 @@
         ]
       ]
     },
+    "Download Recording": {
+      "main": [
+        [
+          {
+            "node": "Upload to Mux",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Get Asset": {
       "main": [
         [
           {
+            "node": "Asset and Rendition Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asset and Rendition Ready?": {
+      "main": [
+        [
+          {
             "node": "Save Playback ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rendition Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rendition Failed?": {
+      "main": [
+        [
+          {
+            "node": "Rendition Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Rendition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Rendition": {
+      "main": [
+        [
+          {
+            "node": "Get Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Playback ID": {
+      "main": [
+        [
+          {
+            "node": "Sign Playback URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Playback URL": {
+      "main": [
+        [
+          {
+            "node": "Transcribe",
             "type": "main",
             "index": 0
           }
@@ -887,10 +1033,11 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "errorWorkflow": "iDcm070UekOYt0f1"
+    "errorWorkflow": "iDcm070UekOYt0f1",
+    "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "0b768ef0-dcbc-4014-ace8-d3b1ea3842b7",
+  "versionId": "57861bd1-5b7c-45da-a012-0574df0dca65",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -900,33 +1047,6 @@
   "isArchived": false,
   "nodeGroups": [
     {
-      "id": "b8f8ba3a-a720-4b3f-b157-fee5e962ba80",
-      "name": "Drop Old Analysis",
-      "nodeIds": [
-        "3d4278c5-41a0-41bf-a2a9-289f8b33208f"
-      ]
-    },
-    {
-      "id": "432f0572-a4ae-429c-aadd-8897add21d62",
-      "name": "Repair transcript and video",
-      "nodeIds": [
-        "2d75bce1-c6fb-4450-97c9-7a787a27e933",
-        "ab16c88f-0e8b-4b57-a754-373f9199ff10",
-        "62e84912-bd9e-44eb-98e7-5f9b3abbf960",
-        "46d9e32f-1f8c-47ab-b769-1acfdb15f175",
-        "5ea499c7-d694-4e8f-8e7c-2c2d42cf47f3",
-        "024ac5a5-53bf-4572-a20e-d182903e392d",
-        "c60e095d-48ae-4a5c-8ff8-dcc36d33cd54",
-        "dd0082d6-3327-465e-8d78-b72d8cfa68fc",
-        "239b1f9a-1f44-45a2-89d4-6c5ba585204e",
-        "58716945-9308-4faf-9fe9-4a1eee7ae906",
-        "0a0325c4-0652-4008-bc1f-c3e2e0ffe9a6",
-        "527c105a-8fcc-4027-ab12-3490c7150b29",
-        "3db885cf-f30f-4c34-bac4-e667850a2671"
-      ],
-      "description": "Re-uses the ingestion steps: Drive download, Deepgram transcript, session vectors, and a Mux asset when the session has none."
-    },
-    {
       "id": "eab3567c-1025-47aa-90ab-e9efa97a9b2f",
       "name": "Analysis chain",
       "nodeIds": [
@@ -935,6 +1055,27 @@
         "9755bc6a-10bf-4707-bc25-bff48b8f4764"
       ],
       "description": "SessionAnalysis, JobAnalysis, OpportunityAnalysis — the same chain the ingestion flow runs."
+    },
+    {
+      "id": "c64430e4-2c89-495b-a328-0bdd36a3dacc",
+      "name": "Upload and transcribe",
+      "nodeIds": [
+        "2d75bce1-c6fb-4450-97c9-7a787a27e933",
+        "3db885cf-f30f-4c34-bac4-e667850a2671",
+        "ab16c88f-0e8b-4b57-a754-373f9199ff10",
+        "62e84912-bd9e-44eb-98e7-5f9b3abbf960",
+        "46d9e32f-1f8c-47ab-b769-1acfdb15f175",
+        "dd0082d6-3327-465e-8d78-b72d8cfa68fc",
+        "239b1f9a-1f44-45a2-89d4-6c5ba585204e",
+        "58716945-9308-4faf-9fe9-4a1eee7ae906",
+        "0a0325c4-0652-4008-bc1f-c3e2e0ffe9a6",
+        "527c105a-8fcc-4027-ab12-3490c7150b29",
+        "0bebf7a0-a6de-45e6-982e-dc538e1cd0fa",
+        "7917b5ad-d1b3-42d4-a90f-f2d901cca19a",
+        "b4b58ab3-0621-4510-9b39-40b8c01c04aa",
+        "3415afaf-a71e-43e5-a0a2-b7b4274eb71e",
+        "4e1ac286-655c-41a5-97b9-0a4c5a9533cf"
+      ]
     }
   ]
 }
