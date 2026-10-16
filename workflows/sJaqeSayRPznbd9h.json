@@ -166,7 +166,7 @@
       ],
       "id": "0c40bc4e-717c-442d-86c3-463b6603d90e",
       "name": "call_sub",
-      "onError": "continueRegularOutput"
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -618,6 +618,33 @@
         }
       },
       "webhookId": "035799e3-af97-466b-af27-7c1a97bef107"
+    },
+    {
+      "id": "15b05d0e-865f-4047-b1fb-560af1663119",
+      "name": "Post Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2064,
+        560
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C09DRCJLQCE"
+        },
+        "text": "=⚠️ SessionIngestion: analysis failed for \"{{ $('item').item.json.name }}\" (drive id {{ $('item').item.json.id }}): {{ $json.error?.message ?? 'see execution log' }}. The session will not retry by itself. Fix the cause, then call re-analyse with force_retranscribe.",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "e672450c-4aea-4bbc-8508-ba491c15c79c"
     }
   ],
   "connections": {
@@ -666,6 +693,13 @@
         [
           {
             "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Failure",
             "type": "main",
             "index": 0
           }
@@ -880,6 +914,17 @@
           }
         ]
       ]
+    },
+    "Post Failure": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -892,7 +937,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
-  "versionId": "5d0826af-8f43-4c09-9d52-51d7e9b421ba",
+  "versionId": "c6e74555-c3fa-44ff-861d-acc30a3dd329",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -910,7 +955,8 @@
         "108fb0d6-3732-4535-88d0-749ad83b5a7c",
         "3219ad7f-9609-4db2-9265-d992cc7ed314",
         "4fea032f-d0d6-4838-a4d1-d0c628edabf3",
-        "76b1427d-3ae0-48ba-ad30-230c38e09943"
+        "76b1427d-3ae0-48ba-ad30-230c38e09943",
+        "15b05d0e-865f-4047-b1fb-560af1663119"
       ]
     },
     {

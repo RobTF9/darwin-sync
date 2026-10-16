@@ -248,6 +248,13 @@
                 "operation": "true",
                 "type": "boolean"
               }
+            },
+            {
+              "leftValue": "={{ $('Re-analyse').item.json.body.force_retranscribe !== true }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              }
             }
           ],
           "options": {
@@ -1037,7 +1044,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "78aafd73-2888-49e9-8eac-f30ad109ee24",
+  "versionId": "f15f76de-e8ed-46bd-885b-e67db1ea0b57",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
