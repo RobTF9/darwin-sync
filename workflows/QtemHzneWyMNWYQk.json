@@ -407,7 +407,12 @@
         "rawContentType": "application/json",
         "body": "={\"url\": \"https://stream.mux.com/{{ $('Get Asset').first().json.data.playback_ids[0].id }}/audio.m4a?token={{ $json.token }}\"}",
         "options": {
-          "timeout": 3600000
+          "timeout": 3600000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
         }
       },
       "id": "46d9e32f-1f8c-47ab-b769-1acfdb15f175",
@@ -498,7 +503,7 @@
           ],
           "value": {
             "session_id": "={{ $('Get Session').item.json.id }}",
-            "words": "={{ $('Transcribe').item.json.results.channels[0].alternatives[0].words }}"
+            "words": "={{ $('Decode Transcription').item.json.results.channels[0].alternatives[0].words }}"
           }
         },
         "options": {
@@ -769,6 +774,19 @@
           "name": "Mux Playback Signing"
         }
       }
+    },
+    {
+      "id": "09d7949c-7269-4863-808c-93bdb192a368",
+      "name": "Decode Transcription",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3536,
+        112
+      ],
+      "parameters": {
+        "jsCode": "// DWN-67: decode the Deepgram response as UTF-8 explicitly.\n// The HTTP node's charset sniffer misread Turkish UTF-8 as a Chinese\n// codepage and produced CJK mojibake. Raw bytes in, exact UTF-8 out.\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nreturn [{ json: JSON.parse(buffer.toString('utf8')) }];"
+      }
     }
   ],
   "connections": {
@@ -879,22 +897,6 @@
         [
           {
             "node": "Download Recording",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Transcribe": {
-      "main": [
-        [
-          {
-            "node": "Save Transcript",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Build Session Vectors",
             "type": "main",
             "index": 0
           }
@@ -1035,6 +1037,33 @@
           }
         ]
       ]
+    },
+    "Transcribe": {
+      "main": [
+        [
+          {
+            "node": "Decode Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Transcription": {
+      "main": [
+        [
+          {
+            "node": "Save Transcript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Session Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1044,7 +1073,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "f15f76de-e8ed-46bd-885b-e67db1ea0b57",
+  "versionId": "4ac5f8ee-d785-4c8f-873f-91c39d2ae334",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -1072,6 +1101,7 @@
         "ab16c88f-0e8b-4b57-a754-373f9199ff10",
         "62e84912-bd9e-44eb-98e7-5f9b3abbf960",
         "46d9e32f-1f8c-47ab-b769-1acfdb15f175",
+        "09d7949c-7269-4863-808c-93bdb192a368",
         "dd0082d6-3327-465e-8d78-b72d8cfa68fc",
         "239b1f9a-1f44-45a2-89d4-6c5ba585204e",
         "58716945-9308-4faf-9fe9-4a1eee7ae906",
