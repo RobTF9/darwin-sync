@@ -378,8 +378,8 @@
               "value": "true"
             },
             {
-              "name": "language",
-              "value": "multi"
+              "name": "detect_language",
+              "value": "true"
             },
             {
               "name": "model",
@@ -927,7 +927,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "2ccd9c29-db1d-412c-97a9-f2876a8dcf4f",
+  "versionId": "d270938e-ec49-429e-8044-938e7b2f3102",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

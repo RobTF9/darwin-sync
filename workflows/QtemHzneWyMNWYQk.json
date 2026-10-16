@@ -378,8 +378,8 @@
               "value": "true"
             },
             {
-              "name": "language",
-              "value": "multi"
+              "name": "detect_language",
+              "value": "true"
             },
             {
               "name": "model",
@@ -1037,7 +1037,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "57861bd1-5b7c-45da-a012-0574df0dca65",
+  "versionId": "78aafd73-2888-49e9-8eac-f30ad109ee24",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
