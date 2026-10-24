@@ -1,0 +1,76 @@
+{
+  "id": "EqDHuJtc4r2yxa91",
+  "name": "B",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        272,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "OOZ2EieCxBmsY2zG",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/OOZ2EieCxBmsY2zG",
+          "cachedResultName": "Darwin — C"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        528,
+        352
+      ],
+      "id": "7e56a65e-e4b6-436c-a41e-38070d29b51b",
+      "name": "Call 'C'"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Call 'C'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "06f52450-dddb-471a-ab7c-d81e79e2c246",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "NFLpboCe3qkMgY3W",
+  "isArchived": false,
+  "nodeGroups": []
+}

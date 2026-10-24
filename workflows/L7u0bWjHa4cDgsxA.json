@@ -1,0 +1,78 @@
+{
+  "id": "L7u0bWjHa4cDgsxA",
+  "name": "A",
+  "description": null,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "76706b0d-d2d8-4ffb-901c-29349ed37e0f",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        336,
+        352
+      ],
+      "id": "db854d95-c2d4-4bd8-b669-0df4ae790865",
+      "name": "Webhook",
+      "webhookId": "76706b0d-d2d8-4ffb-901c-29349ed37e0f"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "EqDHuJtc4r2yxa91",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/EqDHuJtc4r2yxa91",
+          "cachedResultName": "Darwin — B"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        528,
+        352
+      ],
+      "id": "b57f7f3f-5fcb-4d0e-953f-fd022226e28e",
+      "name": "Call B"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Call B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "triggerCount": 1,
+  "versionId": "e7d8d968-b98b-4d12-a36b-7d3c522e97ab",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "NFLpboCe3qkMgY3W",
+  "isArchived": false,
+  "nodeGroups": []
+}
