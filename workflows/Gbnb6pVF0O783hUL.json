@@ -151,38 +151,6 @@
       }
     },
     {
-      "id": "74f450fa-bdec-4f19-b00c-a574f4d8b6fc",
-      "name": "Get Host Sessions",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        1168,
-        192
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "host_email",
-              "condition": "eq",
-              "keyValue": "={{ ($json.user?.profile?.email || 'none').toLowerCase() }}"
-            }
-          ]
-        },
-        "returnAll": true
-      },
-      "alwaysOutputData": true
-    },
-    {
       "id": "abb111de-60d7-4575-8213-1a105279e004",
       "name": "Pick Session",
       "type": "n8n-nodes-base.code",
@@ -194,7 +162,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Finds the host's open sessions and decides what to start.\nconst input = $('Resolve Input').first().json;\nconst cfg = $('Load Config').first().json;\nconst tz = cfg.timezone;\nconst host = $('Find Host By Slack Id').first().json;\nconst hostEmail = (host.user?.profile?.email || '').toLowerCase();\n\nconst say = (action, response, extra = {}) => [{ json: { action, response, host_email: hostEmail, ...extra } }];\n\nif (!host.ok || !hostEmail) {\n  return say('none', 'I could not find your email address in Slack, so I cannot look up your sessions.');\n}\nif (cfg.mockMode && !cfg.allowedHostEmails.includes(hostEmail)) {\n  return say('none', 'Test mode: this feature only works for the test host right now.');\n}\n\nconst OPEN = {\n  unanswered: 'not confirmed yet',\n  showed_up: 'joined, no reward yet',\n  reward_blocked: 'reward blocked, balance was too low',\n};\nconst now = $now.toMillis();\nconst since = $now.minus({ days: cfg.manualLookbackDays }).toMillis();\nconst rows = $('Get Host Sessions').all().map((i) => i.json).filter((r) => r.id);\nconst open = rows\n  .filter((r) => r.booking_status === 'active' && OPEN[r.followup_status])\n  .filter((r) => { const t = DateTime.fromISO(r.starts_at).toMillis(); return t <= now && t >= since; })\n  .sort((a, b) => DateTime.fromISO(b.starts_at).toMillis() - DateTime.fromISO(a.starts_at).toMillis());\n\nconst label = (r, i) => `${i + 1}. ${r.participant_name || r.participant_email}, ${DateTime.fromISO(r.starts_at).setZone(tz).toFormat('ccc d LLL, HH:mm')} (${OPEN[r.followup_status]})`;\n\nif (open.length === 0) {\n  return say('none', `You have no open sessions from the last ${cfg.manualLookbackDays} days. Every session is rewarded, declined or marked as a no-show.`);\n}\n\nlet chosen = null;\nif (input.invitee_uri) chosen = open.find((r) => r.invitee_uri === input.invitee_uri) || null;\nelse if (input.session_number) chosen = open[Number(input.session_number) - 1] || null;\nelse if (open.length === 1) chosen = open[0];\n\nif (!chosen) {\n  const wrongPick = input.session_number || input.invitee_uri ? 'I could not find that session. ' : '';\n  return say('list', `${wrongPick}You have ${open.length} open sessions:\\n${open.map(label).join('\\n')}\\nWhich one do you mean? Reply with the number.`, {\n    sessions: open.map((r, i) => ({ number: i + 1, invitee_uri: r.invitee_uri, participant: r.participant_name, starts_at: r.starts_at, status: r.followup_status })),\n  });\n}\n\nconst who = chosen.participant_name || chosen.participant_email;\nconst day = DateTime.fromISO(chosen.starts_at).setZone(tz).toFormat('ccc d LLL');\nif (chosen.followup_status === 'unanswered') {\n  return say('followup', `OK. I sent you a DM to confirm if ${who} joined your session on ${day}. If yes, I will then ask about the reward.`, { invitee_uri: chosen.invitee_uri });\n}\nreturn say('reward', `OK. I sent you a DM to choose the reward for ${who} (session on ${day}).`, { invitee_uri: chosen.invitee_uri });\n"
+        "jsCode": "// Finds the host's open sessions and decides what to start.\nconst input = $('Resolve Input').first().json;\nconst cfg = $('Load Config').first().json;\nconst tz = cfg.timezone;\nconst host = $('Find Host By Slack Id').first().json;\nconst hostEmail = (host.user?.profile?.email || '').toLowerCase();\n\nconst say = (action, response, extra = {}) => [{ json: { action, response, host_email: hostEmail, ...extra } }];\n\nif (!host.ok || !hostEmail) {\n  return say('none', 'I could not find your email address in Slack, so I cannot look up your sessions.');\n}\n// Host list from PF Config: the test host (mock) or the pilot hosts (production). Empty = all hosts.\nif (cfg.hostAllowList.length && !cfg.hostAllowList.includes(hostEmail)) {\n  return say('none', cfg.mockMode ? 'Test mode: this feature only works for the test host right now.' : cfg.pilotUnavailableText);\n}\n\nconst OPEN = {\n  unanswered: 'not confirmed yet',\n  showed_up: 'joined, no reward yet',\n  reward_blocked: 'reward blocked, balance was too low',\n};\nconst now = $now.toMillis();\nconst since = $now.minus({ days: cfg.manualLookbackDays }).toMillis();\nconst rows = $('Get Host Sessions').all().map((i) => i.json).filter((r) => r.id);\nconst open = rows\n  .filter((r) => r.booking_status === 'active' && OPEN[r.followup_status])\n  .filter((r) => { const t = DateTime.fromISO(r.starts_at).toMillis(); return t <= now && t >= since; })\n  .sort((a, b) => DateTime.fromISO(b.starts_at).toMillis() - DateTime.fromISO(a.starts_at).toMillis());\n\nconst label = (r, i) => `${i + 1}. ${r.participant_name || r.participant_email}, ${DateTime.fromISO(r.starts_at).setZone(tz).toFormat('ccc d LLL, HH:mm')} (${OPEN[r.followup_status]})`;\n\nif (open.length === 0) {\n  return say('none', `You have no open sessions from the last ${cfg.manualLookbackDays} days. Every session is rewarded, declined or marked as a no-show.`);\n}\n\nlet chosen = null;\nif (input.invitee_uri) chosen = open.find((r) => r.invitee_uri === input.invitee_uri) || null;\nelse if (input.session_number) chosen = open[Number(input.session_number) - 1] || null;\nelse if (open.length === 1) chosen = open[0];\n\nif (!chosen) {\n  const wrongPick = input.session_number || input.invitee_uri ? 'I could not find that session. ' : '';\n  return say('list', `${wrongPick}You have ${open.length} open sessions:\\n${open.map(label).join('\\n')}\\nWhich one do you mean? Reply with the number.`, {\n    sessions: open.map((r, i) => ({ number: i + 1, invitee_uri: r.invitee_uri, participant: r.participant_name, starts_at: r.starts_at, status: r.followup_status })),\n  });\n}\n\nconst who = chosen.participant_name || chosen.participant_email;\nconst day = DateTime.fromISO(chosen.starts_at).setZone(tz).toFormat('ccc d LLL');\nif (chosen.followup_status === 'unanswered') {\n  return say('followup', `OK. I sent you a DM to confirm if ${who} joined your session on ${day}. If yes, I will then ask about the reward.`, { invitee_uri: chosen.invitee_uri });\n}\nreturn say('reward', `OK. I sent you a DM to choose the reward for ${who} (session on ${day}).`, { invitee_uri: chosen.invitee_uri });\n"
       }
     },
     {
@@ -408,6 +376,30 @@
         "content": "## PF Darwin Tool: Session Follow-up\nManual path: the host tells Darwin \"I want to send the reward for my last session\".\n\nInput from Darwin: `user_id` (Slack), optional `session_number` (from the list) or `invitee_uri`.\n\nOpen sessions (last 30 days, started): `unanswered` goes to the did-they-join DM; `showed_up` and `reward_blocked` go straight to PF Reward. Rewarded, declined and no-show sessions are never offered. More than one: returns a numbered list for Darwin to show.\n\nTest without Darwin: edit **Test Input**, then run **Manual Test Run**.",
         "color": 5
       }
+    },
+    {
+      "id": "baee0eb0-0e8b-41d7-b1cc-fd457d22bab9",
+      "name": "Get Host Sessions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1168,
+        192
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- The host's sessions from the last N days. Pick Session applies the open-status rules.\nSELECT id, invitee_uri, booking_status, followup_status,\n       organizer_email AS host_email, title AS event_name,\n       to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS starts_at,\n       to_char(ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS ends_at,\n       participant_name, participant_email\nFROM calendar_research_sessions\nWHERE lower(organizer_email) = $1\n  AND invitee_uri IS NOT NULL\n  AND starts_at >= now() - make_interval(days => $2::int)\nORDER BY starts_at DESC;",
+        "options": {
+          "queryReplacement": "={{ [ ($json.user?.profile?.email || 'none').toLowerCase(), String($('Load Config').first().json.manualLookbackDays) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
     }
   ],
   "connections": {
@@ -460,28 +452,6 @@
         [
           {
             "node": "Find Host By Slack Id",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Find Host By Slack Id": {
-      "main": [
-        [
-          {
-            "node": "Get Host Sessions",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Host Sessions": {
-      "main": [
-        [
-          {
-            "node": "Pick Session",
             "type": "main",
             "index": 0
           }
@@ -567,6 +537,28 @@
           }
         ]
       ]
+    },
+    "Find Host By Slack Id": {
+      "main": [
+        [
+          {
+            "node": "Get Host Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Host Sessions": {
+      "main": [
+        [
+          {
+            "node": "Pick Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -574,7 +566,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "f9d72bf2-1948-47ae-840a-f81a22818d7f",
+  "versionId": "dc12c6eb-8a0c-40fa-8a9a-5d55b8813c27",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -584,18 +576,18 @@
   "isArchived": false,
   "nodeGroups": [
     {
-      "id": "0a8e01dc-3970-4e7b-970c-fbdb5f1d6f8b",
+      "id": "6b3ecf72-3525-42ee-a580-32a0b29a8229",
       "name": "Find open sessions",
       "nodeIds": [
         "4f2d79d9-eb23-4d26-a23e-8be8ef28dc26",
         "957895aa-71bd-40c7-8179-99a136fa856d",
-        "74f450fa-bdec-4f19-b00c-a574f4d8b6fc",
+        "baee0eb0-0e8b-41d7-b1cc-fd457d22bab9",
         "abb111de-60d7-4575-8213-1a105279e004"
       ],
-      "description": "Loads config, finds the host email from the Slack id, reads the host sessions, picks one or builds a list."
+      "description": "Loads config, finds the host email from the Slack id, reads the host sessions from Supabase, picks one or lists them."
     },
     {
-      "id": "4f86104c-114a-426b-ab9d-aa76d216ed03",
+      "id": "36890006-dd5a-40be-8f1b-79227728af96",
       "name": "Start follow-up",
       "nodeIds": [
         "a951f08d-332e-4a2d-a044-90e5d909c94d",
@@ -604,7 +596,7 @@
       "description": "Unanswered session: starts the did-they-join DM in manual mode."
     },
     {
-      "id": "8d1b2732-c61c-4b3a-ada1-8e0b7dc4aa51",
+      "id": "65b3ddb7-d919-4af7-ba38-fc040748b5ff",
       "name": "Start reward",
       "nodeIds": [
         "5ab8dad4-3358-40a9-b3ad-af747c79bb91",

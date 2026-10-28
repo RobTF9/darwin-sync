@@ -1,0 +1,298 @@
+{
+  "id": "OhZzH4004fVxykmi",
+  "name": "PF Button Router",
+  "description": "Called by UXR Interaction Handler for pf_ Slack actions. Resumes the waiting PF run from the button value, opens the reward amount modal, sends the modal amount. Sub-workflow. DWN-6.",
+  "nodes": [
+    {
+      "id": "a760bb48-038a-45b9-b15d-0fe1ed2bd934",
+      "name": "When Called By UXR Handler",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "e6e289a2-6c79-4694-aef6-27ead36f23e3",
+      "name": "Read Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Reads one pf_ Slack interaction (parsed by UXR Interaction Handler) and decides what to do.\n// It only calls run addresses on this n8n instance under /webhook-waiting/. Anything else is ignored.\nconst p = $('When Called By UXR Handler').first().json;\nconst ownHost = (String($execution.resumeUrl).match(/^https?:\\/\\/([^/]+)/) || [])[1] || '';\n// Plain text check (the URL class is not available in the Code node sandbox).\nconst isOurs = (u) => {\n  const m = String(u ?? '').match(/^https:\\/\\/([^/?#]+)(\\/[^?#]*)/);\n  return !!m && ownHost !== '' && m[1] === ownHost && m[2].startsWith('/webhook-waiting/');\n};\nconst ignore = (reason) => [{ json: { op: 'ignore', reason, action_id: p.action_id ?? null, own_host: ownHost } }];\nconst id = String(p.action_id || '');\nconst type = String(p.action_type || '');\n\n// Yes / No / $50 / No reward / Confirm / Cancel: the button value is the run address with the answer.\nif (type === 'block_actions' && id.startsWith('pf_answer_')) {\n  const url = String(p.action_value || '');\n  return isOurs(url) ? [{ json: { op: 'resume', url } }] : ignore('answer address is not on this instance');\n}\n\n// Other amount: open the modal first (trigger_id is valid for 3 seconds), then move the run on.\nif (type === 'block_actions' && id === 'pf_amount_open') {\n  let v = {};\n  try { v = JSON.parse(String(p.action_value || '{}')); } catch (e) { v = {}; }\n  if (![v.c, v.a, v.f].every(isOurs)) return ignore('amount addresses are not on this instance');\n  const max = Number(v.max) || 100;\n  const view = {\n    type: 'modal',\n    callback_id: 'pf_amount_submit',\n    private_metadata: JSON.stringify({ a: v.a, channel_id: p.channel_id, message_ts: p.message_ts }),\n    title: { type: 'plain_text', text: 'Reward amount' },\n    submit: { type: 'plain_text', text: 'Continue' },\n    close: { type: 'plain_text', text: 'Cancel' },\n    blocks: [{\n      type: 'input',\n      block_id: 'amount_block',\n      label: { type: 'plain_text', text: `Amount in USD (whole dollars, 1 to ${max})` },\n      element: {\n        type: 'number_input', action_id: 'amount_input', is_decimal_allowed: false,\n        min_value: '1', max_value: String(max), placeholder: { type: 'plain_text', text: 'e.g. 75' },\n      },\n    }],\n  };\n  return [{ json: { op: 'open_modal', trigger_id: p.trigger_id, view, choice_url: v.c, fallback_url: v.f } }];\n}\n\n// Modal submit: send the amount to the waiting run (Wait For Modal Amount in PF Reward).\nif (type === 'view_submission' && id === 'pf_amount_submit') {\n  const view = p.full_payload?.view ?? {};\n  let meta = {};\n  try { meta = JSON.parse(view.private_metadata || '{}'); } catch (e) { meta = {}; }\n  const amount = view.state?.values?.amount_block?.amount_input?.value ?? '';\n  if (!isOurs(meta.a)) return ignore('amount address is not on this instance');\n  return [{ json: { op: 'resume', url: `${meta.a}&amount=${encodeURIComponent(amount)}` } }];\n}\n\nreturn ignore(`unknown pf_ action ${id}`);\n"
+      }
+    },
+    {
+      "id": "8c02dd04-9ec9-4af0-a1b0-074eb2ee7a76",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "resume",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.op }}",
+                    "rightValue": "resume",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "open modal",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.op }}",
+                    "rightValue": "open_modal",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "ignore"
+        }
+      }
+    },
+    {
+      "id": "ed1f4cef-3f37-447c-b840-e223478d3954",
+      "name": "Resume Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        704,
+        -96
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "notes": "Calls the waiting run. Browser User-Agent: the Wait nodes ignore bot requests."
+    },
+    {
+      "id": "f2f7b23c-4448-484e-a0f1-b235245ef59d",
+      "name": "Open Modal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        704,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/views.open",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ trigger_id: $json.trigger_id, view: $json.view }) }}",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "906ac939-f1f1-4668-b83b-acd677f2b3e3",
+      "name": "Resume After Modal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        928,
+        96
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Open Modal').first().json.ok === true ? $('Read Action').first().json.choice_url : $('Read Action').first().json.fallback_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "notes": "Modal open: answer other (modal path). Modal failed: answer other_link (form link)."
+    },
+    {
+      "id": "4fd8d1ac-1de9-43ec-99a0-ffa323dcfafa",
+      "name": "Sticky Note aae28f2c",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        192,
+        -192
+      ],
+      "parameters": {
+        "content": "## PF Button Router\nCalled by **UXR Interaction Handler** for every Slack action whose id starts with `pf_` (DWN-6). Their `uxr_` actions never reach this workflow.\n\n- `pf_answer_*`: the button value is the address of the waiting PF run plus the answer. Resume Run calls it.\n- `pf_amount_open`: opens the reward amount modal (Slack allows 3 s), then tells the run `other`. If the modal cannot open: `other_link` (n8n form).\n- `pf_amount_submit` (modal submit): sends the amount to Wait For Modal Amount.\n\nOnly addresses on this instance under `/webhook-waiting/` are called.",
+        "color": 5,
+        "width": 864,
+        "height": 416
+      }
+    }
+  ],
+  "connections": {
+    "When Called By UXR Handler": {
+      "main": [
+        [
+          {
+            "node": "Read Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Action": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Resume Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Open Modal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open Modal": {
+      "main": [
+        [
+          {
+            "node": "Resume After Modal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "bfdb9599-5788-4cf8-86d0-dc489e8d11e3",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "eHFEcCMe8Z2FBXQI",
+  "isArchived": false,
+  "nodeGroups": []
+}

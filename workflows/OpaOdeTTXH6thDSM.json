@@ -38,7 +38,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Reads the Tremendous balance and decides if the admin must be told.\n// source 'daily': schedule or manual run. DM the admin when below the threshold.\n// source 'order': called by PF Reward before an order. DM the admin only when the order is blocked.\nlet input = {};\ntry { input = $('When Called By Another Workflow').first().json; } catch (e) { input = {}; }\nconst cfg = $('Load Config').first().json;\nconst source = input.source || 'daily';\nconst amount = Number(input.amount || 0);\n\nif (cfg.tremendousMode !== 'stub') {\n  throw new Error(`Tremendous mode \"${cfg.tremendousMode}\" is not built yet. Only \"stub\" works in this build.`);\n}\nconst balance = Number(cfg.mockBalanceUsd);\nconst threshold = Number(cfg.balanceThresholdUsd);\nconst belowThreshold = balance < threshold;\nconst enough = amount > 0 ? balance >= amount : true;\nconst notify = (source === 'daily' && belowThreshold) || (source === 'order' && !enough);\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst stubNote = cfg.tremendousMode === 'stub' ? ' (stub balance from PF Config)' : '';\nlet adminText = '';\nif (source === 'order') {\n  adminText = `${tag}A $${amount} reward for ${input.participant_name || 'a participant'} (host: ${input.host_name || 'unknown'}) was blocked: the Tremendous balance is $${balance}${stubNote}. Please refill it. The host can then send the reward again through Darwin.`;\n} else {\n  adminText = `${tag}The Tremendous balance is $${balance}${stubNote}. This is below $${threshold}. Please refill it.`;\n}\n\nreturn [{\n  json: {\n    source,\n    balance,\n    threshold,\n    below_threshold: belowThreshold,\n    amount,\n    enough,\n    notify,\n    admin_email: (cfg.adminEmail || '').toLowerCase(),\n    admin_allowed: !cfg.mockMode || cfg.allowedHostEmails.includes((cfg.adminEmail || '').toLowerCase()),\n    admin_text: adminText,\n  },\n}];\n"
+        "jsCode": "// Reads the Tremendous balance and decides if the admin must be told.\n// source 'daily': schedule or manual run. DM the admin when below the threshold.\n// source 'order': called by PF Reward before an order. DM the admin only when the order is blocked.\n// Live balance only on production (credential Tremendous Production); stub everywhere else.\nlet input = {};\ntry { input = $('When Called By Another Workflow').first().json; } catch (e) { input = {}; }\nconst cfg = $('Load Config').first().json;\nconst source = input.source || 'daily';\nconst amount = Number(input.amount || 0);\nconst live = cfg.tremendousMode === 'live' && cfg.environment === 'production' && !cfg.mockMode;\n\nlet balance = null;\nlet balanceError = null;\nif (live) {\n  let res = null;\n  try { res = $('Get Balance Source').first().json; } catch (e) { res = null; }\n  const value = res?.body?.funding_source?.meta?.available_amount;\n  if (Number(res?.statusCode) === 200 && typeof value === 'number') balance = value;\n  else balanceError = `Tremendous answered ${res?.statusCode ?? 'no response'}`;\n} else {\n  balance = Number(cfg.mockBalanceUsd);\n}\n\nconst threshold = Number(cfg.balanceThresholdUsd);\nconst known = balanceError === null;\nconst belowThreshold = known && balance < threshold;\nconst enough = known && (amount > 0 ? balance >= amount : true);\n// An unknown balance always goes to the admin, and never lets an order through.\nconst notify = !known || (source === 'daily' && belowThreshold) || (source === 'order' && !enough);\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst stubNote = live ? '' : ' (stub balance from PF Config)';\nconst who = input.participant_name || 'a participant';\nconst host = input.host_name || 'unknown';\nlet adminText = '';\nif (!known) {\n  adminText = source === 'order'\n    ? `${tag}I could not read the Tremendous balance (${balanceError}), so a $${amount} reward for ${who} (host: ${host}) was not sent. Please check the Tremendous Production credential and the balance. The host can then send it again through Darwin.`\n    : `${tag}I could not read the Tremendous balance (${balanceError}). Please check the Tremendous Production credential on production.`;\n} else if (source === 'order') {\n  adminText = `${tag}A $${amount} reward for ${who} (host: ${host}) was blocked: the Tremendous balance is $${balance}${stubNote}. Please refill it. The host can then send the reward again through Darwin.`;\n} else {\n  adminText = `${tag}The Tremendous balance is $${balance}${stubNote}. This is below $${threshold}. Please refill it.`;\n}\n\nreturn [{\n  json: {\n    source,\n    balance: known ? balance : 0,\n    balance_known: known,\n    balance_error: balanceError,\n    threshold,\n    below_threshold: belowThreshold,\n    amount,\n    enough,\n    notify,\n    admin_email: (cfg.adminEmail || '').toLowerCase(),\n    admin_allowed: !cfg.mockMode || cfg.allowedHostEmails.includes((cfg.adminEmail || '').toLowerCase()),\n    admin_text: adminText,\n  },\n}];\n"
       }
     },
     {
@@ -214,23 +214,107 @@
         384
       ],
       "parameters": {
-        "content": "## PF Tremendous Balance\nDaily at 09:00 Madrid (**not published**, DWN-6 gate) or by hand: DM the admin when the balance is below the threshold ($500).\n\nCalled by PF Reward before every order with `{ source: order, amount, participant_name, host_name }`: returns `enough`, and DMs the admin only when the order is blocked.\n\nStub mode: the balance is `mockBalanceUsd` from PF Config. Sandbox and live are not built yet.",
+        "content": "## PF Tremendous Balance\nDaily at 09:00 Madrid (PF Tremendous Balance Daily) or by hand: DM the admin when the balance is below the threshold ($500).\n\nCalled by PF Reward before every order with `{ source: order, amount, participant_name, host_name }`: returns `enough`, and DMs the admin only when the order is blocked.\n\n**Live** (production only): reads the `balance` funding source from Tremendous (credential Tremendous Production). If the balance cannot be read, no order goes out and the admin gets a DM.\n**Stub** (staging): the balance is `mockBalanceUsd` from PF Config.",
         "color": 5
+      }
+    },
+    {
+      "id": "c5b1a323-8b91-4fc6-8d35-1b2488f41723",
+      "name": "Live Balance?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Load Config').first().json.tremendousMode === 'live' && $('Load Config').first().json.environment === 'production' && !$('Load Config').first().json.mockMode }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "8c90867c-43d5-411e-9a6c-9c606d43e79b",
+      "name": "List Funding Sources",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.tremendous.com/api/v2/funding_sources",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "notes": "Live only (production). Credential: Tremendous Production.",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "0FSMfVWgzQUKP6eX",
+          "name": "Tremendous Production"
+        }
+      }
+    },
+    {
+      "id": "c599a922-f859-44e9-ac00-1ddc945d2eae",
+      "name": "Get Balance Source",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.tremendous.com/api/v2/funding_sources/{{ (($json.body && $json.body.funding_sources) || []).find((f) => f.method === 'balance')?.id || 'not-found' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "notes": "The list value is cached by Tremendous; this call returns the current balance.",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "0FSMfVWgzQUKP6eX",
+          "name": "Tremendous Production"
+        }
       }
     }
   ],
   "connections": {
-    "Load Config": {
-      "main": [
-        [
-          {
-            "node": "Compute Balance",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Compute Balance": {
       "main": [
         [
@@ -303,6 +387,57 @@
           }
         ]
       ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Live Balance?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Live Balance?": {
+      "main": [
+        [
+          {
+            "node": "List Funding Sources",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Compute Balance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Funding Sources": {
+      "main": [
+        [
+          {
+            "node": "Get Balance Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Balance Source": {
+      "main": [
+        [
+          {
+            "node": "Compute Balance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -310,7 +445,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "db9e110a-3aab-42e8-9b5c-4cedac48c739",
+  "versionId": "f8ef5e1b-01ae-4d1b-9225-093fd45d2094",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -320,22 +455,25 @@
   "isArchived": false,
   "nodeGroups": [
     {
-      "id": "248368d9-b2f1-4368-b60c-338d3ee9bf72",
+      "id": "55d9aa19-38b3-4230-8b16-f4b32df34349",
       "name": "Read balance",
       "nodeIds": [
         "bb5f0f7b-8fbb-4240-9ea3-37184ba10a51",
+        "c5b1a323-8b91-4fc6-8d35-1b2488f41723",
+        "8c90867c-43d5-411e-9a6c-9c606d43e79b",
+        "c599a922-f859-44e9-ac00-1ddc945d2eae",
         "f2dfef7d-0c4d-4498-be04-1a605a4db3f5"
       ],
-      "description": "Loads config, reads the balance (stub today), decides if the admin must be told."
+      "description": "Loads config, reads the live Tremendous balance (production) or the stub, decides if the admin must be told."
     },
     {
-      "id": "be74779a-e631-44c8-b509-093d8d6aa287",
+      "id": "245428f3-5fc5-4363-9df5-443ae9f8e395",
       "name": "Tell admin",
       "nodeIds": [
         "b21b7166-330f-423f-9a73-2617098e9abe",
         "b5536794-1f80-4355-b27e-d1496f2f0245"
       ],
-      "description": "Finds the admin in Slack and sends the refill or blocked-order DM."
+      "description": "Finds the admin in Slack and sends the refill, blocked-order or balance-error DM."
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "id": "YPO7bVn4V2BJNURN",
   "name": "PF Show-up Check",
-  "description": "Every 5 min (not published): claims due sessions and starts PF Session Follow-up. Manual run for tests. DWN-6.",
+  "description": "Every 5 min (not published): claims due sessions in Supabase for the hosts in PF Config hostAllowList (empty = all) and starts PF Session Follow-up. DWN-6.",
   "nodes": [
     {
       "id": "725339ca-d556-49f1-ba25-4e9707e036d4",
@@ -47,115 +47,6 @@
       }
     },
     {
-      "id": "23c5ff7c-e4b6-4b47-9e33-cf7d01d14c95",
-      "name": "Get Due Sessions",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        496,
-        224
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "booking_status",
-              "condition": "eq",
-              "keyValue": "active"
-            },
-            {
-              "keyName": "followup_status",
-              "condition": "eq",
-              "keyValue": "pending"
-            },
-            {
-              "keyName": "starts_at",
-              "condition": "lte",
-              "keyValue": "={{ $now.minus({ minutes: $('Load Config').first().json.askDelayMinutes }).toUTC().toISO() }}"
-            },
-            {
-              "keyName": "starts_at",
-              "condition": "gte",
-              "keyValue": "={{ $now.minus({ hours: $('Load Config').first().json.showupWindowHours }).toUTC().toISO() }}"
-            }
-          ]
-        },
-        "returnAll": true
-      }
-    },
-    {
-      "id": "c8b75836-cfe1-4bed-adf2-8870376dd384",
-      "name": "Claim Session",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        720,
-        224
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "id",
-              "condition": "eq",
-              "keyValue": "={{ $json.id }}"
-            },
-            {
-              "keyName": "followup_status",
-              "condition": "eq",
-              "keyValue": "pending"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "followup_status": "asked",
-            "showup_asked_at": "={{ $now.toISO() }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "followup_status",
-              "displayName": "followup_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "showup_asked_at",
-              "displayName": "showup_asked_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "063cd71c-5be2-4d88-958b-d39aa96d47a1",
       "name": "Follow-up Input",
       "type": "n8n-nodes-base.set",
@@ -172,7 +63,7 @@
             {
               "id": "fi-uri",
               "name": "invitee_uri",
-              "value": "={{ $('Get Due Sessions').item.json.invitee_uri }}",
+              "value": "={{ $json.invitee_uri }}",
               "type": "string"
             },
             {
@@ -232,42 +123,66 @@
         "content": "## PF Show-up Check\nEvery 5 minutes: finds sessions that are `active`, `pending`, started at least `askDelayMinutes` ago (mock 1, real 15) and not more than 6 h ago.\n\nClaims each one (`pending` to `asked`) so two runs cannot ask twice, then starts **PF Session Follow-up** without waiting.\n\n**Not published.** Publishing needs a yes from Aniol (DWN-6 gate). Use **Run Check Now** until then.",
         "color": 5
       }
+    },
+    {
+      "id": "363c21d2-5f8f-4a20-a9a6-8fb69fcbfcdb",
+      "name": "Claim Due Sessions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        224
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Select and claim in one statement, so two runs can never ask about the same session.\n-- $3: comma-separated host emails to include; empty = all hosts.\nUPDATE calendar_research_sessions\nSET followup_status = 'asked',\n    showup_asked_at = now(),\n    updated_at = now()\nWHERE id IN (\n  SELECT id FROM calendar_research_sessions\n  WHERE booking_status = 'active'\n    AND followup_status = 'pending'\n    AND invitee_uri IS NOT NULL\n    AND starts_at <= now() - make_interval(mins => $1::int)\n    AND starts_at >= now() - make_interval(hours => $2::int)\n    AND ($3 = '' OR lower(organizer_email) = ANY(string_to_array($3, ',')))\n  FOR UPDATE SKIP LOCKED\n)\nAND followup_status = 'pending'\nRETURNING id, invitee_uri;",
+        "options": {
+          "queryReplacement": "={{ [ String($('Load Config').first().json.askDelayMinutes), String($('Load Config').first().json.showupWindowHours), ($('Load Config').first().json.hostAllowList || []).join(',') ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "id": "5c83fefa-5278-4a18-8f21-e49883970abe",
+      "name": "Has Session?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        224
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.invitee_uri ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "The Postgres node outputs one {success: true} item when no session is due. Only claimed sessions (with invitee_uri) continue."
     }
   ],
   "connections": {
-    "Load Config": {
-      "main": [
-        [
-          {
-            "node": "Get Due Sessions",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Due Sessions": {
-      "main": [
-        [
-          {
-            "node": "Claim Session",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Claim Session": {
-      "main": [
-        [
-          {
-            "node": "Follow-up Input",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Follow-up Input": {
       "main": [
         [
@@ -300,6 +215,39 @@
           }
         ]
       ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Claim Due Sessions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Due Sessions": {
+      "main": [
+        [
+          {
+            "node": "Has Session?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Session?": {
+      "main": [
+        [
+          {
+            "node": "Follow-up Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -307,7 +255,7 @@
     "availableInMCP": true
   },
   "triggerCount": 1,
-  "versionId": "99091f9c-0a7f-4aeb-94ce-81052baa91d6",
+  "versionId": "c9929d63-1629-47fe-8885-dbf67d54e582",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -317,16 +265,16 @@
   "isArchived": false,
   "nodeGroups": [
     {
-      "id": "dbff3efd-1345-4f9a-8d24-1d82fa21641d",
+      "id": "e7a7a633-833f-4735-8fec-4a9efa13d09d",
       "name": "Find and claim due sessions",
       "nodeIds": [
         "32a56844-fa3d-4bb7-a596-c96567130405",
-        "23c5ff7c-e4b6-4b47-9e33-cf7d01d14c95",
-        "c8b75836-cfe1-4bed-adf2-8870376dd384",
+        "363c21d2-5f8f-4a20-a9a6-8fb69fcbfcdb",
+        "5c83fefa-5278-4a18-8f21-e49883970abe",
         "063cd71c-5be2-4d88-958b-d39aa96d47a1",
         "465ca4ba-c244-46c2-8cef-899be400f3f6"
       ],
-      "description": "Reads config, selects due pending sessions, marks each asked, starts one follow-up per session."
+      "description": "Claims due pending sessions of hosts in hostAllowList in one statement, starts one follow-up per claimed session."
     }
   ]
 }

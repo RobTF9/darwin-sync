@@ -40,39 +40,6 @@
       }
     },
     {
-      "id": "6fd90e7f-5961-48cf-b684-233512b71f09",
-      "name": "Get Session Row",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        496,
-        416
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "get",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('When Called By Another Workflow').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "returnAll": false,
-        "limit": 1
-      },
-      "alwaysOutputData": true
-    },
-    {
       "id": "9296f51f-9048-4add-800c-8e425303b3a3",
       "name": "Prepare Follow-up",
       "type": "n8n-nodes-base.code",
@@ -84,7 +51,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Checks the session can be asked about, then builds the Slack texts and wait limits.\nconst input = $('When Called By Another Workflow').first().json;\nconst cfg = $('Load Config').first().json;\nconst row = $('Get Session Row').first().json ?? {};\nconst mode = input.mode || 'auto';\n\nlet blockStatus = null;\nif (!row.id) blockStatus = 'skipped_no_row';\nelse if (row.booking_status !== 'active') blockStatus = 'skipped_not_active';\nelse if (cfg.mockMode && !cfg.allowedHostEmails.includes((row.host_email || '').toLowerCase())) blockStatus = 'guard_blocked';\n\nconst tz = cfg.timezone;\nconst start = DateTime.fromISO(row.starts_at || $now.toISO()).setZone(tz);\nconst end = DateTime.fromISO(row.ends_at || $now.toISO()).setZone(tz);\n// Wait for the first answer until the session ends, but at least 2 minutes.\nconst minAsk = $now.plus({ minutes: 2 });\nconst askUntil = (end > minAsk ? end : minAsk).toUTC().toISO();\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst hostFirst = (row.host_name || '').split(' ')[0] || 'there';\nconst who = row.participant_name || row.participant_email || 'the participant';\nconst first = row.participant_first_name || who;\nconst when = start.toFormat('HH:mm');\n\nreturn [{\n  json: {\n    ok: blockStatus === null,\n    block_status: blockStatus,\n    mode,\n    invitee_uri: row.invitee_uri ?? input.invitee_uri,\n    host_email: row.host_email,\n    ends_at: row.ends_at,\n    ask_until: askUntil,\n    reminder_minutes: cfg.finalTimeoutMinutes,\n    ask_text: `${tag}Hi ${hostFirst}, your session \"${row.event_name}\" with ${who} started at ${when} (${tz}). Did ${first} join?`,\n    remind_text: `${tag}Reminder: did ${who} join your session \"${row.event_name}\" at ${when} (${tz})?`,\n    yes_note_before_end: `:white_check_mark: You answered: *${first} joined*. When the session ends at ${end.toFormat('HH:mm')}, I will ask you about the reward.`,\n    yes_note_after_end: `:white_check_mark: You answered: *${first} joined*. I will ask you about the reward now.`,\n    no_note: `:x: You answered: *${first} did not join*.`,\n    rebook_text: `${tag}Do you want me to send ${first} an email with a link to book a new time? It comes from noreply@info.n8n.io and names you as the host.`,\n    rebook_yes_note: `:email: OK, I will send ${first} the link to book a new time.`,\n    rebook_no_note: `:no_entry_sign: OK, I will not send anything to ${first}.`,\n    rebook_timeout_note: `:zzz: No answer, so I did not send anything to ${first}.`,\n    first_timeout_note: ':hourglass_flowing_sand: No answer yet. I sent you a reminder.',\n    final_timeout_note: ':zzz: No answer, so I stopped asking. You can still tell Darwin later: \"I want to send the reward for my last session\".',\n  },\n}];\n"
+        "jsCode": "// Checks the session can be asked about, then builds the Slack texts and wait limits.\nconst input = $('When Called By Another Workflow').first().json;\nconst cfg = $('Load Config').first().json;\nconst row = $('Get Session Row').first().json ?? {};\nconst mode = input.mode || 'auto';\n\nlet blockStatus = null;\nif (!row.id) blockStatus = 'skipped_no_row';\nelse if (row.booking_status !== 'active') blockStatus = 'skipped_not_active';\n// Host list from PF Config: the test host (mock) or the pilot hosts (production). Empty = all hosts.\nelse if (cfg.hostAllowList.length && !cfg.hostAllowList.includes((row.host_email || '').toLowerCase())) blockStatus = 'guard_blocked';\n\nconst tz = cfg.timezone;\nconst start = DateTime.fromISO(row.starts_at || $now.toISO()).setZone(tz);\nconst end = DateTime.fromISO(row.ends_at || $now.toISO()).setZone(tz);\n// Wait for the first answer until the session ends, but at least 2 minutes.\nconst minAsk = $now.plus({ minutes: 2 });\nconst askUntil = (end > minAsk ? end : minAsk).toUTC().toISO();\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst hostFirst = (row.host_name || '').split(' ')[0] || 'there';\nconst who = row.participant_name || row.participant_email || 'the participant';\nconst first = row.participant_first_name || who;\nconst when = start.toFormat('HH:mm');\n\nconst out = {\n    ok: blockStatus === null,\n    block_status: blockStatus,\n    mode,\n    invitee_uri: row.invitee_uri ?? input.invitee_uri,\n    host_email: row.host_email,\n    ends_at: row.ends_at,\n    ask_until: askUntil,\n    reminder_minutes: cfg.finalTimeoutMinutes,\n    ask_text: `${tag}Hi ${hostFirst}, your session \"${row.event_name}\" with ${who} started at ${when} (${tz}). Did ${first} join?`,\n    remind_text: `${tag}Reminder: did ${who} join your session \"${row.event_name}\" at ${when} (${tz})?`,\n    yes_note_before_end: `:white_check_mark: You answered: *${first} joined*. When the session ends at ${end.toFormat('HH:mm')}, I will ask you about the reward.`,\n    yes_note_after_end: `:white_check_mark: You answered: *${first} joined*. I will ask you about the reward now.`,\n    no_note: `:x: You answered: *${first} did not join*.`,\n    rebook_text: `${tag}Do you want me to send ${first} an email with a link to book a new time? It comes from noreply@info.n8n.io.`,\n    rebook_yes_note: `:email: OK, I will send ${first} the link to book a new time.`,\n    rebook_no_note: `:no_entry_sign: OK, I will not send anything to ${first}.`,\n    rebook_timeout_note: `:zzz: No answer, so I did not send anything to ${first}.`,\n    first_timeout_note: ':hourglass_flowing_sand: No answer yet. I sent you a reminder.',\n    final_timeout_note: ':zzz: No answer, so I stopped asking. You can still tell Darwin later: \"I want to send the reward for my last session\".',\n};\n\n// Slack question messages. One helper for both layouts (PF Config slackButtons):\n//   off: links in the text (a click opens the browser for a moment and comes back to Slack)\n//   on:  native buttons; PF Button Router resumes this run from the button value.\n// The resume address is the same for every Wait node in this run; the suffix selects the Wait node.\nconst [resumeBase, resumeQuery] = String($execution.resumeUrl).split('?');\nconst answerUrl = (suffix, answer) => `${resumeBase}/${suffix}?${resumeQuery}&answer=${answer}`;\nfunction question(text, suffix, options) {\n  if (cfg.slackButtons) {\n    return {\n      text,\n      blocks: [\n        { type: 'section', text: { type: 'mrkdwn', text } },\n        { type: 'actions', elements: options.map((o) => ({\n          type: 'button',\n          action_id: `pf_answer_${suffix}_${o.answer}`,\n          text: { type: 'plain_text', text: o.label },\n          value: answerUrl(suffix, o.answer),\n          ...(o.style ? { style: o.style } : {}),\n        })) },\n      ],\n    };\n  }\n  const links = options.map((o) => `<${answerUrl(suffix, o.answer)}|${o.label}>`).join('     ·     ');\n  const full = `${text}\\n\\n${links}`;\n  return { text: full, blocks: [{ type: 'section', text: { type: 'mrkdwn', text: full } }] };\n}\nconst joinedOptions = [\n  { label: 'Yes, they joined', answer: 'yes', style: 'primary' },\n  { label: 'No, they did not', answer: 'no' },\n];\n\nreturn [{\n  json: {\n    ...out,\n    msg_first: question(out.ask_text, 'first', joinedOptions),\n    msg_reminder: question(out.remind_text, 'reminder', joinedOptions),\n    msg_rebook: question(out.rebook_text, 'rebook', [\n      { label: 'Yes, send it', answer: 'yes', style: 'primary' },\n      { label: 'No, do not send it', answer: 'no' },\n    ]),\n  },\n}];\n"
       }
     },
     {
@@ -150,41 +117,6 @@
           "name": "Slack Bot"
         }
       }
-    },
-    {
-      "id": "372d9f34-bd69-4056-a604-a34498218e3e",
-      "name": "Post Question",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.7,
-      "position": [
-        1248,
-        512
-      ],
-      "parameters": {
-        "resource": "message",
-        "operation": "post",
-        "authentication": "accessToken",
-        "select": "user",
-        "user": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
-        },
-        "messageType": "text",
-        "text": "={{ $('Prepare Follow-up').first().json.ask_text }}\n\n<{{ $execution.resumeUrl.split('?')[0] }}/first?{{ $execution.resumeUrl.split('?')[1] }}&answer=yes|Yes, they joined>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/first?{{ $execution.resumeUrl.split('?')[1] }}&answer=no|No, they did not>",
-        "otherOptions": {
-          "includeLinkToWorkflow": false,
-          "unfurl_links": false,
-          "unfurl_media": false
-        }
-      },
-      "credentials": {
-        "slackApi": {
-          "id": "BBkWcmrv3sWmNe1t",
-          "name": "Slack Bot"
-        }
-      },
-      "webhookId": "ff54bd30-bc0d-40a7-a63a-f8f426cbae37"
     },
     {
       "id": "e1a90cb3-8252-4b32-ad1d-613acfb9f248",
@@ -315,64 +247,6 @@
       }
     },
     {
-      "id": "863fcb98-1079-4dcc-8325-3ed2a1784521",
-      "name": "Mark Showed Up",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        2528,
-        416
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "followup_status": "showed_up",
-            "showup_answered_at": "={{ $now.toISO() }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "followup_status",
-              "displayName": "followup_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "showup_answered_at",
-              "displayName": "showup_answered_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "dfc96231-8e4a-4a49-914a-14f96cb57753",
       "name": "Wait Until Session End",
       "type": "n8n-nodes-base.wait",
@@ -387,147 +261,6 @@
         "unit": "seconds"
       },
       "webhookId": "88a88665-65d1-40ec-9a28-c4912b0e531b"
-    },
-    {
-      "id": "b9cdd335-d1ed-448d-89bb-811bc6460a82",
-      "name": "Mark No Show",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        2528,
-        608
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "followup_status": "no_show",
-            "showup_answered_at": "={{ $now.toISO() }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "followup_status",
-              "displayName": "followup_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "showup_answered_at",
-              "displayName": "showup_answered_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "ce397462-2076-4488-b02e-7b6220fd4922",
-      "name": "Mark Reminded",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        1776,
-        288
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "followup_status": "reminded"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "followup_status",
-              "displayName": "followup_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "dd51ccc5-96a3-4148-bc74-d76b3872a1fe",
-      "name": "Post Reminder",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.7,
-      "position": [
-        2000,
-        288
-      ],
-      "parameters": {
-        "resource": "message",
-        "operation": "post",
-        "authentication": "accessToken",
-        "select": "user",
-        "user": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
-        },
-        "messageType": "text",
-        "text": "={{ $('Prepare Follow-up').first().json.remind_text }}\n\n<{{ $execution.resumeUrl.split('?')[0] }}/reminder?{{ $execution.resumeUrl.split('?')[1] }}&answer=yes|Yes, they joined>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/reminder?{{ $execution.resumeUrl.split('?')[1] }}&answer=no|No, they did not>",
-        "otherOptions": {
-          "includeLinkToWorkflow": false,
-          "unfurl_links": false,
-          "unfurl_media": false
-        }
-      },
-      "credentials": {
-        "slackApi": {
-          "id": "BBkWcmrv3sWmNe1t",
-          "name": "Slack Bot"
-        }
-      },
-      "webhookId": "93474635-44f0-49f5-8963-4195724b8828"
     },
     {
       "id": "724a89c6-fd93-4f9c-8a7a-9849ab4b2bc6",
@@ -659,102 +392,6 @@
       }
     },
     {
-      "id": "431b5111-f8fe-4a12-8535-d082a31dbb6a",
-      "name": "Mark Unanswered",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        2640,
-        0
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "followup_status": "unanswered"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "followup_status",
-              "displayName": "followup_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "f80ff2ef-bb52-465f-8738-4bc28b3b11d3",
-      "name": "Mark Not Asked",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        1136,
-        192
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "followup_status": "={{ $('Prepare Follow-up').first().json.block_status }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "followup_status",
-              "displayName": "followup_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "4183106d-0318-44ad-8d0c-5dfe1325f1f0",
       "name": "Sticky Note f65b0b36",
       "type": "n8n-nodes-base.stickyNote",
@@ -767,41 +404,6 @@
         "content": "## PF Session Follow-up\nInput: `{ invitee_uri, mode }`. One run per session.\n\nThe question is a Slack DM with two **links** (not buttons), so clicks never reach the recruiting interactivity handler. Each link resumes this run with `answer=yes` or `answer=no`. After the answer or the timeout, the message is edited: links removed, answer shown.\n\nNo answer: one reminder (mock 3 min, real 24 h), then `unanswered`. Only an explicit `yes` / `no` counts as an answer.",
         "color": 5
       }
-    },
-    {
-      "id": "66987a7e-8496-4747-ba37-2211c4aeb6ab",
-      "name": "Post Rebook Question",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.7,
-      "position": [
-        2900,
-        600
-      ],
-      "parameters": {
-        "resource": "message",
-        "operation": "post",
-        "authentication": "accessToken",
-        "select": "user",
-        "user": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $('Find Host In Slack').first().json.user.id }}"
-        },
-        "messageType": "text",
-        "text": "={{ $('Prepare Follow-up').first().json.rebook_text }}\n\n<{{ $execution.resumeUrl.split('?')[0] }}/rebook?{{ $execution.resumeUrl.split('?')[1] }}&answer=yes|Yes, send it>     ·     <{{ $execution.resumeUrl.split('?')[0] }}/rebook?{{ $execution.resumeUrl.split('?')[1] }}&answer=no|No, do not send it>",
-        "otherOptions": {
-          "includeLinkToWorkflow": false,
-          "unfurl_links": false,
-          "unfurl_media": false
-        }
-      },
-      "credentials": {
-        "slackApi": {
-          "id": "BBkWcmrv3sWmNe1t",
-          "name": "Slack Bot"
-        }
-      },
-      "webhookId": "c9b1a2f9-6773-40cc-987f-41e41eb1c308"
     },
     {
       "id": "6ade54ad-be00-488a-a67c-4bc5c87d41a9",
@@ -933,150 +535,6 @@
       }
     },
     {
-      "id": "06dbda13-e06f-4970-a7f9-64b8d26ee6f1",
-      "name": "Mark Rebook Approved",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        3780,
-        450
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "rebook_status": "approved"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "rebook_status",
-              "displayName": "rebook_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "fba66d55-93c1-4a25-ac94-d7e8164b83e5",
-      "name": "Mark Rebook Declined",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        3780,
-        600
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "rebook_status": "declined"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "rebook_status",
-              "displayName": "rebook_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "20bffbb3-0758-4f3a-ad48-a1075f628c74",
-      "name": "Mark Rebook Unanswered",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        3780,
-        750
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "rebook_status": "unanswered"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "rebook_status",
-              "displayName": "rebook_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "ab8cad2f-f916-4c1a-9a52-26a85b37645d",
       "name": "Build Rebook Email",
       "type": "n8n-nodes-base.code",
@@ -1088,7 +546,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// Builds the rebook email and applies the mock guard.\nconst cfg = $('Load Config').first().json;\nconst row = $('Get Session Row').first().json;\nconst tz = cfg.timezone;\nconst first = row.participant_first_name || 'there';\nconst hostFirst = (row.host_name || '').split(' ')[0] || 'our research team';\nconst day = DateTime.fromISO(row.starts_at).setZone(tz).toFormat('cccc d LLLL');\nconst to = (row.participant_email || '').toLowerCase();\nconst link = row.booking_link;\n\n// Why the email cannot be sent. The last check exists only in test mode.\nlet blockedNote = null;\nif (!to) blockedNote = `:warning: I could not send the email: ${first} has no email address in the booking.`;\nelse if (!link) blockedNote = ':warning: I could not send the email: there is no booking link for this session.';\nelse if (cfg.mockMode && !new RegExp(cfg.allowedParticipantEmailPattern).test(to)) blockedNote = `:lock: Test mode: I only send emails to Aniol's test addresses, so nothing was sent to ${to}.`;\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\nconst text = [\n  `Hi ${first},`,\n  '',\n  `Sorry we missed you on ${day} for your session with ${hostFirst} from n8n.`,\n  '',\n  'If you still want to talk, you can pick a new time here:',\n  link,\n  '',\n  'Thanks,',\n  'The n8n research team',\n].join('\\n');\n\nreturn [{\n  json: {\n    allowed: blockedNote === null,\n    to,\n    from: cfg.emailFrom,\n    reply_to: cfg.emailReplyTo,\n    subject: `${tag}Sorry we missed you, ${first}`,\n    text,\n    sent_note: `:email: Sent to ${first} (${to}) at ${$now.setZone(tz).toFormat('HH:mm')}.`,\n    blocked_note: blockedNote,\n  },\n}];\n"
+        "jsCode": "// Builds the rebook email and applies the guard.\nconst cfg = $('Load Config').first().json;\nconst row = $('Get Session Row').first().json;\nconst tz = cfg.timezone;\nconst first = row.participant_first_name || 'there';\nconst to = (row.participant_email || '').toLowerCase();\nconst link = row.booking_link;\n\n// Why the email cannot be sent. The last check exists only in mock mode.\nlet blockedNote = null;\nif (!to) blockedNote = `:warning: I could not send the email: ${first} has no email address in the booking.`;\nelse if (!link) blockedNote = ':warning: I could not send the email: there is no booking link for this session.';\nelse if (cfg.mockMode && !new RegExp(cfg.allowedParticipantEmailPattern).test(to)) blockedNote = `:lock: Test mode: I only send emails to Aniol's test addresses, so nothing was sent to ${to}.`;\n\nconst tag = cfg.mockMode ? '[MOCK] ' : '';\n// Text by Aniol (DWN-6, 2026-10-27).\nconst text = [\n  'Hi,',\n  '',\n  'We are sorry you could not attend today’s research session with the n8n team.',\n  '',\n  'We are very interested in hearing from you and learning from your experience so we can build a better product.',\n  '',\n  `If you would like to reschedule, you can do it using the following link: ${link}`,\n  '',\n  'Best,',\n  'n8n Research team',\n].join('\\n');\n\nreturn [{\n  json: {\n    allowed: blockedNote === null,\n    to,\n    from: cfg.emailFrom,\n    reply_to: cfg.emailReplyTo,\n    subject: `${tag}About your n8n research session`,\n    text,\n    sent_note: `:email: Sent to ${first} (${to}) at ${$now.setZone(tz).toFormat('HH:mm')}.`,\n    blocked_note: blockedNote,\n  },\n}];\n"
       }
     },
     {
@@ -1152,64 +610,6 @@
       "webhookId": "93547dc1-2f69-4e97-b4db-eca9c05652fb"
     },
     {
-      "id": "ad643e21-ada4-4fdc-aedb-9ce2aefec3d4",
-      "name": "Mark Email Sent",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        4660,
-        350
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "rebook_status": "sent",
-            "noshow_email_sent_at": "={{ $now.toISO() }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "rebook_status",
-              "displayName": "rebook_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "noshow_email_sent_at",
-              "displayName": "noshow_email_sent_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "ad92dda3-685a-45e6-a279-4906836ab325",
       "name": "Confirm Email Sent",
       "type": "n8n-nodes-base.slack",
@@ -1241,54 +641,6 @@
         }
       },
       "webhookId": "25b39026-f72a-46be-aead-5b64fb2594a1"
-    },
-    {
-      "id": "757e0dcb-757a-4aab-8cfa-de222e9cdd41",
-      "name": "Mark Email Blocked",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        4440,
-        550
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "L3Sa3FfY5RtqeUgk",
-          "cachedResultName": "MOCK - PF Sessions"
-        },
-        "matchType": "allConditions",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "invitee_uri",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Follow-up').first().json.invitee_uri }}"
-            }
-          ]
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "rebook_status": "guard_blocked"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "rebook_status",
-              "displayName": "rebook_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        }
-      }
     },
     {
       "id": "b01c559e-ee26-4373-84aa-2feac12a6b93",
@@ -1369,6 +721,501 @@
           "waitForSubWorkflow": false
         }
       }
+    },
+    {
+      "id": "cc0c55ed-037f-4e4b-b564-274bacbed316",
+      "name": "Get Session Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        496,
+        416
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Column aliases keep the names the code nodes used with the mock table.\nSELECT id, invitee_uri, booking_status, followup_status, rebook_status,\n       organizer_email AS host_email, organizer_name AS host_name,\n       title AS event_name, external_id AS event_uri,\n       -- ISO text, the same format the code read from the mock table (DateTime.fromISO).\n       to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS starts_at,\n       to_char(ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS ends_at,\n       participant_name, participant_first_name, participant_email,\n       booking_link, reward_amount, reward_order_id, is_mock\nFROM calendar_research_sessions\nWHERE invitee_uri = $1\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $('When Called By Another Workflow').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "70b03e5c-4ed1-49b1-be47-6fbc4787e1f3",
+      "name": "Mark Showed Up",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2528,
+        416
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET followup_status = 'showed_up',\n    showup_answered_at = now(),\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e86e8db8-7ac9-45f0-8d94-c160802e912f",
+      "name": "Mark No Show",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2528,
+        608
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET followup_status = 'no_show',\n    showup_answered_at = now(),\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b3e33c6e-03b3-45b4-8483-2f72543cde8e",
+      "name": "Mark Reminded",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1776,
+        288
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET followup_status = 'reminded',\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "dcf2e572-747b-4e2a-a83a-2cd0e2c073bf",
+      "name": "Mark Unanswered",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET followup_status = 'unanswered',\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "8143ff69-7c68-415e-9619-cb4b860d7d18",
+      "name": "Mark Not Asked",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1136,
+        192
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET followup_status = $2,\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri, $('Prepare Follow-up').first().json.block_status ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c4d0f101-73ff-431c-98af-ebc74eaea4c2",
+      "name": "Mark Rebook Approved",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3780,
+        450
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET rebook_status = 'approved',\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "820c5840-8009-447b-a166-c7492c814d99",
+      "name": "Mark Rebook Declined",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3780,
+        600
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET rebook_status = 'declined',\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ead5359d-c99a-4ed4-b0bd-0d724b8c6e7d",
+      "name": "Mark Rebook Unanswered",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3780,
+        750
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET rebook_status = 'unanswered',\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "f3e84fb0-79c8-44b1-8940-948decce499a",
+      "name": "Mark Email Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4660,
+        350
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET rebook_status = 'sent',\n    noshow_email_sent_at = now(),\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "6fcbf18d-aa3e-491b-913f-e9ab9fbcd1e3",
+      "name": "Mark Email Blocked",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4440,
+        550
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET rebook_status = 'guard_blocked',\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c6abfa38-c8cf-4a6a-89e7-22ed72d69fe5",
+      "name": "Host In Slack?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1136,
+        512
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok === true && !!$json.user?.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "dfa3688f-e2b5-44d4-9488-f7b6b1b3b586",
+      "name": "Mark Host Not Found",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1360,
+        720
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE calendar_research_sessions\nSET followup_status = 'host_not_found',\n    updated_at = now()\nWHERE invitee_uri = $1\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Follow-up').first().json.invitee_uri ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "1c450b52-ea00-414b-8e34-439e2a3e2f9f",
+      "name": "Find Admin In Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1584,
+        720
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://slack.com/api/users.lookupByEmail",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $('Load Config').first().json.adminEmail }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "518e912d-4141-4e35-98e0-673ad93fccc0",
+      "name": "Tell Admin",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1808,
+        720
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "accessToken",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Find Admin In Slack').first().json.user.id }}"
+        },
+        "messageType": "text",
+        "text": "={{ ($('Load Config').first().json.mockMode ? '[MOCK] ' : '') + 'I could not find the host ' + ($('Get Session Row').first().json.host_email || '(no email)') + ' in Slack, so I did not ask about the session \"' + ($('Get Session Row').first().json.event_name || '') + '\" with ' + ($('Get Session Row').first().json.participant_name || $('Get Session Row').first().json.participant_email || 'a participant') + ' at ' + DateTime.fromISO($('Get Session Row').first().json.starts_at).setZone($('Load Config').first().json.timezone).toFormat('ccc d LLL, HH:mm') + '. Please check the host email in Calendly. The row is marked host_not_found.' }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "289dfdb2-a1fe-4b2e-96a8-ae5fd7d391bf"
+    },
+    {
+      "id": "50dc01cb-64e2-4c4d-a372-a29ec1af47fc",
+      "name": "Post Question",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1248,
+        512
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Find Host In Slack').first().json.user.id, text: $('Prepare Follow-up').first().json.msg_first.text, blocks: $('Prepare Follow-up').first().json.msg_first.blocks, unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "notes": "chat.postMessage: links or buttons, from Prepare Follow-up (PF Config slackButtons)."
+    },
+    {
+      "id": "8e39cd66-ba68-4343-8ac7-58082d967f4b",
+      "name": "Post Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        288
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Find Host In Slack').first().json.user.id, text: $('Prepare Follow-up').first().json.msg_reminder.text, blocks: $('Prepare Follow-up').first().json.msg_reminder.blocks, unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "notes": "chat.postMessage: links or buttons, from Prepare Follow-up (PF Config slackButtons)."
+    },
+    {
+      "id": "ca6df1ca-4b1d-40ac-96cf-792ecff012a6",
+      "name": "Post Rebook Question",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2900,
+        600
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "slackApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $('Find Host In Slack').first().json.user.id, text: $('Prepare Follow-up').first().json.msg_rebook.text, blocks: $('Prepare Follow-up').first().json.msg_rebook.blocks, unfurl_links: false, unfurl_media: false }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "notes": "chat.postMessage: links or buttons, from Prepare Follow-up (PF Config slackButtons)."
     }
   ],
   "connections": {
@@ -1377,28 +1224,6 @@
         [
           {
             "node": "Load Config",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Load Config": {
-      "main": [
-        [
-          {
-            "node": "Get Session Row",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Session Row": {
-      "main": [
-        [
-          {
-            "node": "Prepare Follow-up",
             "type": "main",
             "index": 0
           }
@@ -1434,28 +1259,6 @@
         ]
       ]
     },
-    "Find Host In Slack": {
-      "main": [
-        [
-          {
-            "node": "Post Question",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Post Question": {
-      "main": [
-        [
-          {
-            "node": "Wait For Answer",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Wait For Answer": {
       "main": [
         [
@@ -1472,6 +1275,123 @@
         [
           {
             "node": "Route First Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Reminder Answer": {
+      "main": [
+        [
+          {
+            "node": "Update Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Reminder": {
+      "main": [
+        [
+          {
+            "node": "Route Reminder Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Rebook Answer": {
+      "main": [
+        [
+          {
+            "node": "Update Rebook Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Rebook Question": {
+      "main": [
+        [
+          {
+            "node": "Route Rebook Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Rebook Email": {
+      "main": [
+        [
+          {
+            "node": "Email Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Allowed?": {
+      "main": [
+        [
+          {
+            "node": "Send Rebook Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Email Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Until Session End": {
+      "main": [
+        [
+          {
+            "node": "Reward Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reward Input": {
+      "main": [
+        [
+          {
+            "node": "Start Reward",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Config": {
+      "main": [
+        [
+          {
+            "node": "Get Session Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Session Row": {
+      "main": [
+        [
+          {
+            "node": "Prepare Follow-up",
             "type": "main",
             "index": 0
           }
@@ -1503,61 +1423,6 @@
         ]
       ]
     },
-    "Mark Showed Up": {
-      "main": [
-        [
-          {
-            "node": "Wait Until Session End",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mark Reminded": {
-      "main": [
-        [
-          {
-            "node": "Post Reminder",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Post Reminder": {
-      "main": [
-        [
-          {
-            "node": "Wait For Reminder Answer",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait For Reminder Answer": {
-      "main": [
-        [
-          {
-            "node": "Update Reminder",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Reminder": {
-      "main": [
-        [
-          {
-            "node": "Route Reminder Answer",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Route Reminder Answer": {
       "main": [
         [
@@ -1583,44 +1448,11 @@
         ]
       ]
     },
-    "Mark No Show": {
+    "Mark Showed Up": {
       "main": [
         [
           {
-            "node": "Post Rebook Question",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Post Rebook Question": {
-      "main": [
-        [
-          {
-            "node": "Wait For Rebook Answer",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait For Rebook Answer": {
-      "main": [
-        [
-          {
-            "node": "Update Rebook Question",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Rebook Question": {
-      "main": [
-        [
-          {
-            "node": "Route Rebook Answer",
+            "node": "Wait Until Session End",
             "type": "main",
             "index": 0
           }
@@ -1663,35 +1495,6 @@
         ]
       ]
     },
-    "Build Rebook Email": {
-      "main": [
-        [
-          {
-            "node": "Email Allowed?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Email Allowed?": {
-      "main": [
-        [
-          {
-            "node": "Send Rebook Email",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Mark Email Blocked",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Send Rebook Email": {
       "main": [
         [
@@ -1725,22 +1528,106 @@
         ]
       ]
     },
-    "Wait Until Session End": {
+    "Find Host In Slack": {
       "main": [
         [
           {
-            "node": "Reward Input",
+            "node": "Host In Slack?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Reward Input": {
+    "Host In Slack?": {
       "main": [
         [
           {
-            "node": "Start Reward",
+            "node": "Post Question",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Host Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Host Not Found": {
+      "main": [
+        [
+          {
+            "node": "Find Admin In Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Admin In Slack": {
+      "main": [
+        [
+          {
+            "node": "Tell Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Question": {
+      "main": [
+        [
+          {
+            "node": "Wait For Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Reminded": {
+      "main": [
+        [
+          {
+            "node": "Post Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Reminder": {
+      "main": [
+        [
+          {
+            "node": "Wait For Reminder Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark No Show": {
+      "main": [
+        [
+          {
+            "node": "Post Rebook Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Rebook Question": {
+      "main": [
+        [
+          {
+            "node": "Wait For Rebook Answer",
             "type": "main",
             "index": 0
           }
@@ -1753,7 +1640,7 @@
     "availableInMCP": true
   },
   "triggerCount": 0,
-  "versionId": "c6d38fcb-1f42-4d8f-a4c1-68b95a94adb6",
+  "versionId": "806f2224-78dc-4c02-a19f-57f9a1858ffe",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
@@ -1763,42 +1650,41 @@
   "isArchived": false,
   "nodeGroups": [
     {
-      "id": "f1a2bf7a-3463-4007-86ae-e8e3aee4ad66",
+      "id": "b935f4ec-a70a-4e1b-a36a-f5e2627842af",
       "name": "Check session",
       "nodeIds": [
         "5ae04e47-e61d-42e8-a172-aa8a89919f39",
-        "6fd90e7f-5961-48cf-b684-233512b71f09",
+        "cc0c55ed-037f-4e4b-b564-274bacbed316",
         "9296f51f-9048-4add-800c-8e425303b3a3"
       ],
-      "description": "Loads config and the session row, checks it is active and the host passes the mock guard, builds texts."
+      "description": "Loads config and the session row from Supabase, checks it is active and the host passes the guard, builds texts and messages."
     },
     {
-      "id": "2cb8e6c3-f4ea-4272-94c9-a7592480ebab",
+      "id": "d156aaa2-1d74-44c5-9e2a-22ee6a3e0345",
       "name": "Ask host",
       "nodeIds": [
-        "4eabbea4-2a47-4da9-8201-a32cf155c3a0",
-        "372d9f34-bd69-4056-a604-a34498218e3e",
+        "50dc01cb-64e2-4c4d-a372-a29ec1af47fc",
         "e1a90cb3-8252-4b32-ad1d-613acfb9f248",
         "bcb608c0-076e-483e-8f1d-0aeb8cdf6472"
       ],
-      "description": "DMs the host a yes/no question with links, waits until the session end, then edits the message to show the answer."
+      "description": "DMs the host a yes/no question (links or buttons), waits until the session end, then edits the message to show the answer."
     },
     {
-      "id": "ba0ca915-ac83-45c5-bf33-bf463493a591",
+      "id": "e31603c2-abd0-4407-bb2a-00f306f94531",
       "name": "Reminder",
       "nodeIds": [
-        "ce397462-2076-4488-b02e-7b6220fd4922",
-        "dd51ccc5-96a3-4148-bc74-d76b3872a1fe",
+        "b3e33c6e-03b3-45b4-8483-2f72543cde8e",
+        "8e39cd66-ba68-4343-8ac7-58082d967f4b",
         "724a89c6-fd93-4f9c-8a7a-9849ab4b2bc6",
         "267e6002-5c2f-4a77-9912-3c44a5676b74"
       ],
       "description": "No first answer: asks once more (mock 3 min, real 24 h), then edits the message."
     },
     {
-      "id": "8ef80d47-e63f-4c7d-8bed-c2d27f46d989",
+      "id": "0e2b0b56-36c0-46fe-ad0e-726b3486a3eb",
       "name": "Joined",
       "nodeIds": [
-        "863fcb98-1079-4dcc-8325-3ed2a1784521",
+        "70b03e5c-4ed1-49b1-be47-6fbc4787e1f3",
         "dfc96231-8e4a-4a49-914a-14f96cb57753",
         "b8d29ab2-2325-414a-bb3d-08d6093dc440",
         "8cd11fdd-50dd-4d6d-a084-012218501413"
@@ -1806,43 +1692,53 @@
       "description": "Marks showed_up, waits until the session end, then starts PF Reward."
     },
     {
-      "id": "1ad96f73-4a99-40d6-bde6-0294d978b2b1",
+      "id": "f1eaf183-baa4-46fc-9fb5-2902e8d01ec0",
       "name": "Ask before rebook email",
       "nodeIds": [
-        "b9cdd335-d1ed-448d-89bb-811bc6460a82",
-        "66987a7e-8496-4747-ba37-2211c4aeb6ab",
+        "e86e8db8-7ac9-45f0-8d94-c160802e912f",
+        "ca6df1ca-4b1d-40ac-96cf-792ecff012a6",
         "6ade54ad-be00-488a-a67c-4bc5c87d41a9",
         "69719e7a-6e22-4ba6-8849-f80bb682883e"
       ],
       "description": "Marks no_show, asks the host if the participant should get a rebook email, edits the message with the decision."
     },
     {
-      "id": "9b656bdb-23ef-47c7-abe5-06fd2af5b277",
+      "id": "f6fcb32b-d3bd-4ac1-8ddb-afeca33b3332",
       "name": "Prepare rebook email",
       "nodeIds": [
-        "06dbda13-e06f-4970-a7f9-64b8d26ee6f1",
+        "c4d0f101-73ff-431c-98af-ebc74eaea4c2",
         "ab8cad2f-f916-4c1a-9a52-26a85b37645d"
       ],
-      "description": "Host said yes: marks approved, builds the email, applies the mock guard."
+      "description": "Host said yes: marks approved, builds the email, applies the guard."
     },
     {
-      "id": "8af1b5f7-546f-43ad-90a9-90e31e473adf",
+      "id": "b228b024-fcc7-4030-b070-edbfd068af8f",
       "name": "Send rebook email",
       "nodeIds": [
         "4a4e4204-923a-44d0-ac49-3e65064f8b98",
-        "ad643e21-ada4-4fdc-aedb-9ce2aefec3d4",
+        "f3e84fb0-79c8-44b1-8940-948decce499a",
         "ad92dda3-685a-45e6-a279-4906836ab325"
       ],
       "description": "Sends from noreply@info.n8n.io through Mailgun, stamps the row, edits the DM with the send time."
     },
     {
-      "id": "97a4e5ed-22fe-4a65-a4e3-f9b938ab1ec0",
+      "id": "0ee0ed1b-5d5f-466a-b5d8-789a14ffb140",
       "name": "Email blocked",
       "nodeIds": [
-        "757e0dcb-757a-4aab-8cfa-de222e9cdd41",
+        "6fcbf18d-aa3e-491b-913f-e9ab9fbcd1e3",
         "b01c559e-ee26-4373-84aa-2feac12a6b93"
       ],
       "description": "Guard or missing data: nothing sent, row marked guard_blocked, DM says why."
+    },
+    {
+      "id": "35b0e0b8-975c-467c-be26-9c2d08fa5292",
+      "name": "Host not in Slack",
+      "nodeIds": [
+        "dfa3688f-e2b5-44d4-9488-f7b6b1b3b586",
+        "1c450b52-ea00-414b-8e34-439e2a3e2f9f",
+        "518e912d-4141-4e35-98e0-673ad93fccc0"
+      ],
+      "description": "Host email has no Slack user: row marked host_not_found, the admin gets a DM. Nothing is sent to the participant."
     }
   ]
 }
