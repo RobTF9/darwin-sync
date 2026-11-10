@@ -23,7 +23,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "tNYo3eGqheixdzIb",
-          "name": "PidgeonHead"
+          "name": "Webhook Auth"
         }
       }
     },
@@ -424,7 +424,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const raw = $input.item.json;\nconst findingsIn = (raw.output && raw.output.findings) || raw.findings || [];\nconst questionInsightId = $('Attach Findings').first().json.question_insight_id;\nconst validIds = new Set(($('Compute Coverage Stats').first().json.session_answers_for_llm || []).map(a => a.session_answer_id));\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst findings = findingsIn\n  .map(f => {\n    const verifiedIds = (f.session_answer_ids || []).filter(id => uuidRegex.test(id) && validIds.has(id));\n    return { ...f, session_answer_ids: verifiedIds };\n  })\n  .filter(f => f.session_answer_ids.length > 0);\nconst proposed = findingsIn.length;\nconst dropped = proposed - findings.length;\nreturn { json: { question_insight_id: questionInsightId, findings: findings, findings_proposed: proposed, findings_dropped: dropped } };"
+        "jsCode": "const raw = $input.item.json;\nconst findingsIn = (raw.output && raw.output.findings) || raw.findings || [];\nconst questionInsightId = $('Attach Findings').first().json.question_insight_id;\nconst validIds = new Set(($('Compute Coverage Stats').first().json.session_answers_for_llm || []).map(a => a.session_answer_id));\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst findings = findingsIn\n  .map(f => {\n    const verifiedIds = (f.session_answer_ids || []).filter(id => uuidRegex.test(id) && validIds.has(id));\n    // DWN-84: an LLM can cite the same id twice (for example, a merge in Consolidate Findings).\n    // A duplicate makes two equal evidence rows and breaks the evidence primary key.\n    return { ...f, session_answer_ids: [...new Set(verifiedIds)] };\n  })\n  .filter(f => f.session_answer_ids.length > 0);\nconst proposed = findingsIn.length;\nconst dropped = proposed - findings.length;\nreturn { json: { question_insight_id: questionInsightId, findings: findings, findings_proposed: proposed, findings_dropped: dropped } };"
       },
       "id": "2c81dd1b-03c5-4b62-9174-4d1524ad3bdb",
       "name": "Verify Finding Citations",
@@ -839,7 +839,7 @@
     "availableInMCP": true
   },
   "triggerCount": 1,
-  "versionId": "32a7afd8-413e-4384-9370-ca4cd93ee346",
+  "versionId": "16dd6e66-c925-4b39-8498-4233f77047a2",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
