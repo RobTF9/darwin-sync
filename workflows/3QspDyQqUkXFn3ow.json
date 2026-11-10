@@ -96,8 +96,8 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -1216,
-        544
+        -1440,
+        528
       ],
       "id": "2150717a-5fe3-4a68-963b-5f1b933fdf2f",
       "name": "When clicking ‘Execute workflow’"
@@ -175,7 +175,7 @@
           "mode": "id",
           "value": "gong"
         },
-        "embeddingBatchSize": 100,
+        "embeddingBatchSize": 10,
         "options": {
           "queryName": "match_gong"
         }
@@ -353,17 +353,18 @@
         },
         "mode": "each",
         "options": {
-          "waitForSubWorkflow": false
+          "waitForSubWorkflow": true
         }
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        128,
-        368
+        352,
+        432
       ],
       "id": "313ad3af-b7f4-4816-868f-b87c55c64cdf",
-      "name": "Call 'GongIngestion'"
+      "name": "Call 'GongIngestion'",
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -392,7 +393,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH ins AS (\n  INSERT INTO public.resource (parent_id, path, kind, source_id, title, summary, created_at)\n  SELECT d.id,\n         (d.path::text || '.r' || g.id)::ltree,\n         'gong_call', g.id::text,\n         left(coalesce(g.metadata->>'title', 'gong call'), 80),\n         d.summary,\n         coalesce(nullif(g.metadata->>'scheduled_at', '')::timestamptz, now())\n  FROM public.gong g\n  JOIN public.resource d ON d.kind = 'directory' AND d.path = ('gong.c' || $1)::ltree\n  WHERE g.metadata->>'call_id' = $1\n  ON CONFLICT (path) DO NOTHING\n  RETURNING id\n),\ndel AS (\n  DELETE FROM public.resource r\n  WHERE r.kind = 'gong_call'\n    AND r.path <@ ('gong.c' || $1)::ltree\n    AND r.source_id::bigint NOT IN (SELECT id FROM public.gong WHERE metadata->>'call_id' = $1)\n  RETURNING 1\n),\nled AS (\n  INSERT INTO public.ingest_ledger (source, source_id, content_hash, chunk_version, embed_model, status, ingested_at)\n  VALUES ('gong', $1, md5(coalesce($2, '')), 1, 'text-embedding-3-large', 'done', now())\n  ON CONFLICT (source, source_id) DO UPDATE SET content_hash = EXCLUDED.content_hash, status = 'done', ingested_at = now()\n  RETURNING source_id\n)\nSELECT (SELECT count(*) FROM ins) AS leaves_added,\n       (SELECT count(*) FROM del) AS leaves_removed,\n       (SELECT count(*) FROM led) AS ledger_written",
+        "query": "WITH ins AS (\n  INSERT INTO public.resource (parent_id, path, kind, source_id, title, summary, created_at)\n  SELECT d.id,\n         (d.path::text || '.r' || g.id)::ltree,\n         'gong_call', g.id::text,\n         left(coalesce(g.metadata->>'title', 'gong call'), 80),\n         d.summary,\n         coalesce(nullif(g.metadata->>'scheduled_at', '')::timestamptz, now())\n  FROM public.gong g\n  JOIN public.resource d ON d.kind = 'directory' AND d.path = ('gong.c' || $1)::ltree\n  WHERE g.metadata->>'call_id' = $1\n  ON CONFLICT (path) DO NOTHING\n  RETURNING id\n),\ndel AS (\n  DELETE FROM public.resource r\n  WHERE r.kind = 'gong_call'\n    AND r.path <@ ('gong.c' || $1)::ltree\n    AND r.source_id::bigint NOT IN (SELECT id FROM public.gong WHERE metadata->>'call_id' = $1)\n  RETURNING 1\n),\nled AS (\n  INSERT INTO public.ingest_ledger (source, source_id, content_hash, chunk_version, embed_model, status, ingested_at)\n  VALUES ('gong', $1, md5(coalesce($2, '')), 1, 'text-embedding-3-large', 'done', now())\n  ON CONFLICT (source, source_id) DO UPDATE SET content_hash = EXCLUDED.content_hash, status = 'done', error = NULL, ingested_at = now()\n  RETURNING source_id\n)\nSELECT (SELECT count(*) FROM ins) AS leaves_added,\n       (SELECT count(*) FROM del) AS leaves_removed,\n       (SELECT count(*) FROM led) AS ledger_written",
         "options": {
           "queryReplacement": "={{ [$('Prepare Calls').item.json.call_id, $('Prepare Calls').item.json.transcript_text] }}"
         }
@@ -411,12 +412,13 @@
           "name": "Supabase Postgres"
         }
       },
-      "notes": "Creates gong_call leaf resource nodes for this call’s vector rows (after embedding) and prunes leaves whose vector rows were deleted."
+      "notes": "Creates gong_call leaf resource nodes for this call’s vector rows (after embedding) and prunes leaves whose vector rows were deleted.",
+      "executeOnce": true
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT j->>'call_id' AS call_id, j->>'title' AS title, j->>'parties' AS parties,\n       j->>'sync_status' AS sync_status, j->>'sync_time' AS sync_time\nFROM (SELECT $2::jsonb) AS t(j)\nWHERE NOT EXISTS (\n  SELECT 1 FROM public.ingest_ledger WHERE source = 'gong' AND source_id = $1\n)",
+        "query": "SELECT j->>'call_id' AS call_id, j->>'title' AS title, j->>'parties' AS parties,\n       j->>'sync_status' AS sync_status, j->>'sync_time' AS sync_time\nFROM (SELECT $2::jsonb) AS t(j)\nWHERE NOT EXISTS (\n  -- DWN-65: skip calls that are done, in flight (pending), or failed 3 times.\n  SELECT 1 FROM public.ingest_ledger\n  WHERE source = 'gong' AND source_id = $1\n    AND (status IN ('done', 'pending') OR attempts >= 3)\n)",
         "options": {
           "queryReplacement": "={{ [$json.call_id, JSON.stringify($json)] }}"
         }
@@ -438,38 +440,11 @@
     },
     {
       "parameters": {
-        "batchSize": 5,
-        "options": {}
-      },
-      "id": "d8ac5088-cca4-4779-b1d3-9f617426c490",
-      "name": "BatchLoop",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        -96,
-        432
-      ]
-    },
-    {
-      "parameters": {
-        "amount": 10
-      },
-      "id": "cf892edc-11a4-470c-bf56-bedf410a53f7",
-      "name": "PaceWait",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        352,
-        432
-      ],
-      "webhookId": "48c9cbd4-88f1-450a-ac35-986d3e8389bb"
-    },
-    {
-      "parameters": {
         "rule": {
           "interval": [
             {
-              "triggerAtHour": 1
+              "field": "cronExpression",
+              "expression": "0 1,5,9,13,17,21 * * *"
             }
           ]
         }
@@ -477,8 +452,8 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -1216,
-        288
+        -1440,
+        336
       ],
       "id": "c80a2334-360a-4694-976f-5ba9f5e063f9",
       "name": "Schedule Trigger"
@@ -489,11 +464,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        154,
-        840
+        576,
+        336
       ],
       "parameters": {
-        "jsCode": "// DWN-39: simple success message. The done output of the\n// loop carries the items that were processed in this run.\nconst count = items.length;\nif (count === 0) return [];\nreturn [{ json: { count } }];"
+        "jsCode": "// DWN-65: this node is on the success output of the call node, so the\n// count holds only calls that finished. Failed calls go to MarkFailed.\nconst count = items.length;\nif (count === 0) return [];\nreturn [{ json: { count } }];"
       }
     },
     {
@@ -502,8 +477,8 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        354,
-        840
+        800,
+        336
       ],
       "parameters": {
         "select": "channel",
@@ -521,7 +496,95 @@
           "name": "Slack Bot"
         }
       },
-      "webhookId": "8a2c6abc-99f1-4196-88d8-7359f0c6a55d"
+      "webhookId": "8a2c6abc-99f1-4196-88d8-7359f0c6a55d",
+      "disabled": false
+    },
+    {
+      "id": "49ba1465-0adf-48d8-9e2d-893a864b0530",
+      "name": "TidyLedger",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1216,
+        432
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.ingest_ledger\nSET status = 'error',\n    error  = 'stale claim: no result within 6 hours (the run stopped, or the call returned no data)'\nWHERE source = 'gong'\n  AND status = 'pending'\n  AND last_attempt_at < now() - interval '6 hours';",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "DWN-65: a pending claim older than 6 hours has no result (the run stopped, or the call returned no data). Mark it as error, so the normal retry rule applies.",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "a37cc85f-d69b-4922-b183-face95f91d84",
+      "name": "Limit",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        432
+      ],
+      "parameters": {
+        "maxItems": 60,
+        "keep": "firstItems"
+      },
+      "notes": "DWN-65: at most N calls per run. Calls run one at a time, so N bounds the run time."
+    },
+    {
+      "id": "3877290e-3920-48e2-b3db-aa26f70f4a96",
+      "name": "Claim",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        128,
+        432
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.ingest_ledger AS l (source, source_id, content_hash, status, attempts, last_attempt_at)\nVALUES ('gong', $1, '', 'pending', 1, now())\nON CONFLICT (source, source_id) DO UPDATE\n  SET status = 'pending', attempts = l.attempts + 1, last_attempt_at = now()\n  WHERE l.status = 'error' AND l.attempts < 3\nRETURNING l.source_id AS call_id, l.attempts",
+        "options": {
+          "queryReplacement": "={{ [$json.call_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "DWN-65: claim the call in ingest_ledger before it runs (pending, attempts + 1). No row comes back when another run holds the call, when it is done, or when it failed 3 times. content_hash stays empty until SyncGongNodes writes it."
+    },
+    {
+      "id": "af61177b-5271-44b1-b7c6-c8105fb3b736",
+      "name": "MarkFailed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        576,
+        528
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.ingest_ledger\nSET status = 'error', error = left($2, 2000)\nWHERE source = 'gong' AND source_id = $1 AND status = 'pending'\nRETURNING source_id AS call_id, attempts, status",
+        "options": {
+          "queryReplacement": "={{ [$json.call_id, String($json.error ?? 'unknown error')] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "DWN-65: the sub-workflow failed for this call. Store the error. The call is tried again on a later run until it has 3 attempts."
     }
   ],
   "connections": {
@@ -552,17 +615,6 @@
         [
           {
             "node": "Has Calls",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "When clicking ‘Execute workflow’": {
-      "main": [
-        [
-          {
-            "node": "Fetch Sync Reports",
             "type": "main",
             "index": 0
           }
@@ -690,26 +742,74 @@
         ]
       ]
     },
-    "LedgerCheck": {
+    "Build Report": {
       "main": [
         [
           {
-            "node": "BatchLoop",
+            "node": "Post Success",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BatchLoop": {
+    "Schedule Trigger": {
       "main": [
         [
           {
-            "node": "Build Report",
+            "node": "TidyLedger",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "TidyLedger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TidyLedger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sync Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LedgerCheck": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim": {
+      "main": [
         [
           {
             "node": "Call 'GongIngestion'",
@@ -723,40 +823,14 @@
       "main": [
         [
           {
-            "node": "PaceWait",
+            "node": "Build Report",
             "type": "main",
             "index": 0
           }
-        ]
-      ]
-    },
-    "PaceWait": {
-      "main": [
+        ],
         [
           {
-            "node": "BatchLoop",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "Fetch Sync Reports",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Report": {
-      "main": [
-        [
-          {
-            "node": "Post Success",
+            "node": "MarkFailed",
             "type": "main",
             "index": 0
           }
@@ -771,7 +845,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
-  "versionId": "c5dd2d29-f156-4ab5-823a-72993a03a58d",
+  "versionId": "e0ca12eb-1ad9-4bd2-936f-cd86995c6959",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
