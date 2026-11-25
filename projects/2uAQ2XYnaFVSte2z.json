@@ -36,6 +36,12 @@
       "key": "pidgeon_head_url",
       "type": "string",
       "value": ""
+    },
+    {
+      "id": "aZNkEs3vzZP9zEv4",
+      "key": "uxr_recruiting_live_mode",
+      "type": "string",
+      "value": ""
     }
   ]
 }

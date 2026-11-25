@@ -1,0 +1,16 @@
+{
+  "id": "OwQ5bGnh19gd9dkJ",
+  "name": "UXR Recruiting Slack signing secret",
+  "type": "crypto",
+  "data": {
+    "hmacSecret": ""
+  },
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "isGlobal": false,
+  "isResolvable": false,
+  "resolvableAllowFallback": false
+}
