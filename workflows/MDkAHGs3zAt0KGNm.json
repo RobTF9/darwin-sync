@@ -1,0 +1,103 @@
+{
+  "id": "MDkAHGs3zAt0KGNm",
+  "name": "GetSession",
+  "description": "Sub-workflow tool for Darwin and Galapagos: one session by exact UUID. Parameterized query (replaces the inline get_session Postgres tool, which interpolated the model value into SQL). DWN-81.",
+  "nodes": [
+    {
+      "id": "596012d4-1d0e-4a49-990c-3020a9415fd0",
+      "name": "Sub",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "id"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bc66b882-0bb0-429c-aad2-6ec0e97f59c3",
+      "name": "Get Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.id, s.participant_name, s.role, s.company_type, s.technical_ability, s.ai_usage, s.ai_usage_evidence, s.using_n8n_for, s.session_summary, s.profile_summary, s.approved, s.project_id, s.created_at, s.updated_at FROM session s WHERE s.id::text = $1 LIMIT 1",
+        "options": {
+          "queryReplacement": "={{ [String($json.id ?? '').trim()] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Av2ehn3RdLrlzohO",
+          "name": "Supabase Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "0dbca2c0-a7e2-44b8-9d85-1474d752335e",
+      "name": "Shape Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows = $input.all().filter(i => i.json && i.json.id);\nif (rows.length) return rows;\nreturn [{ json: { error: 'No session found for this id. Pass the exact session UUID from a search hit.' } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Sub": {
+      "main": [
+        [
+          {
+            "node": "Get Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Session": {
+      "main": [
+        [
+          {
+            "node": "Shape Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1"
+  },
+  "triggerCount": 0,
+  "versionId": "39edfe49-f089-41db-846c-38d52d4e0f95",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": []
+}

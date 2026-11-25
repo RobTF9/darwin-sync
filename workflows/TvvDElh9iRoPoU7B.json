@@ -30,7 +30,7 @@
           "mode": "id",
           "value": "n8n-telemetry"
         },
-        "sqlQuery": "{{ \"SELECT * FROM `n8n-telemetry.gong.gong_calls` WHERE call_id = '\" + $json.call_id + \"' LIMIT 1\" }}",
+        "sqlQuery": "{{ \"SELECT * FROM `n8n-telemetry.gong.gong_calls` WHERE call_id = '\" + String($json.call_id ?? '').replace(/[^0-9]/g, '') + \"' LIMIT 1\" }}",
         "options": {
           "location": "EU"
         }
@@ -94,7 +94,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "970a2659-eb83-4fd5-bee1-0e23c8e30002",
+  "versionId": "d1839abb-7774-4dc7-80b2-fb7e2d7e6534",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

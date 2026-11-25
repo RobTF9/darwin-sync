@@ -1,0 +1,274 @@
+{
+  "id": "NWOdCxLtrCYM0Rpp",
+  "name": "Galapagos — Tool Call",
+  "description": "Galapagos (DWN-81): runs one Darwin tool sub-workflow for an MCP call, then writes one tool_call_log row (caller, args, status, error, latency, result size). Returns the tool output unchanged.",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tool"
+            },
+            {
+              "name": "args"
+            },
+            {
+              "name": "caller"
+            },
+            {
+              "name": "user_id"
+            },
+            {
+              "name": "user_email"
+            },
+            {
+              "name": "user_name"
+            },
+            {
+              "name": "parent_execution_id"
+            }
+          ]
+        }
+      },
+      "id": "f8272ffb-7025-4bfa-9584-c00f86c74d46",
+      "name": "Sub",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map the Galapagos tool name to its Darwin tool sub-workflow, parse the\n// arguments, and record the start time for the log row (DWN-81).\nconst TOOLS = {\n  search: 'SeM49wLBqaM1KknA',\n  ls: 'dLWwo63SMOZqfYfJ',\n  get_resource_context: 'Zfh4IcfyPk9fICFe',\n  get_transcript: 'jUXyju77iBG3FGUz',\n  get_session: 'MDkAHGs3zAt0KGNm',\n  get_project: 'B81Gkws52MZNrzJZ',\n  get_forum_thread: 'Ft4amYKPNROF6WLy',\n  get_gong_call: 'TvvDElh9iRoPoU7B',\n  get_scheduled_sessions: 'Ngwj2PVZOYGh7wTU',\n};\nconst t = $input.first().json;\nlet args = {};\nif (t.args && typeof t.args === 'object') args = t.args;\nelse if (t.args) { try { args = JSON.parse(t.args); } catch (e) { args = { _unparsed: String(t.args) }; } }\nconst blank = (v) => v === undefined || v === null || v === '' || v === '__UNKNOWN__';\n// Note: never name a key 'caller' here. The n8n expression sandbox blocks\n// access to a property with that name, so downstream expressions fail.\nreturn [{ json: { ...args, _galapagos: {\n  tool: String(t.tool || ''),\n  workflow_id: TOOLS[t.tool] || 'unknown-tool',\n  args,\n  via: blank(t.caller) ? 'galapagos' : String(t.caller),\n  user_id: blank(t.user_id) ? null : String(t.user_id),\n  user_email: blank(t.user_email) ? null : String(t.user_email),\n  user_name: blank(t.user_name) ? null : String(t.user_name),\n  execution_id: blank(t.parent_execution_id) ? String($execution.id) : String(t.parent_execution_id),\n  started_ms: Date.now(),\n} } }];"
+      },
+      "id": "557ec1ff-a836-49ec-9972-45400f3f5874",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json._galapagos.workflow_id }}"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "a343b2a5-0740-4d5d-9f18-0fd2ab086bd7",
+      "name": "Run Tool",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        96
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One log row per call. Status is 'error' when the tool output is a single\n// { error } item: an n8n failure (Run Tool continues on error) or an error\n// the tool reported itself. Otherwise 'success'.\nconst m = $('Prepare').first().json._galapagos;\nconst result = $input.all().map(i => i.json).filter(j => j && Object.keys(j).length > 0);\nconst isError = result.length === 1 && result[0].error !== undefined && Object.keys(result[0]).every(k => ['error', 'path'].includes(k));\nlet msg = null;\nif (isError) {\n  const e = result[0].error;\n  msg = typeof e === 'string' ? e : (e && (e.message || e.description)) || JSON.stringify(e);\n  if (m.workflow_id === 'unknown-tool') msg = 'Unknown tool: ' + m.tool;\n}\nconst text = JSON.stringify(result);\nreturn [{ json: { result, isError, message: msg, log: {\n  server: 'galapagos', via: m.via, tool: m.tool,\n  user_id: m.user_id, user_email: m.user_email, user_name: m.user_name,\n  args: m.args, status: isError ? 'error' : 'success', error: msg ? String(msg).slice(0, 4000) : null,\n  duration_ms: Date.now() - m.started_ms,\n  result_bytes: isError ? 0 : text.length, result_items: isError ? 0 : result.length,\n  n8n_execution_id: m.execution_id,\n} } }];"
+      },
+      "id": "9e16f954-42b7-4a72-a3ce-ca0d6a35553f",
+      "name": "Build Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "tool_call_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "server",
+              "fieldValue": "={{ $json.log.server }}"
+            },
+            {
+              "fieldId": "caller",
+              "fieldValue": "={{ $json.log.via }}"
+            },
+            {
+              "fieldId": "tool",
+              "fieldValue": "={{ $json.log.tool }}"
+            },
+            {
+              "fieldId": "user_id",
+              "fieldValue": "={{ $json.log.user_id }}"
+            },
+            {
+              "fieldId": "user_email",
+              "fieldValue": "={{ $json.log.user_email }}"
+            },
+            {
+              "fieldId": "user_name",
+              "fieldValue": "={{ $json.log.user_name }}"
+            },
+            {
+              "fieldId": "args",
+              "fieldValue": "={{ $json.log.args }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.log.status }}"
+            },
+            {
+              "fieldId": "error",
+              "fieldValue": "={{ $json.log.error }}"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "={{ $json.log.duration_ms }}"
+            },
+            {
+              "fieldId": "result_bytes",
+              "fieldValue": "={{ $json.log.result_bytes }}"
+            },
+            {
+              "fieldId": "result_items",
+              "fieldValue": "={{ $json.log.result_items }}"
+            },
+            {
+              "fieldId": "n8n_execution_id",
+              "fieldValue": "={{ $json.log.n8n_execution_id }}"
+            }
+          ]
+        }
+      },
+      "id": "7cb0aafa-872f-4bfc-ad93-ef0bb3d4c501",
+      "name": "Save Log",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "gBIPPKjo4dshypxE",
+          "name": "Supabase API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return the tool output unchanged (the log insert result must not leak).\nconst b = $('Build Log').first().json;\nif (b.isError) return [{ json: { error: b.message } }];\nif (!b.result.length) return [{ json: { message: 'The tool returned no results.' } }];\nreturn b.result.map(r => ({ json: r }));"
+      },
+      "id": "d1272db9-6c1f-4f18-a349-cc93d51818b1",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Sub": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare": {
+      "main": [
+        [
+          {
+            "node": "Run Tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Tool": {
+      "main": [
+        [
+          {
+            "node": "Build Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Log": {
+      "main": [
+        [
+          {
+            "node": "Save Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Log": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "iDcm070UekOYt0f1",
+    "binaryMode": "separate"
+  },
+  "triggerCount": 0,
+  "versionId": "eabd5f1d-f840-417d-83c5-2fbf908ab442",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "wkVsUQ3LVUIdgVe0",
+  "isArchived": false,
+  "nodeGroups": [
+    {
+      "id": "33aecbca-6685-472d-b357-18614fe7f727",
+      "name": "Log call",
+      "nodeIds": [
+        "9e16f954-42b7-4a72-a3ce-ca0d6a35553f",
+        "7cb0aafa-872f-4bfc-ad93-ef0bb3d4c501",
+        "d1272db9-6c1f-4f18-a349-cc93d51818b1"
+      ],
+      "description": "Writes one row to tool_call_log (success or error), then returns the tool output unchanged."
+    }
+  ]
+}
