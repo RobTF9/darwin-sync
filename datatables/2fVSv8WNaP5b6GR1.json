@@ -1,0 +1,115 @@
+{
+  "id": "2fVSv8WNaP5b6GR1",
+  "name": "DWN-8 signals",
+  "columns": [
+    {
+      "id": "W3encxBBXzO0Vakd",
+      "name": "signal_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "xevXvVck9DoqcJCx",
+      "name": "source",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "Xt3yQqrs4Z6OjkZd",
+      "name": "source_id",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "bwxffVSIjZ6I9TLY",
+      "name": "occurred_at",
+      "type": "date",
+      "index": 3
+    },
+    {
+      "id": "6YqoKcBkgE5zkZJm",
+      "name": "customer_key",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "SVV6tLeV5pZf2GGm",
+      "name": "speaker",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "eUHWDilrOXWJPdru",
+      "name": "statement",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "EzdKqE3nVe3EaMOr",
+      "name": "quote",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "sGS2Qg1JKpqIEk9D",
+      "name": "context",
+      "type": "string",
+      "index": 8
+    },
+    {
+      "id": "u3Cn6rrik1GlOF0G",
+      "name": "kind",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "pxrDM63hPIIbs7n3",
+      "name": "lens",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "QGN6GbByacXyEwO1",
+      "name": "start_ms",
+      "type": "number",
+      "index": 11
+    },
+    {
+      "id": "6xwAawY9gaN6ZfBN",
+      "name": "deep_link",
+      "type": "string",
+      "index": 12
+    },
+    {
+      "id": "Lq2btLZbizHt6RA3",
+      "name": "segment",
+      "type": "string",
+      "index": 13
+    },
+    {
+      "id": "c8c7x8999Jfcy3PV",
+      "name": "model",
+      "type": "string",
+      "index": 14
+    },
+    {
+      "id": "ZppYfkeTolPaMFHi",
+      "name": "prompt_version",
+      "type": "string",
+      "index": 15
+    },
+    {
+      "id": "wcha9jIVLnTGSb0t",
+      "name": "extraction_run",
+      "type": "string",
+      "index": 16
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-12T10:07:15.858Z",
+  "updatedAt": "2026-11-12T10:34:01.637Z"
+}

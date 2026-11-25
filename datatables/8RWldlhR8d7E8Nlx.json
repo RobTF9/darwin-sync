@@ -1,0 +1,43 @@
+{
+  "id": "8RWldlhR8d7E8Nlx",
+  "name": "DWN-8 signal matches",
+  "columns": [
+    {
+      "id": "Vo1tmn9UdcxgNzaB",
+      "name": "signal_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "c4ac9ZY2wUIEo3aL",
+      "name": "codebook_version",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "UFyzMuG0xtjNFSDL",
+      "name": "n_concepts",
+      "type": "number",
+      "index": 2
+    },
+    {
+      "id": "ZVTANVm88ypJ9WDU",
+      "name": "model",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "QzXQoQ8E5If9Cyjj",
+      "name": "prompt_version",
+      "type": "string",
+      "index": 4
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-12T10:07:16.676Z",
+  "updatedAt": "2026-11-12T10:34:15.753Z"
+}

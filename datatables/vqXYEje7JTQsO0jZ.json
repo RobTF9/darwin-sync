@@ -1,0 +1,67 @@
+{
+  "id": "vqXYEje7JTQsO0jZ",
+  "name": "MOCK - Enterprise Accounts",
+  "columns": [
+    {
+      "id": "eRwmFonDztGXdWwA",
+      "name": "account_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "DHf6V1rCfBdH5VpB",
+      "name": "account_name",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "Ct9MxbScA4JzWCEb",
+      "name": "csm_name",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "lNtfWVnLVE8pTz0d",
+      "name": "csm_email",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "hTQBfV8B7F5kNagf",
+      "name": "arr_usd",
+      "type": "number",
+      "index": 4
+    },
+    {
+      "id": "TNBlH6yrAtKEgThX",
+      "name": "user_count",
+      "type": "number",
+      "index": 5
+    },
+    {
+      "id": "79uISj56ZKenBXoy",
+      "name": "deployment",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "QgYMVy8qPNXo6yoj",
+      "name": "churn_risk",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "ov7tBQxDmJjd7sNZ",
+      "name": "is_mock",
+      "type": "boolean",
+      "index": 8
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-02T12:47:13.747Z",
+  "updatedAt": "2026-11-02T12:47:25.786Z"
+}

@@ -1,0 +1,97 @@
+{
+  "id": "SX8hgQzZoErhxAmH",
+  "name": "DWN-8 codebook",
+  "columns": [
+    {
+      "id": "rJ94sCHJMJUvko8f",
+      "name": "concept_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "jdHWuEb7vRLrzato",
+      "name": "scheme",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "pa3yAUNCEwua56g3",
+      "name": "parent_id",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "RYmsKgqckOw0yT6l",
+      "name": "label",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "b6xqT0dOeSJQkp3a",
+      "name": "definition",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "wg6UYM6dY0kWezq6",
+      "name": "include_rules",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "KLzo42OWjcPdwhj3",
+      "name": "exclude_rules",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "SvRAtswwZEUrUcbp",
+      "name": "examples",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "EGhgbnHo494lBhjj",
+      "name": "status",
+      "type": "string",
+      "index": 8
+    },
+    {
+      "id": "d7hEPvpX13mdFstP",
+      "name": "origin",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "SAokI4b7AF3nJU0R",
+      "name": "added_in_version",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "U9uWT2t9uswlk8dH",
+      "name": "archived_in_version",
+      "type": "string",
+      "index": 11
+    },
+    {
+      "id": "CMClTH2i1JFoYLYJ",
+      "name": "approved_by",
+      "type": "string",
+      "index": 12
+    },
+    {
+      "id": "j0G2xRcc6J9jK8ld",
+      "name": "approved_at",
+      "type": "date",
+      "index": 13
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-12T10:07:16.346Z",
+  "updatedAt": "2026-11-12T10:08:35.389Z"
+}

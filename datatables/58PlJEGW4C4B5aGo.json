@@ -1,0 +1,37 @@
+{
+  "id": "58PlJEGW4C4B5aGo",
+  "name": "NPS Invites - Opt-outs",
+  "columns": [
+    {
+      "id": "XIwPDElVdQ2fWEED",
+      "name": "cio_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "zsHvnp1AGda7yVFe",
+      "name": "user_id",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "NtjRZqZzdlTVfFWC",
+      "name": "event_id",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "HPYw1CndVFtlqhDt",
+      "name": "opted_out_at",
+      "type": "date",
+      "index": 3
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-06T09:19:21.646Z",
+  "updatedAt": "2026-11-06T10:39:34.656Z"
+}

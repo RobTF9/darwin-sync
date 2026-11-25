@@ -1,0 +1,115 @@
+{
+  "id": "1INrmTHiYlaNp0j2",
+  "name": "UXR Enterprise - Picks",
+  "columns": [
+    {
+      "id": "mBlgH7IVBq7IfAKf",
+      "name": "request_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "QQvuvyTBNZu8pax4",
+      "name": "account_id",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "VP4585OW50mqhmzL",
+      "name": "account_name",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "oB2SoifK2jdDZWDP",
+      "name": "csm_email",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "JiihU9WQh8j2PmW5",
+      "name": "rank",
+      "type": "number",
+      "index": 4
+    },
+    {
+      "id": "vmYTATk0onf7bhwz",
+      "name": "status",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "Osjvgs6Wv0dyy3B4",
+      "name": "asked_at",
+      "type": "date",
+      "index": 6
+    },
+    {
+      "id": "HO8cdxkE1lBYisK5",
+      "name": "reminded_at",
+      "type": "date",
+      "index": 7
+    },
+    {
+      "id": "M9EAhNHLrAabKJbM",
+      "name": "decided_at",
+      "type": "date",
+      "index": 8
+    },
+    {
+      "id": "T4GQ75E7Y87Vxpqm",
+      "name": "decided_by",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "ImkWl1NkrPcNq5VG",
+      "name": "no_days",
+      "type": "number",
+      "index": 10
+    },
+    {
+      "id": "ZZKXi92Cv9velQIL",
+      "name": "contact_email",
+      "type": "string",
+      "index": 11
+    },
+    {
+      "id": "IpJ8NyEStTkDqFMK",
+      "name": "email_sent_at",
+      "type": "date",
+      "index": 12
+    },
+    {
+      "id": "2TUu0GPwEDqKLGrY",
+      "name": "csm_dm_channel",
+      "type": "string",
+      "index": 13
+    },
+    {
+      "id": "FizesF2yNaivTQHr",
+      "name": "csm_dm_ts",
+      "type": "string",
+      "index": 14
+    },
+    {
+      "id": "7aDBlhIMB4K5TesR",
+      "name": "opt_out_token",
+      "type": "string",
+      "index": 15
+    },
+    {
+      "id": "hX59tW8Pc79LeD1s",
+      "name": "email_status",
+      "type": "string",
+      "index": 16
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-02T12:47:14.098Z",
+  "updatedAt": "2026-11-04T16:53:46.650Z"
+}

@@ -1,0 +1,97 @@
+{
+  "id": "9AhVgGTGmOtE2evw",
+  "name": "DWN-8 ingest ledger",
+  "columns": [
+    {
+      "id": "Dxe9ORfjZSu3JqZV",
+      "name": "source",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "3ax1TLervu9F8bpd",
+      "name": "source_id",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "mcICxldKMm4HJ3a7",
+      "name": "occurred_at",
+      "type": "date",
+      "index": 2
+    },
+    {
+      "id": "kyILHCnJuyBkYmog",
+      "name": "status",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "ZcsACLGG9OT0nbsn",
+      "name": "n_signals",
+      "type": "number",
+      "index": 4
+    },
+    {
+      "id": "PeCfEemqVesLa8ca",
+      "name": "n_rejected_quotes",
+      "type": "number",
+      "index": 5
+    },
+    {
+      "id": "PNQx1UMVA0vSVa6M",
+      "name": "n_matched",
+      "type": "number",
+      "index": 6
+    },
+    {
+      "id": "zZliF3KWgVV0QZk4",
+      "name": "customer_key",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "9KNBzq7QEnZpezBi",
+      "name": "model",
+      "type": "string",
+      "index": 8
+    },
+    {
+      "id": "uSs9G1XOV4SWyrNN",
+      "name": "prompt_version",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "O55vN4CDGuh7oJYJ",
+      "name": "input_tokens",
+      "type": "number",
+      "index": 10
+    },
+    {
+      "id": "FQyS8VXnVEAjnRE4",
+      "name": "output_tokens",
+      "type": "number",
+      "index": 11
+    },
+    {
+      "id": "FERhdQqNqj6GvERa",
+      "name": "run_label",
+      "type": "string",
+      "index": 12
+    },
+    {
+      "id": "RtPf7PrsLgbi1fU4",
+      "name": "error",
+      "type": "string",
+      "index": 13
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-12T10:28:31.003Z",
+  "updatedAt": "2026-11-12T10:34:15.985Z"
+}

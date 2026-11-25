@@ -1,0 +1,115 @@
+{
+  "id": "jfteZ9YI0flTrlYo",
+  "name": "DWN-8 signal extraction test",
+  "columns": [
+    {
+      "id": "Pwue0xvdRw5q80dw",
+      "name": "run_label",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "HDmebZuzbMKLWgEd",
+      "name": "call_id",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "pFTiAs3zPeV914J5",
+      "name": "band",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "jY03XPV3NsyS8LM7",
+      "name": "arm",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "wV9tMiEZW19AHHJA",
+      "name": "model",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "3deoMVr2jtb44AI0",
+      "name": "run",
+      "type": "number",
+      "index": 5
+    },
+    {
+      "id": "rh9JMNIXa6kXInpH",
+      "name": "status",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "chvFnxoxhQFjO9uX",
+      "name": "stop_reason",
+      "type": "string",
+      "index": 7
+    },
+    {
+      "id": "g49IZXlQHses7FSm",
+      "name": "input_tokens",
+      "type": "number",
+      "index": 8
+    },
+    {
+      "id": "SdBnc7GrIl1sw4dO",
+      "name": "output_tokens",
+      "type": "number",
+      "index": 9
+    },
+    {
+      "id": "CFbO9wVAom6WkUhO",
+      "name": "transcript_chars",
+      "type": "number",
+      "index": 10
+    },
+    {
+      "id": "Uk9Ip2K5hvYR8Rnf",
+      "name": "n_signals",
+      "type": "number",
+      "index": 11
+    },
+    {
+      "id": "GaL2QnuekXj8sLfQ",
+      "name": "n_verified",
+      "type": "number",
+      "index": 12
+    },
+    {
+      "id": "471dTZDEcS0Exar3",
+      "name": "n_not_found",
+      "type": "number",
+      "index": 13
+    },
+    {
+      "id": "njmciPKvuV5Z9pWt",
+      "name": "n_not_external",
+      "type": "number",
+      "index": 14
+    },
+    {
+      "id": "rigfoKGml12i4PmY",
+      "name": "signals",
+      "type": "string",
+      "index": 15
+    },
+    {
+      "id": "7LgzKUbsprRjM5rN",
+      "name": "error",
+      "type": "string",
+      "index": 16
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-10T11:00:16.896Z",
+  "updatedAt": "2026-11-12T09:47:31.695Z"
+}

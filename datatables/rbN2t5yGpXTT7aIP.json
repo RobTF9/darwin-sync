@@ -1,0 +1,103 @@
+{
+  "id": "rbN2t5yGpXTT7aIP",
+  "name": "NPS Invites - Log",
+  "columns": [
+    {
+      "id": "KmEAutnMfnxEZrIl",
+      "name": "event_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "G5UlmyzEAUUKBg7U",
+      "name": "answered_at",
+      "type": "date",
+      "index": 1
+    },
+    {
+      "id": "Y4kz3ccnaxUykALK",
+      "name": "nps",
+      "type": "number",
+      "index": 2
+    },
+    {
+      "id": "Nb4yzIuyOHIYKfCx",
+      "name": "user_id",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "pFMca933I2TfKdB6",
+      "name": "instance_id",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "PnEfPD0xp8Wxxroz",
+      "name": "deployment",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "siAeZSiJ55oCfTyU",
+      "name": "category",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "37JXIMzGPXWilpS1",
+      "name": "actionable",
+      "type": "boolean",
+      "index": 7
+    },
+    {
+      "id": "ABvemOOTQq1sM9Zj",
+      "name": "result",
+      "type": "string",
+      "index": 8
+    },
+    {
+      "id": "XYLfuFXoNfeGggzT",
+      "name": "target_cio_id",
+      "type": "string",
+      "index": 9
+    },
+    {
+      "id": "pv9a7lYdrzu7GHXK",
+      "name": "profile_cio_ids",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "wS227puqnoAUmoH5",
+      "name": "opt_out_token",
+      "type": "string",
+      "index": 11
+    },
+    {
+      "id": "6Gptr6JDk5sUYlkA",
+      "name": "live",
+      "type": "boolean",
+      "index": 12
+    },
+    {
+      "id": "XblnZeyyTRUQtkDN",
+      "name": "sent_at",
+      "type": "date",
+      "index": 13
+    },
+    {
+      "id": "NoxJ9PL2MQ8izj1o",
+      "name": "opted_out_at",
+      "type": "date",
+      "index": 14
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-06T09:19:21.488Z",
+  "updatedAt": "2026-11-25T08:27:01.877Z"
+}

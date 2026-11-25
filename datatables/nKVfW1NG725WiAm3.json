@@ -1,0 +1,25 @@
+{
+  "id": "nKVfW1NG725WiAm3",
+  "name": "DWN-8 codebook versions",
+  "columns": [
+    {
+      "id": "T5RnOkjNrK8ych11",
+      "name": "label",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "pP8e2cAuVzQqJKEg",
+      "name": "notes",
+      "type": "string",
+      "index": 1
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-12T10:07:16.133Z",
+  "updatedAt": "2026-11-12T10:08:35.107Z"
+}

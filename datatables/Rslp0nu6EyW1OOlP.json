@@ -1,0 +1,85 @@
+{
+  "id": "Rslp0nu6EyW1OOlP",
+  "name": "DWN-8 signal judge",
+  "columns": [
+    {
+      "id": "VFMwNMZR5LYovmbr",
+      "name": "judge_label",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "V1MC624kS0VEWR2Q",
+      "name": "judge",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "VIPEFyg3cgGrr3yZ",
+      "name": "source_row_id",
+      "type": "number",
+      "index": 2
+    },
+    {
+      "id": "BjEsbEqWlBZE1xkA",
+      "name": "call_id",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "lS5gAXXBuwS8QFXB",
+      "name": "arm",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "EdFzJHz35An5R0BJ",
+      "name": "status",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "3YOXTuo1JkSTrb23",
+      "name": "input_tokens",
+      "type": "number",
+      "index": 6
+    },
+    {
+      "id": "2pQ49mcExJVHUTXQ",
+      "name": "output_tokens",
+      "type": "number",
+      "index": 7
+    },
+    {
+      "id": "9yifR0do8eccv1sv",
+      "name": "n_signals",
+      "type": "number",
+      "index": 8
+    },
+    {
+      "id": "pRoH9tG4tR24Oh23",
+      "name": "n_judged",
+      "type": "number",
+      "index": 9
+    },
+    {
+      "id": "UlwLJHW5P4NLOmPO",
+      "name": "labels",
+      "type": "string",
+      "index": 10
+    },
+    {
+      "id": "ua6SUKra0Wacjoaf",
+      "name": "error",
+      "type": "string",
+      "index": 11
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-12T09:25:34.218Z",
+  "updatedAt": "2026-11-12T09:49:40.930Z"
+}

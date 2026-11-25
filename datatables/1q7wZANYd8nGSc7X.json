@@ -1,0 +1,61 @@
+{
+  "id": "1q7wZANYd8nGSc7X",
+  "name": "UXR Enterprise - Blocks",
+  "columns": [
+    {
+      "id": "YvSca2Uyl3GOknDy",
+      "name": "scope",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "SnU3ZK812FvoyNSv",
+      "name": "account_id",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "XYMkij2TzH3NH1Ie",
+      "name": "email",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "VdtiBuHpROcMBseU",
+      "name": "kind",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "xtrwDm96n1rAPyl7",
+      "name": "blocked_until",
+      "type": "date",
+      "index": 4
+    },
+    {
+      "id": "9ACXC8YCRlZ66Rko",
+      "name": "reason",
+      "type": "string",
+      "index": 5
+    },
+    {
+      "id": "omcLlFEftSoM97Yr",
+      "name": "set_by",
+      "type": "string",
+      "index": 6
+    },
+    {
+      "id": "4AP4LyvliG2Uz3Yy",
+      "name": "request_id",
+      "type": "string",
+      "index": 7
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-02T12:47:14.290Z",
+  "updatedAt": "2026-11-04T16:49:42.689Z"
+}

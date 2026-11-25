@@ -1,0 +1,49 @@
+{
+  "id": "LOhWM4OmLQEhum7W",
+  "name": "DWN-8 signal tags",
+  "columns": [
+    {
+      "id": "CA7uLjA4ii0rcC0G",
+      "name": "signal_id",
+      "type": "string",
+      "index": 0
+    },
+    {
+      "id": "oU837cnbVyn03xxG",
+      "name": "concept_id",
+      "type": "string",
+      "index": 1
+    },
+    {
+      "id": "IVGOaMDOW5dMHRih",
+      "name": "codebook_version",
+      "type": "string",
+      "index": 2
+    },
+    {
+      "id": "jASJlnaxmJ7VfKs0",
+      "name": "model",
+      "type": "string",
+      "index": 3
+    },
+    {
+      "id": "EAXFCdRjcdtoCyiR",
+      "name": "prompt_version",
+      "type": "string",
+      "index": 4
+    },
+    {
+      "id": "KiUrDz0ctx8raSMt",
+      "name": "origin",
+      "type": "string",
+      "index": 5
+    }
+  ],
+  "ownedBy": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "createdAt": "2026-11-12T10:07:16.498Z",
+  "updatedAt": "2026-11-12T10:34:15.863Z"
+}
