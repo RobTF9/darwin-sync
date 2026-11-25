@@ -8,28 +8,30 @@
         "httpMethod": "POST",
         "path": "recruiting-interaction",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {
+          "rawBody": true
+        }
       },
       "id": "ed12708f-dff2-4836-95eb-f719883035ef",
       "name": "Slack Interaction Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        0,
+        -1120,
         208
       ],
       "webhookId": "c6bb7055-bca3-4d86-ab5d-b2843ec29691"
     },
     {
       "parameters": {
-        "jsCode": "const req = $input.first().json || {};\nconst raw = req.body && req.body.payload;\nconst payload = JSON.parse(raw);\n// Slack re-sends the same interaction when it gets no 200 within 3 seconds (cold start). The first run keeps going,\n// so a retry must be acknowledged and dropped, never processed twice (double send, double post).\nconst hdr = req.headers || {};\nconst retryNum = hdr['x-slack-retry-num'] || hdr['X-Slack-Retry-Num'] || null;\nconst is_retry = retryNum !== null && retryNum !== undefined && String(retryNum) !== '' && String(retryNum) !== '0';\nlet action_id = null;\nlet action_type = payload.type || null;\nlet action_value = null;\nlet channel_id = (payload.channel && payload.channel.id) || null;\nlet thread_ts = null;\nlet message_ts = null;\nif (payload.type === 'view_submission') {\n  const view = payload.view || {};\n  action_id = view.callback_id || null;\n  action_value = view.state || null;\n  // Modals opened by this wizard carry the thread context in private_metadata (JSON)\n  let meta = null;\n  try { meta = JSON.parse(view.private_metadata || ''); } catch (e) { meta = null; }\n  if (meta && typeof meta === 'object') {\n    channel_id = channel_id || meta.channel_id || null;\n    thread_ts = meta.thread_ts || null;\n    message_ts = meta.message_ts || null;\n  } else {\n    channel_id = channel_id || (view.private_metadata || null);\n  }\n} else {\n  const act = (payload.actions && payload.actions[0]) || {};\n  action_id = act.action_id || null;\n  if (Array.isArray(act.selected_options)) {\n    action_value = act.selected_options.map(o => o.value);\n  } else {\n    action_value = (act.selected_option && act.selected_option.value) || act.value || null;\n  }\n  const msg = payload.message || {};\n  thread_ts = msg.thread_ts || msg.ts || null;\n  message_ts = msg.ts || null;\n}\nconst threadKey = thread_ts || message_ts || null;\nconst session_key = channel_id && threadKey ? channel_id + '_' + threadKey : null;\nreturn [{ json: {\n  action_id,\n  action_type,\n  action_value,\n  is_retry,\n  retry_reason: hdr['x-slack-retry-reason'] || hdr['X-Slack-Retry-Reason'] || null,\n  trigger_id: payload.trigger_id || null,\n  user_id: (payload.user && payload.user.id) || null,\n  user_name: (payload.user && payload.user.username) || null,\n  channel_id,\n  thread_ts,\n  message_ts,\n  session_key,\n  response_url: payload.response_url || null,\n  full_payload: payload\n} }];"
+        "jsCode": "// Read the original webhook item: the signature check nodes in front of this one replace $input.\nconst req = $('Slack Interaction Webhook').first().json || {};\nconst raw = req.body && req.body.payload;\nconst payload = JSON.parse(raw);\n// Slack re-sends the same interaction when it gets no 200 within 3 seconds (cold start). The first run keeps going,\n// so a retry must be acknowledged and dropped, never processed twice (double send, double post).\nconst hdr = req.headers || {};\nconst retryNum = hdr['x-slack-retry-num'] || hdr['X-Slack-Retry-Num'] || null;\nconst is_retry = retryNum !== null && retryNum !== undefined && String(retryNum) !== '' && String(retryNum) !== '0';\nlet action_id = null;\nlet action_type = payload.type || null;\nlet action_value = null;\nlet channel_id = (payload.channel && payload.channel.id) || null;\nlet thread_ts = null;\nlet message_ts = null;\nif (payload.type === 'view_submission') {\n  const view = payload.view || {};\n  action_id = view.callback_id || null;\n  action_value = view.state || null;\n  // Modals opened by this wizard carry the thread context in private_metadata (JSON)\n  let meta = null;\n  try { meta = JSON.parse(view.private_metadata || ''); } catch (e) { meta = null; }\n  if (meta && typeof meta === 'object') {\n    channel_id = channel_id || meta.channel_id || null;\n    thread_ts = meta.thread_ts || null;\n    message_ts = meta.message_ts || null;\n  } else {\n    channel_id = channel_id || (view.private_metadata || null);\n  }\n} else {\n  const act = (payload.actions && payload.actions[0]) || {};\n  action_id = act.action_id || null;\n  if (Array.isArray(act.selected_options)) {\n    action_value = act.selected_options.map(o => o.value);\n  } else {\n    action_value = (act.selected_option && act.selected_option.value) || act.value || null;\n  }\n  const msg = payload.message || {};\n  thread_ts = msg.thread_ts || msg.ts || null;\n  message_ts = msg.ts || null;\n}\nconst threadKey = thread_ts || message_ts || null;\nconst session_key = channel_id && threadKey ? channel_id + '_' + threadKey : null;\nreturn [{ json: {\n  action_id,\n  action_type,\n  action_value,\n  is_retry,\n  retry_reason: hdr['x-slack-retry-reason'] || hdr['X-Slack-Retry-Reason'] || null,\n  trigger_id: payload.trigger_id || null,\n  user_id: (payload.user && payload.user.id) || null,\n  user_name: (payload.user && payload.user.username) || null,\n  channel_id,\n  thread_ts,\n  message_ts,\n  session_key,\n  response_url: payload.response_url || null,\n  full_payload: payload\n} }];"
       },
       "id": "82b28f85-3030-4551-83f4-f9933cb115ad",
       "name": "Parse Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
+        0,
         208
       ]
     },
@@ -53,7 +55,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        448,
+        224,
         208
       ]
     },
@@ -389,7 +391,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst AUDIENCE_LABELS = { n8n_users: 'n8n users', volunteers: 'Research volunteers', non_users: 'Non-users' };\nfunction audienceLabel(a) { return AUDIENCE_LABELS[a] || a || 'unknown'; }\nfunction defsFor(config, audience) {\n  if (audience === 'n8n_users') return config.nUserFilters || [];\n  return config.volunteerFilters || config.nonUserFilters || [];\n}\nfunction optionText(o) { return { type: 'plain_text', text: String(o.label || o.value).slice(0, 75), emoji: true }; }\nfunction renderFilterBlocks(config, audience, filters) {\n  const defs = defsFor(config, audience);\n  const blocks = [\n    { type: 'section', text: { type: 'mrkdwn', text: ':busts_in_silhouette: *Audience: ' + audienceLabel(audience) + '*\\n\\nSelect any filters you want to apply (you can pick more than one value per filter). All are optional. The % tells you how many profiles carry that information.' } },\n    { type: 'divider' }\n  ];\n  const disabled = [];\n  for (const def of defs) {\n    if (def.enabled === false) { disabled.push(def); continue; }\n    const options = (def.options || []).map(o => ({ text: optionText(o), value: String(o.value) }));\n    const hasKey = filters && Object.prototype.hasOwnProperty.call(filters, def.id);\n    const raw = hasKey ? filters[def.id] : (def.default || []);\n    const selected = (Array.isArray(raw) ? raw : (raw ? [raw] : [])).map(String);\n    const selectedOptions = options.filter(o => selected.includes(o.value));\n    const labelsOf = selectedOptions.map(o => o.text.text);\n    let selectedLine;\n    if (!hasKey && def.default && def.default.length) selectedLine = '*Selected (default):* ' + labelsOf.join(', ');\n    else if (labelsOf.length) selectedLine = '*Selected:* ' + labelsOf.join(', ');\n    else selectedLine = '_Selected: none' + (def.default && def.default.length ? ' (default applies)' : '') + '_';\n    let text = '*' + def.label + '*  ·  _available in ' + (def.coverage || '?') + ' of profiles' + (def.coverageNote ? ', ' + def.coverageNote : '') + '_';\n    if (def.hint) text += '\\n' + def.hint;\n    text += '\\n' + selectedLine;\n    const element = { type: 'multi_static_select', action_id: 'uxr_filter_' + def.id, placeholder: { type: 'plain_text', text: 'Select one or more' }, options };\n    if (selectedOptions.length) element.initial_options = selectedOptions;\n    blocks.push({ type: 'section', block_id: 'filter_' + def.id, text: { type: 'mrkdwn', text }, accessory: element });\n  }\n  if (disabled.length) {\n    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: ':hourglass_flowing_sand: *Coming soon* (needs Customer.io segments): ' + disabled.map(d => d.label).join(', ') + '  ·  _available in ' + (disabled[0].coverage || '~10%') + ' of profiles' + (disabled[0].coverageNote ? ', ' + disabled[0].coverageNote : '') + '_' }] });\n  }\n  blocks.push({ type: 'divider' });\n  blocks.push({ type: 'actions', elements: [\n    { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Apply Filters', emoji: true }, style: 'primary', action_id: 'uxr_filter_apply', value: 'apply' },\n    { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, action_id: 'uxr_cancel', value: 'cancel' }\n  ] });\n  return blocks;\n}\nfunction filterSummaryLines(config, audience, filters) {\n  const defs = defsFor(config, audience);\n  const lines = [];\n  for (const def of defs) {\n    if (def.enabled === false) continue;\n    const hasKey = filters && Object.prototype.hasOwnProperty.call(filters, def.id);\n    const raw = hasKey ? filters[def.id] : null;\n    const vals = (Array.isArray(raw) ? raw : (raw ? [raw] : [])).map(String);\n    if (vals.length) {\n      const labels = vals.map(v => { const o = (def.options || []).find(x => String(x.value) === v); return o ? (o.label || o.value) : v; });\n      lines.push('• *' + def.label + '*: ' + labels.join(', '));\n    } else if (def.default && def.default.length) {\n      lines.push('• *' + def.label + '*: _default (everyone except deleted accounts)_');\n    }\n  }\n  return lines;\n}\n\nfunction getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\nconst parsed = $('Parse Payload').first().json;\nconst config = $input.first().json || {};\nconst row = getSessionRow();\nconst nowIso = new Date().toISOString();\nif (!row) return [{ json: { skip: true, post_message: false, update_message: false, sess: { session_key: '__none__', state: '', filters_json: '{}', updated_at: nowIso } } }];\n\nlet filters = {};\ntry { filters = JSON.parse(row.filters_json || '{}'); } catch (e) { filters = {}; }\nconst actionId = parsed.action_id;\n\nif (actionId === 'uxr_filter_apply' || actionId === 'uxr_filter_skip') {\n  const maxSample = Number(config.maxSampleSize) || 20;\n  const lines = filterSummaryLines(config, row.audience, filters);\n  const filterSummary = lines.length ? lines.join('\\n') : '_No filters applied. Sampling from the full pool._';\n  const blocks = [\n    { type: 'section', text: { type: 'mrkdwn', text: ':1234: *How many people do you want to contact?*\\n\\n*Audience:* ' + audienceLabel(row.audience) + '\\n*Filters:*\\n' + filterSummary } },\n    { type: 'input', block_id: 'sample_size_block', element: { type: 'number_input', is_decimal_allowed: false, action_id: 'uxr_sample_size_input', min_value: '1', max_value: String(maxSample), placeholder: { type: 'plain_text', text: 'e.g. 10' } }, label: { type: 'plain_text', text: 'Number of people to contact (1-' + maxSample + ')' } },\n    { type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Draw Sample', emoji: true }, style: 'primary', action_id: 'uxr_sample_draw', value: 'draw' }, { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, action_id: 'uxr_cancel', value: 'cancel' } ] }\n  ];\n  return [{ json: { channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, text: 'How many people do you want to contact?', blocks: JSON.stringify(blocks), post_message: true, update_message: false, sess: { session_key: row.session_key, state: 'sample_size', filters_json: JSON.stringify(filters), updated_at: nowIso } } }];\n}\n\n// A dropdown changed: store it and refresh the filters message so the selection is visible\nconst filterId = actionId.replace('uxr_filter_', '');\nconst v = parsed.action_value;\nfilters[filterId] = Array.isArray(v) ? v : (v ? [v] : []);\nconst blocks = renderFilterBlocks(config, row.audience, filters);\nreturn [{ json: { skip: false, stored_filter: filterId, value: filters[filterId], post_message: false, update_message: !!parsed.message_ts, channel_id: parsed.channel_id, message_ts: parsed.message_ts, blocks: JSON.stringify(blocks), sess: { session_key: row.session_key, state: row.state, filters_json: JSON.stringify(filters), updated_at: nowIso } } }];"
+        "jsCode": "\nconst AUDIENCE_LABELS = { n8n_users: 'n8n users', volunteers: 'Research volunteers', non_users: 'Non-users' };\nfunction audienceLabel(a) { return AUDIENCE_LABELS[a] || a || 'unknown'; }\nfunction defsFor(config, audience) {\n  if (audience === 'n8n_users') return config.nUserFilters || [];\n  return config.volunteerFilters || config.nonUserFilters || [];\n}\nfunction optionText(o) { return { type: 'plain_text', text: String(o.label || o.value).slice(0, 75), emoji: true }; }\nfunction renderFilterBlocks(config, audience, filters) {\n  const defs = defsFor(config, audience);\n  const blocks = [\n    { type: 'section', text: { type: 'mrkdwn', text: ':busts_in_silhouette: *Audience: ' + audienceLabel(audience) + '*\\n\\nSelect any filters you want to apply (you can pick more than one value per filter). All are optional. The % tells you how many profiles carry that information.' } },\n    { type: 'divider' }\n  ];\n  const disabled = [];\n  for (const def of defs) {\n    if (def.enabled === false) { disabled.push(def); continue; }\n    const options = (def.options || []).map(o => ({ text: optionText(o), value: String(o.value) }));\n    const hasKey = filters && Object.prototype.hasOwnProperty.call(filters, def.id);\n    const raw = hasKey ? filters[def.id] : (def.default || []);\n    const selected = (Array.isArray(raw) ? raw : (raw ? [raw] : [])).map(String);\n    const selectedOptions = options.filter(o => selected.includes(o.value));\n    const labelsOf = selectedOptions.map(o => o.text.text);\n    let selectedLine;\n    if (!hasKey && def.default && def.default.length) selectedLine = '*Selected (default):* ' + labelsOf.join(', ');\n    else if (labelsOf.length) selectedLine = '*Selected:* ' + labelsOf.join(', ');\n    else selectedLine = '_Selected: none' + (def.default && def.default.length ? ' (default applies)' : '') + '_';\n    let text = '*' + def.label + '*  ·  _available in ' + (def.coverage || '?') + ' of profiles' + (def.coverageNote ? ', ' + def.coverageNote : '') + '_';\n    if (def.hint) text += '\\n' + def.hint;\n    text += '\\n' + selectedLine;\n    const element = { type: 'multi_static_select', action_id: 'uxr_filter_' + def.id, placeholder: { type: 'plain_text', text: 'Select one or more' }, options };\n    if (selectedOptions.length) element.initial_options = selectedOptions;\n    blocks.push({ type: 'section', block_id: 'filter_' + def.id, text: { type: 'mrkdwn', text }, accessory: element });\n  }\n  if (disabled.length) {\n    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: ':hourglass_flowing_sand: *Coming soon* (needs Customer.io segments): ' + disabled.map(d => d.label).join(', ') + '  ·  _available in ' + (disabled[0].coverage || '~10%') + ' of profiles' + (disabled[0].coverageNote ? ', ' + disabled[0].coverageNote : '') + '_' }] });\n  }\n  blocks.push({ type: 'divider' });\n  blocks.push({ type: 'actions', elements: [\n    { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Apply Filters', emoji: true }, style: 'primary', action_id: 'uxr_filter_apply', value: 'apply' },\n    { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, action_id: 'uxr_cancel', value: 'cancel' }\n  ] });\n  return blocks;\n}\nfunction filterSummaryLines(config, audience, filters) {\n  const defs = defsFor(config, audience);\n  const lines = [];\n  for (const def of defs) {\n    if (def.enabled === false) continue;\n    const hasKey = filters && Object.prototype.hasOwnProperty.call(filters, def.id);\n    const raw = hasKey ? filters[def.id] : null;\n    const vals = (Array.isArray(raw) ? raw : (raw ? [raw] : [])).map(String);\n    if (vals.length) {\n      const labels = vals.map(v => { const o = (def.options || []).find(x => String(x.value) === v); return o ? (o.label || o.value) : v; });\n      lines.push('• *' + def.label + '*: ' + labels.join(', '));\n    } else if (def.default && def.default.length) {\n      lines.push('• *' + def.label + '*: _default (everyone except deleted accounts)_');\n    }\n  }\n  return lines;\n}\n\nfunction getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\nconst parsed = $('Parse Payload').first().json;\nconst config = $input.first().json || {};\nconst row = getSessionRow();\nconst nowIso = new Date().toISOString();\nif (!row) return [{ json: { skip: true, post_message: false, update_message: false, sess: { session_key: '__none__', state: '', filters_json: '{}', updated_at: nowIso } } }];\n\nlet filters = {};\ntry { filters = JSON.parse(row.filters_json || '{}'); } catch (e) { filters = {}; }\nconst actionId = parsed.action_id;\n\nif (actionId === 'uxr_filter_apply' || actionId === 'uxr_filter_skip') {\n  const maxSample = Number(config.maxSampleSize) || 20;\n  const lines = filterSummaryLines(config, row.audience, filters);\n  const filterSummary = lines.length ? lines.join('\\n') : '_No filters applied. Sampling from the full pool._';\n  const blocks = [\n    { type: 'section', text: { type: 'mrkdwn', text: ':1234: *How many people do you want to contact?*\\n\\n*Audience:* ' + audienceLabel(row.audience) + '\\n*Filters:*\\n' + filterSummary } },\n    { type: 'input', block_id: 'sample_size_block', element: { type: 'number_input', is_decimal_allowed: false, action_id: 'uxr_sample_size_input', min_value: '1', max_value: String(maxSample), placeholder: { type: 'plain_text', text: 'e.g. 10' } }, label: { type: 'plain_text', text: 'Number of people to contact (1-' + maxSample + ')' } },\n    // DWN-87: free email filter. Slack sends a click on every tick, even in an input block: Slack Retry? drops uxr_toggle_free_email\n    // right after the ack, and Prepare Search reads the tick from the message state on Draw Sample.\n    { type: 'input', block_id: 'free_email_block', optional: true, element: { type: 'checkboxes', action_id: 'uxr_toggle_free_email', options: [ { text: { type: 'mrkdwn', text: '*Business emails only* (skip providers such as Gmail, Hotmail…)' }, value: 'exclude' } ] }, label: { type: 'plain_text', text: 'Email addresses' } },\n    { type: 'actions', elements: [ { type: 'button', text: { type: 'plain_text', text: ':white_check_mark: Draw Sample', emoji: true }, style: 'primary', action_id: 'uxr_sample_draw', value: 'draw' }, { type: 'button', text: { type: 'plain_text', text: 'Cancel', emoji: true }, action_id: 'uxr_cancel', value: 'cancel' } ] }\n  ];\n  return [{ json: { channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, text: 'How many people do you want to contact?', blocks: JSON.stringify(blocks), post_message: true, update_message: false, sess: { session_key: row.session_key, state: 'sample_size', filters_json: JSON.stringify(filters), updated_at: nowIso } } }];\n}\n\n// A dropdown changed: store it and refresh the filters message so the selection is visible\nconst filterId = actionId.replace('uxr_filter_', '');\nconst v = parsed.action_value;\nfilters[filterId] = Array.isArray(v) ? v : (v ? [v] : []);\nconst blocks = renderFilterBlocks(config, row.audience, filters);\nreturn [{ json: { skip: false, stored_filter: filterId, value: filters[filterId], post_message: false, update_message: !!parsed.message_ts, channel_id: parsed.channel_id, message_ts: parsed.message_ts, blocks: JSON.stringify(blocks), sess: { session_key: row.session_key, state: row.state, filters_json: JSON.stringify(filters), updated_at: nowIso } } }];"
       },
       "id": "fa634fab-0455-455c-ab05-0421050013ce",
       "name": "Process Filter",
@@ -591,7 +593,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        896,
+        672,
         304
       ],
       "alwaysOutputData": true
@@ -1007,7 +1009,8 @@
             "batch_id": "={{ $json.sess.batch_id }}",
             "csv_emails_json": "={{ $json.sess.csv_emails_json }}",
             "updated_at": "={{ $json.sess.updated_at }}",
-            "sample_target_count": "={{ $json.sess.sample_target_count }}"
+            "sample_target_count": "={{ $json.sess.sample_target_count }}",
+            "exclude_free_email": "={{ $('Prepare Search').first().json.excludeFreeEmail === true }}"
           },
           "matchingColumns": [
             "session_key"
@@ -1159,6 +1162,16 @@
               "required": false,
               "display": true,
               "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "exclude_free_email",
+              "displayName": "exclude_free_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
               "readOnly": false,
               "removed": false
             }
@@ -2043,21 +2056,20 @@
     },
     {
       "parameters": {
-        "select": "channel",
+        "operation": "update",
         "channelId": {
           "__rl": true,
           "mode": "id",
           "value": "={{ $('Build Candidates').first().json.channel_id }}"
         },
+        "ts": "={{ $('Show Search Loading').first().json.message_timestamp }}",
         "messageType": "block",
         "blocksUi": "={{ JSON.stringify({ blocks: JSON.parse($('Build Candidates').first().json.blocks) }) }}",
+        "text": "={{ $('Build Candidates').first().json.text }}",
+        "updateFields": {},
         "otherOptions": {
           "includeLinkToWorkflow": false
-        },
-        "operation": "update",
-        "ts": "={{ $('Show Search Loading').first().json.message_timestamp }}",
-        "text": "={{ $('Build Candidates').first().json.text }}",
-        "updateFields": {}
+        }
       },
       "id": "480eae45-1dbe-44c2-b34f-ca38cb16bc3d",
       "name": "Post Candidates",
@@ -2227,7 +2239,7 @@
     },
     {
       "parameters": {
-        "content": "## UXR Interaction Handler\n**The wizard engine.** Slack calls this webhook every time someone clicks a button or changes a dropdown in a recruiting thread. The workflow answers Slack within 3 seconds, then loads the session, applies the guard rails, routes on the button's `action_id` and posts the next step in the thread.\n\nRead left to right: **A. Ingress & ack** → **B. Session & guard rails** → **C. Routing** → **D. One lane per step** (right side, top to bottom = wizard order).\n\n**State:** data table *UXR Recruiting - Sessions* (one row per thread, key `channel_threadts`, 30-minute timeout on `updated_at`). Drawn batches go to *UXR Recruiting - Candidates* under a `batch_id`.\n**Step 1** (audience buttons) is posted by *UXR Recruiting Start*, not here. Every `action_id` starts with `uxr_`.\n**Real search since 2026-09-22:** *Prepare Search* → *Run UXR Search* (sub-workflow, random shard sampling on Customer.io) → *Build Candidates*. **Real send since 2026-09-22:** *Prepare Send* → *Ready to Send?* → *Run Send & Stamp* → *Complete Send*. Protected by the `liveMode` switch in UXR Config: while it is false (or missing), Send & Stamp redirects every email to the test recipient and stamps nothing, whatever this wizard passes.",
+        "content": "## UXR Interaction Handler\n**The wizard engine.** Slack calls this webhook every time someone clicks a button or changes a dropdown in a recruiting thread. The workflow first checks that the request really comes from Slack, answers Slack within 3 seconds, then loads the session, applies the guard rails, routes on the button's `action_id` and posts the next step in the thread.\n\nRead left to right: **A. Ingress, signature check & ack** → **B. Session & guard rails** → **C. Routing** → **D. One lane per step** (right side, top to bottom = wizard order).\n\n**State:** data table *UXR Recruiting - Campaigns* (one row per thread, key `channel_threadts`, 30-minute timeout on `updated_at`). Drawn batches go to *UXR Recruiting - Candidates* under a `batch_id`.\n**Step 1** (audience buttons) is posted by *UXR Recruiting Start*, not here. Every `action_id` starts with `uxr_`.\n**Search:** *Prepare Search* → *Run UXR Search* (sub-workflow, random shard sampling on Customer.io) → *Build Candidates*. **Send:** *Prepare Send* → *Ready to Send?* → *Run Send & Stamp* → *Complete Send*. Protected by the `liveMode` switch in UXR Config (project variable `uxr_recruiting_live_mode`): while it is not `true`, Send & Stamp redirects every email to the test recipient and stamps nothing, whatever this wizard passes.",
         "height": 292,
         "width": 740,
         "color": 4
@@ -2237,15 +2249,15 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -64,
+        -1184,
         -176
       ]
     },
     {
       "parameters": {
-        "content": "### A. Ingress & ack\n*Slack Interaction Webhook* (POST /recruiting-interaction) receives Slack's form-encoded `payload`. *Parse Payload* extracts action_id, action_value (single or multi-select), channel, thread_ts, message_ts, user and the session key. *Ack Slack* returns an empty 200 immediately: Slack requires the ack within 3 seconds or shows an error on the button. Everything after this node runs after the ack.",
-        "height": 220,
-        "width": 636,
+        "content": "### A. Ingress, signature check & ack\n*Slack Interaction Webhook* (POST /recruiting-interaction, option Raw Body on) receives Slack's form-encoded `payload`. First the request must prove it comes from Slack: *Read Raw Request Body* turns the raw bytes into text, *Sign Request Body* computes HMAC SHA-256 of `v0:<timestamp>:<raw body>` with the Slack app's signing secret (credential *UXR Recruiting Slack signing secret*, type Crypto, one per instance), *Keep Recent Requests* drops requests whose `X-Slack-Request-Timestamp` is more than 5 minutes off, *Keep Requests Signed By Slack* drops requests whose `X-Slack-Signature` does not match. A dropped request ends the run: no ack, no table write, no Slack message. Debug only: project variable `uxr_recruiting_skip_signature_check` = `true` skips both filters; keep it missing or `false`.\n*Parse Payload* reads the webhook item and extracts action_id, action_value (single or multi-select), channel, thread_ts, message_ts, user and the session key. *Ack Slack* returns an empty 200: Slack requires the ack within 3 seconds or shows an error on the button. Everything after this node runs after the ack.",
+        "height": 300,
+        "width": 1560,
         "color": 5
       },
       "id": "653c09d7-f186-4286-a1b8-a8c011e81604",
@@ -2253,15 +2265,15 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -48,
+        -1184,
         480
       ]
     },
     {
       "parameters": {
-        "content": "### B. Session & guard rails\n*Load Session* reads the thread's row from *UXR Recruiting - Sessions*. *Freeze Clicked Message* + *Should Freeze?* + *Update Frozen Message*: for buttons that move the wizard forward, the clicked message is rewritten in place (buttons replaced by a ✅ recap line) so it cannot be clicked twice. *Validate Step* + *Step Valid?*: the action must match the session's current step (e.g. an approve click while the session is at `filters` is rejected); a stale click gets an ephemeral *Post Out-of-Order Notice* visible only to the clicker. *Session State* computes the parsed state for routing and flags an expired session (no fresh row and the action is not audience/cancel).",
-        "height": 240,
-        "width": 1132,
+        "content": "### B. Session & guard rails\n*Load Session* reads the thread's row from *UXR Recruiting - Campaigns*. *Clicked By Session Owner?*: only the person who started the recruiting (row `slack_user`) can drive it. A click by anyone else gets the ephemeral *Post Not-Owner Notice* and stops before anything changes. Rows without an owner pass. *Freeze Clicked Message* + *Should Freeze?* + *Update Frozen Message*: for buttons that move the wizard forward, the clicked message is rewritten in place (buttons replaced by a ✅ recap line) so it cannot be clicked twice. *Validate Step* + *Step Valid?*: the action must match the session's current step (e.g. an approve click while the session is at `filters` is rejected); a stale click gets an ephemeral *Post Out-of-Order Notice* visible only to the clicker. *Session State* computes the parsed state for routing and flags an expired session (no fresh row and the action is not audience/cancel).",
+        "height": 260,
+        "width": 1240,
         "color": 5
       },
       "id": "b3e37218-6dda-48bf-824b-ca857ba6a89a",
@@ -2269,8 +2281,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        688,
-        512
+        600,
+        768
       ]
     },
     {
@@ -2291,7 +2303,7 @@
     },
     {
       "parameters": {
-        "content": "### D. Lanes, top to bottom = wizard order\n**Expired** → posts \"session expired, start a new one\".\n**Audience** (`uxr_audience_n8n_users` / `uxr_audience_volunteers`) → *Load Config (Audience)* → *Build Audience Filters* renders the filter dropdowns from UXR Config (labels, options, measured coverage %, defaults such as \"everyone except deleted\") → save session (state `filters`) → *Post Filters*.\n**Filters** (`uxr_filter_*`) → *Load Config (Filters)* → *Process Filter*: on a dropdown change it saves the selection and *Update Filters Message* rewrites the filters message in place with a \"Selected: …\" line; on Apply it posts the sample-size step with a labelled filter summary (*Filter Needs Post?* decides) → state `sample_size`.\n**Sample size** (`uxr_sample_draw` / `uxr_sample_redraw`) → *Prepare Search* reads the number input (or the session count on redraw), audience and filters → *Run UXR Search* (sub-workflow: Customer.io search + random shards + cooldown, ~5-10 s) → *Build Candidates* renders the real list with a pool estimate, or a \"search failed\" / \"no candidates\" card with only New Sample + Cancel → save session (state `review_candidates`, new `batch_id`) → *Post Candidates* + *Stage Candidates* → *Insert Candidates* into the Candidates table (attributes_json carries cio_id for the stamp).\n**Approve list** (`uxr_approve_list_*`) → *Build Email Preview* shows subject, body and the Calendly URL input → state `review_email`.\n**Email** (`uxr_email_*`) → *Edit Click or Modal Submit?*: the Edit Email click opens a Slack modal (*Build Edit Modal* → *Open Edit Modal*, views.open with the thread context in private_metadata); the modal submission (`uxr_email_modal_submit`) → *Apply Email Edit* (saves subject/body, re-appends `{{calendly_link}}` if missing) → *Save Session (Email Edit)* → *Update Email Preview* rewrites the preview message in place. The preview card also has a checkbox **Also send me BCC email** (`uxr_email_calendly_bcc`, shown only when the session has the researcher's Slack email): ticking it is a no-op event, its state is never stored; it is read from the message state on the next interaction (Calendly select, Edit click → carried through the modal's private_metadata, Approve).\n**Send** (`uxr_send_approve`) → *Prepare Send* reads batch, subject/body, the Calendly URL from the input and the BCC tick (`bcc_email` = researcher's Slack email when ticked, passed to Send & Stamp) → *Ready to Send?* (missing/invalid Calendly, no batch, empty body → *Complete Send* re-posts the preview with the reason, state stays `review_email`) → *Run Send & Stamp* (sub-workflow; test mode enforced unless UXR Config `liveMode` is true) → *Complete Send* renders the recap (sent/failed, TEST MODE banner) → state `complete` → *Post Complete*.\n**Cancel** → state `cancelled` → *Post Cancel Message*.\n**Unknown** → *Post Unknown Action*.",
+        "content": "### D. Lanes, top to bottom = wizard order\n**Expired** → posts \"session expired, start a new one\".\n**Audience** (`uxr_audience_n8n_users` / `uxr_audience_volunteers`) → *Load Config (Audience)* → *Build Audience Filters* renders the filter dropdowns from UXR Config (labels, options, measured coverage %, defaults such as \"everyone except deleted\") → save session (state `filters`) → *Post Filters*.\n**Filters** (`uxr_filter_*`) → *Load Config (Filters)* → *Process Filter*: on a dropdown change it saves the selection and *Update Filters Message* rewrites the filters message in place with a \"Selected: …\" line; on Apply it posts the sample-size step with a labelled filter summary, the number input and the optional *Business emails only* checkbox (*Filter Needs Post?* decides) → state `sample_size`. Slack sends a click on every tick of that checkbox (`uxr_toggle_free_email`), even inside an input block: *Slack Retry?* drops it right after the ack.\n**Sample size** (`uxr_sample_draw` / `uxr_sample_redraw`) → *Prepare Search* reads the number input and the checkbox from the message state (or the session count and `exclude_free_email` on redraw; always false for CSV), audience and filters → *Run UXR Search* (sub-workflow: Customer.io search + random shards + cooldown, ~5-10 s) → *Build Candidates* renders the real list with a pool estimate, or a \"search failed\" / \"no candidates\" card with only New Sample + Cancel → save session (state `review_candidates`, new `batch_id`, `exclude_free_email`) → *Post Candidates* + *Stage Candidates* → *Insert Candidates* into the Candidates table (attributes_json carries cio_id for the stamp).\n**Approve list** (`uxr_approve_list_*`) → *Build Email Preview* shows subject, body and the Calendly URL input → state `review_email`.\n**Email** (`uxr_email_*`) → *Edit Click or Modal Submit?*: the Edit Email click opens a Slack modal (*Build Edit Modal* → *Open Edit Modal*, views.open with the thread context in private_metadata); the modal submission (`uxr_email_modal_submit`) → *Apply Email Edit* (saves subject/body, re-appends `{{calendly_link}}` if missing) → *Save Session (Email Edit)* → *Update Email Preview* rewrites the preview message in place. The preview card also has a checkbox **Also send me BCC email** (`uxr_email_calendly_bcc`, shown only when the session has the researcher's Slack email): ticking it is a no-op event, its state is never stored; it is read from the message state on the next interaction (Calendly select, Edit click → carried through the modal's private_metadata, Approve).\n**Send** (`uxr_send_approve`) → *Prepare Send* reads batch, subject/body, the Calendly URL from the input and the BCC tick (`bcc_email` = researcher's Slack email when ticked, passed to Send & Stamp) → *Ready to Send?* (missing/invalid Calendly, no batch, empty body → *Complete Send* re-posts the preview with the reason, state stays `review_email`) → *Run Send & Stamp* (sub-workflow; test mode enforced unless UXR Config `liveMode` is true) → *Complete Send* renders the recap (sent/failed, TEST MODE banner) → state `complete` → *Post Complete*.\n**Cancel** → state `cancelled` → *Post Cancel Message*.\n**Unknown** → *Post Unknown Action*.",
         "height": 920,
         "width": 792,
         "color": 5
@@ -2526,7 +2538,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\n\nconst parsed = $('Parse Payload').first().json;\nconst row = getSessionRow();\nconst nowIso = new Date().toISOString();\n// Cooldown window: not passed here on purpose, UXR Search reads cooldownDays from UXR Config (single source, same as Send & Stamp)\nif (!row) return [{ json: { skip: true, channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, mode: 'n8n_users', filters: {}, sampleSize: 5, nowIso } }];\n\n// Search target is independent of the actual selected count. Null identifies legacy sessions.\nconst storedTarget = row.sample_target_count;\nconst targetCount = storedTarget !== null && storedTarget !== undefined && Number.isFinite(Number(storedTarget)) && Number(storedTarget) >= 0\n  ? Number(storedTarget) : Number(row.requested_count) || 0;\n\n// CSV upload submitted from the modal: carry the file URL, the search happens after Download CSV -> Parse CSV\nif (parsed.action_id === 'uxr_sample_csv_submit') {\n  const values = (parsed.action_value && parsed.action_value.values) || {};\n  const files = (values.csv_block && values.csv_block.uxr_csv_file && values.csv_block.uxr_csv_file.files) || [];\n  const f = files[0] || {};\n  let url = f.url_private_download || f.url_private || '';\n  // The URL arrives in the Slack payload and is fetched with the bot token: accept Slack file hosts only\n  let csv_error = '';\n  if (!/^https:\\/\\/files\\.slack\\.com\\//i.test(url)) { url = ''; csv_error = 'The uploaded file could not be read from Slack (unexpected file host). Please upload it again.'; }\n  const n = parseInt((values.csv_count_block && values.csv_count_block.uxr_csv_count && values.csv_count_block.uxr_csv_count.value) || '0', 10);\n  return [{ json: {\n    skip: false,\n    channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, session_key: row.session_key, audience: 'csv',\n    mode: 'csv', filters: {}, sampleSize: (Number.isFinite(n) && n > 0) ? n : 0,\n    csv_download: !!url, csv_file_url: url, csv_file_name: f.name || f.title || '', csv_error,\n    nowIso\n  } }];\n}\n// \"New Sample\" on a CSV session: reuse the emails stored on the session\nif (row.audience === 'csv') {\n  let emails = [];\n  try { emails = JSON.parse(row.csv_emails_json || '[]'); if (!Array.isArray(emails)) emails = []; } catch (e) { emails = []; }\n  return [{ json: {\n    skip: false,\n    channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, session_key: row.session_key, audience: 'csv',\n    mode: 'csv', filters: { emails }, sampleSize: targetCount,\n    csv_download: false, csv_file_url: '', csv_file_name: '',\n    nowIso\n  } }];\n}\n\n// Sample size: from the number input on \"Draw Sample\", or the session on \"New Sample\"\nlet sampleSize = NaN;\ntry {\n  const payload = typeof parsed.full_payload === 'string' ? JSON.parse(parsed.full_payload) : parsed.full_payload;\n  const block = payload && payload.state && payload.state.values && payload.state.values.sample_size_block;\n  if (block) {\n    if (block.uxr_sample_size_input && block.uxr_sample_size_input.value != null) {\n      sampleSize = parseInt(block.uxr_sample_size_input.value, 10);\n    } else if (block.uxr_sample_size_select && block.uxr_sample_size_select.selected_option) {\n      sampleSize = parseInt(block.uxr_sample_size_select.selected_option.value, 10);\n    }\n  }\n} catch (e) {}\nif (!Number.isFinite(sampleSize)) sampleSize = targetCount || 5;\nif (!Number.isFinite(sampleSize) || sampleSize < 1) sampleSize = 5;\n// The real cap is maxSampleSize in UXR Config (applied by UXR Search); this is only a sanity ceiling\nif (sampleSize > 500) sampleSize = 500;\n\nlet filters = {};\ntry { filters = JSON.parse(row.filters_json || '{}'); } catch (e) { filters = {}; }\n// Drop empty selections so they do not become empty OR clauses\nfor (const k of Object.keys(filters)) {\n  const v = filters[k];\n  if (v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) delete filters[k];\n}\n\nconst mode = ['volunteers', 'non_users'].includes(row.audience) ? row.audience : 'n8n_users';\n\nreturn [{ json: {\n  skip: false,\n  channel_id: parsed.channel_id,\n  thread_ts: parsed.thread_ts,\n  session_key: row.session_key,\n  audience: row.audience,\n  mode, filters, sampleSize,\n  csv_download: false,\n  nowIso\n} }];"
+        "jsCode": "function getSessionRow() {\n  var items = $('Load Session').all();\n  if (!items.length) return null;\n  var r = items[0].json || {};\n  return r.session_key ? r : null;\n}\n\nconst parsed = $('Parse Payload').first().json;\nconst row = getSessionRow();\nconst nowIso = new Date().toISOString();\n// Cooldown window: not passed here on purpose, UXR Search reads cooldownDays from UXR Config (single source, same as Send & Stamp)\nif (!row) return [{ json: { skip: true, channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, mode: 'n8n_users', filters: {}, sampleSize: 5, nowIso } }];\n\n// Search target is independent of the actual selected count. Null identifies legacy sessions.\nconst storedTarget = row.sample_target_count;\nconst targetCount = storedTarget !== null && storedTarget !== undefined && Number.isFinite(Number(storedTarget)) && Number(storedTarget) >= 0\n  ? Number(storedTarget) : Number(row.requested_count) || 0;\n\n// CSV upload submitted from the modal: carry the file URL, the search happens after Download CSV -> Parse CSV\nif (parsed.action_id === 'uxr_sample_csv_submit') {\n  const values = (parsed.action_value && parsed.action_value.values) || {};\n  const files = (values.csv_block && values.csv_block.uxr_csv_file && values.csv_block.uxr_csv_file.files) || [];\n  const f = files[0] || {};\n  let url = f.url_private_download || f.url_private || '';\n  // The URL arrives in the Slack payload and is fetched with the bot token: accept Slack file hosts only\n  let csv_error = '';\n  if (!/^https:\\/\\/files\\.slack\\.com\\//i.test(url)) { url = ''; csv_error = 'The uploaded file could not be read from Slack (unexpected file host). Please upload it again.'; }\n  const n = parseInt((values.csv_count_block && values.csv_count_block.uxr_csv_count && values.csv_count_block.uxr_csv_count.value) || '0', 10);\n  return [{ json: {\n    skip: false,\n    channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, session_key: row.session_key, audience: 'csv',\n    mode: 'csv', filters: {}, sampleSize: (Number.isFinite(n) && n > 0) ? n : 0, excludeFreeEmail: false,\n    csv_download: !!url, csv_file_url: url, csv_file_name: f.name || f.title || '', csv_error,\n    nowIso\n  } }];\n}\n// \"New Sample\" on a CSV session: reuse the emails stored on the session\nif (row.audience === 'csv') {\n  let emails = [];\n  try { emails = JSON.parse(row.csv_emails_json || '[]'); if (!Array.isArray(emails)) emails = []; } catch (e) { emails = []; }\n  return [{ json: {\n    skip: false,\n    channel_id: parsed.channel_id, thread_ts: parsed.thread_ts, session_key: row.session_key, audience: 'csv',\n    mode: 'csv', filters: { emails }, sampleSize: targetCount, excludeFreeEmail: false,\n    csv_download: false, csv_file_url: '', csv_file_name: '',\n    nowIso\n  } }];\n}\n\n// Sample size: from the number input on \"Draw Sample\", or the session on \"New Sample\"\nlet sampleSize = NaN;\ntry {\n  const payload = typeof parsed.full_payload === 'string' ? JSON.parse(parsed.full_payload) : parsed.full_payload;\n  const block = payload && payload.state && payload.state.values && payload.state.values.sample_size_block;\n  if (block) {\n    if (block.uxr_sample_size_input && block.uxr_sample_size_input.value != null) {\n      sampleSize = parseInt(block.uxr_sample_size_input.value, 10);\n    } else if (block.uxr_sample_size_select && block.uxr_sample_size_select.selected_option) {\n      sampleSize = parseInt(block.uxr_sample_size_select.selected_option.value, 10);\n    }\n  }\n} catch (e) {}\nif (!Number.isFinite(sampleSize)) sampleSize = targetCount || 5;\nif (!Number.isFinite(sampleSize) || sampleSize < 1) sampleSize = 5;\n// The real cap is maxSampleSize in UXR Config (applied by UXR Search); this is only a sanity ceiling\nif (sampleSize > 500) sampleSize = 500;\n\nlet filters = {};\ntry { filters = JSON.parse(row.filters_json || '{}'); } catch (e) { filters = {}; }\n// Drop empty selections so they do not become empty OR clauses\nfor (const k of Object.keys(filters)) {\n  const v = filters[k];\n  if (v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)) delete filters[k];\n}\n\nconst mode = ['volunteers', 'non_users'].includes(row.audience) ? row.audience : 'n8n_users';\n\n// Free email filter (DWN-87): the checkbox on \"Draw Sample\", the session on \"New Sample\" (the card with the checkbox is gone by then)\nlet excludeFreeEmail = row.exclude_free_email === true || String(row.exclude_free_email) === 'true';\ntry {\n  const payload = typeof parsed.full_payload === 'string' ? JSON.parse(parsed.full_payload) : parsed.full_payload;\n  const freeBlock = payload && payload.state && payload.state.values && payload.state.values.free_email_block;\n  if (freeBlock && freeBlock.uxr_toggle_free_email) {\n    const selected = freeBlock.uxr_toggle_free_email.selected_options;\n    excludeFreeEmail = Array.isArray(selected) && selected.some(o => o && o.value === 'exclude');\n  }\n} catch (e) {}\n\nreturn [{ json: {\n  skip: false,\n  channel_id: parsed.channel_id,\n  thread_ts: parsed.thread_ts,\n  session_key: row.session_key,\n  audience: row.audience,\n  mode, filters, sampleSize, excludeFreeEmail,\n  csv_download: false,\n  nowIso\n} }];"
       },
       "id": "e0508a5b-39c7-458a-8ae0-959007ca558c",
       "name": "Prepare Search",
@@ -2550,7 +2562,8 @@
           "value": {
             "mode": "={{ $json.mode }}",
             "filters": "={{ $json.filters }}",
-            "sampleSize": "={{ $json.sampleSize }}"
+            "sampleSize": "={{ $json.sampleSize }}",
+            "excludeFreeEmail": "={{ $json.excludeFreeEmail === true }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -2588,6 +2601,15 @@
               "defaultMatch": false,
               "display": true,
               "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "excludeFreeEmail",
+              "displayName": "excludeFreeEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
               "canBeUsedToMatch": true
             }
           ]
@@ -3365,7 +3387,7 @@
           "conditions": [
             {
               "id": "is-retry",
-              "leftValue": "={{ $('Parse Payload').first().json.is_retry === true || ($('Parse Payload').first().json.action_type === 'block_actions' && $('Parse Payload').first().json.action_id === 'candidate_ids' && $('Parse Payload').first().json.full_payload.view?.callback_id === 'uxr_approve_list_remove_submit') }}",
+              "leftValue": "={{ $('Parse Payload').first().json.is_retry === true || ($('Parse Payload').first().json.action_type === 'block_actions' && $('Parse Payload').first().json.action_id === 'candidate_ids' && $('Parse Payload').first().json.full_payload.view?.callback_id === 'uxr_approve_list_remove_submit') || $('Parse Payload').first().json.action_id === 'uxr_toggle_free_email' }}",
               "operator": {
                 "type": "boolean",
                 "operation": "true",
@@ -3382,7 +3404,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        672,
+        448,
         208
       ]
     },
@@ -3393,7 +3415,7 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        896,
+        672,
         112
       ]
     },
@@ -3467,7 +3489,6 @@
         2400
       ],
       "parameters": {
-        "resource": "row",
         "operation": "get",
         "dataTableId": {
           "__rl": true,
@@ -3481,12 +3502,10 @@
           "conditions": [
             {
               "keyName": "batch_id",
-              "condition": "eq",
               "keyValue": "={{ $('Load Session').first().json.batch_id }}"
             },
             {
               "keyName": "status",
-              "condition": "eq",
               "keyValue": "staged"
             }
           ]
@@ -3537,7 +3556,6 @@
         2400
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "const p=$('Parse Payload').first().json;\nconst row=$('Load Session').first().json;\nconst candidates=$input.all().map(i=>i.json).filter(r=>r.status==='staged'&&r.batch_id===row.batch_id);\nif(!candidates.length) return [];\nconst blocks=[{type:'section',text:{type:'mrkdwn',text:'Uncheck the people you want to remove, then select *Save changes*. Checked people stay in the list. This only changes the current campaign.'}}];\nfor(let i=0;i<candidates.length;i+=10){\n const chunk=candidates.slice(i,i+10);\n blocks.push({type:'input',block_id:'remove_'+i,optional:true,label:{type:'plain_text',text:candidates.length>10?'Candidates '+(i+1)+'–'+(i+chunk.length):'Candidates'},\n element:{type:'checkboxes',action_id:'candidate_ids',options:chunk.map(r=>{\n const option={text:{type:'plain_text',text:String(r.email).slice(0,75)},value:String(r.id)};\n if(r.summary)option.description={type:'plain_text',text:String(r.summary).slice(0,75)};\n return option;\n })}});\n}\nfor (const block of blocks) { if (block.element?.type === 'checkboxes') block.element.initial_options = block.element.options; }\n// Action blocks avoid Slack's automatic optional label. State is submitted on Save changes.\nfor (let i=0;i<blocks.length;i++) {\n const block=blocks[i];\n if(block.type==='input') blocks[i]={type:'actions',block_id:block.block_id,elements:[block.element]};\n}\n// The edited list is redrawn from the Candidates table, which does not hold the search summary (skipped people, pool, filters).\n// Carry it through the modal from the clicked message, when it fits in Slack's 3000-character private_metadata.\nconst meta={channel_id:p.channel_id,thread_ts:p.thread_ts,message_ts:p.message_ts,batch_id:row.batch_id,selection_mode:'keep',candidate_ids:candidates.map(r=>String(r.id))};\ntry{\n const fp=typeof p.full_payload==='string'?JSON.parse(p.full_payload):(p.full_payload||{});\n const sb=((fp.message&&fp.message.blocks)||[]).find(x=>x&&x.block_id==='uxr_search_summary');\n const summary=sb&&sb.text&&sb.text.text?String(sb.text.text):'';\n if(summary&&JSON.stringify(meta).length+JSON.stringify(summary).length+12<=2900)meta.summary=summary;\n}catch(e){}\nreturn [{json:{trigger_id:p.trigger_id,view:{type:'modal',callback_id:'uxr_approve_list_remove_submit',title:{type:'plain_text',text:'Edit candidates'},submit:{type:'plain_text',text:'Save changes'},close:{type:'plain_text',text:'Cancel'},private_metadata:JSON.stringify(meta),blocks}}}];"
       },
       "executeOnce": false
@@ -3591,7 +3609,6 @@
         2400
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "const p=$('Parse Payload').first().json;\nconst row=$('Load Session').first().json;\nlet meta={};try{meta=JSON.parse(p.full_payload.view.private_metadata);}catch(e){return [];}\nif(row.state!=='review_candidates'||!row.batch_id||meta.batch_id!==row.batch_id||Date.now()-Date.parse(row.updated_at)>1800000)return [];\nconst values=p.full_payload.view.state.values||{};\nconst selected=new Set(Object.values(values).flatMap(b=>(b.candidate_ids?.selected_options||[]).map(o=>String(o.value))));\nconst rows=$input.all().map(i=>i.json).filter(r=>r.status==='staged'&&r.batch_id===row.batch_id);\nif(meta.selection_mode!=='keep' && !selected.size)return [];\nif([...selected].some(id=>!rows.some(r=>String(r.id)===id)))throw new Error('Candidate list changed. Reopen Remove candidates.');\nif(meta.selection_mode==='keep'){\n const snapshot=Array.isArray(meta.candidate_ids)?meta.candidate_ids:[];\n if(snapshot.length!==rows.length||rows.some(r=>!snapshot.includes(String(r.id))))throw new Error('Candidate list changed. Reopen Remove candidates.');\n const groupCount=Math.ceil(snapshot.length/10);\n for(let i=0;i<groupCount;i++){\n  if(!Object.prototype.hasOwnProperty.call(values['remove_'+(i*10)]?.candidate_ids||{},'selected_options'))throw new Error('Missing checkbox state. Reopen Remove candidates.');\n }\n}\nreturn rows.filter(r=>meta.selection_mode==='keep'?!selected.has(String(r.id)):selected.has(String(r.id))).map(r=>({json:{row_id:r.id,batch_id:row.batch_id}}));"
       }
     },
@@ -3605,7 +3622,6 @@
         2400
       ],
       "parameters": {
-        "resource": "row",
         "operation": "update",
         "dataTableId": {
           "__rl": true,
@@ -3624,12 +3640,10 @@
             },
             {
               "keyName": "batch_id",
-              "condition": "eq",
               "keyValue": "={{ $json.batch_id }}"
             },
             {
               "keyName": "status",
-              "condition": "eq",
               "keyValue": "staged"
             }
           ]
@@ -3662,7 +3676,6 @@
         2400
       ],
       "parameters": {
-        "resource": "row",
         "operation": "get",
         "dataTableId": {
           "__rl": true,
@@ -3676,12 +3689,10 @@
           "conditions": [
             {
               "keyName": "batch_id",
-              "condition": "eq",
               "keyValue": "={{ $('Load Session').first().json.batch_id }}"
             },
             {
               "keyName": "status",
-              "condition": "eq",
               "keyValue": "staged"
             }
           ]
@@ -3701,7 +3712,6 @@
         2400
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "\n// Slack may expand emails/URLs in interaction payloads. Recheck the actual text before every update.\nfunction safeSlackBlocks(blocks) {\n  const result = [];\n  for (const block of blocks) {\n    if (block.type !== 'section' || !block.text || block.text.text.length <= 3000) { result.push(block); continue; }\n    let remaining = block.text.text;\n    const pieces = [];\n    while (remaining.length > 3000) {\n      let end = remaining.lastIndexOf('\\n', 2999) + 1;\n      if (!end) end = remaining.lastIndexOf(' ', 2999) + 1;\n      if (!end) end = 3000;\n      const open = remaining.lastIndexOf('<', end - 1);\n      if (open >= 0 && remaining.indexOf('>', open) >= end) {\n        if (open === 0) throw new Error('A single Slack link exceeds 3000 characters.');\n        end = open;\n      }\n      if (/[\\uD800-\\uDBFF]/.test(remaining[end - 1])) end--;\n      pieces.push(remaining.slice(0, end));\n      remaining = remaining.slice(end);\n    }\n    if (remaining) pieces.push(remaining);\n    pieces.forEach((text, i) => {\n      const part = {...block, expand: true, text: {...block.text, text}};\n      delete part.block_id;\n      if (i) { delete part.fields; delete part.accessory; }\n      result.push(part);\n    });\n  }\n  if (result.length > 50) throw new Error('This Slack message exceeds 50 blocks. Reduce the sample size.');\n  return result;\n}\nconst p=$('Parse Payload').first().json;\nconst session=$('Load Session').first().json;\nconst rows=$input.all().map(i=>i.json).filter(r=>r.batch_id===session.batch_id&&r.status==='staged');\nlet meta={};try{meta=JSON.parse(p.full_payload.view.private_metadata);}catch(e){throw new Error('Missing list context');}\nconst escape=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/`/g,\"'\");\nconst blocks=[{type:'section',text:{type:'mrkdwn',text:':clipboard: *Candidate List* ('+rows.length+' selected)\\nUpdated for this campaign only. No invitations have been sent.'}}];\n// Search summary carried by Build Remove Modal, without its own title line (this card has its own)\nconst summary=typeof meta.summary==='string'?meta.summary.replace(/^[^\\n]*\\*Candidate List\\*[^\\n]*\\n+/,''):'';\nif(summary)blocks.push({type:'section',block_id:'uxr_search_summary',expand:true,text:{type:'mrkdwn',text:summary}});\nconst attrsOf=r=>{try{return JSON.parse(r.attributes_json||'{}')||{};}catch(e){return {};}};\nconst mixed=rows.filter(r=>attrsOf(r).unsubscribe_conflict===true).length;\nif(mixed&&session.audience==='csv')blocks.push({type:'section',text:{type:'mrkdwn',text:':information_source: '+(mixed===1?'1 person has':mixed+' people have')+' another Customer.io profile that is unsubscribed. They are included because one of their profiles is still subscribed.'}});\n// Note above and per-row markers only for CSV uploads, as on the first card\nconst showRowNotes=session.audience==='csv';\nconst lines=rows.map((r,i)=>{\n let a={};try{a=JSON.parse(r.attributes_json||'{}');}catch(e){}\n return (i+1)+'. `'+escape(r.email)+'`'+(showRowNotes&&a.profile_count>1?' · *'+a.profile_count+' matching profiles in CIO*':'')+(showRowNotes&&a.unsubscribe_conflict?' · one profile unsubscribed':'')+' · '+escape(r.summary||'no profile details').slice(0,180)+(a.cio_url&&/^https:\\/\\/fly\\.customer\\.io\\//.test(a.cio_url)?' · <'+a.cio_url+'|CIO>':'');\n});\nlet chunk = [];\nlet length = 0;\nfunction flush() { if(chunk.length) blocks.push({type:'section',expand:true,text:{type:'mrkdwn',text:chunk.join('\\n')}}); chunk=[]; length=0; }\nfor(const line of lines) {\n if(chunk.length && length+line.length+1>2800) flush();\n chunk.push(line); length+=line.length+1;\n}\nflush();\nif(!rows.length)blocks.push({type:'section',text:{type:'mrkdwn',text:'All candidates have been removed. Draw a new sample or cancel.'}});\nconst buttons=[];\nif(rows.length)buttons.push({type:'button',text:{type:'plain_text',text:'Approve List'},style:'primary',action_id:'uxr_approve_list_yes',value:session.batch_id},{type:'button',text:{type:'plain_text',text:'Remove candidates'},action_id:'uxr_approve_list_remove',value:session.batch_id});\nbuttons.push({type:'button',text:{type:'plain_text',text:'New Sample'},action_id:'uxr_sample_redraw',value:'redraw'},{type:'button',text:{type:'plain_text',text:'Cancel'},action_id:'uxr_cancel',value:'cancel'});\nblocks.push({type:'actions',elements:buttons});\nreturn [{json:{channel:p.channel_id,ts:meta.message_ts,text:'Candidate list ('+rows.length+' selected)',blocks:safeSlackBlocks(blocks),requested_count:rows.length,session_key:session.session_key,batch_id:session.batch_id,updated_at:new Date().toISOString()}}];"
       }
     },
@@ -3715,7 +3725,6 @@
         2400
       ],
       "parameters": {
-        "resource": "row",
         "operation": "update",
         "dataTableId": {
           "__rl": true,
@@ -3729,17 +3738,14 @@
           "conditions": [
             {
               "keyName": "session_key",
-              "condition": "eq",
               "keyValue": "={{ $json.session_key }}"
             },
             {
               "keyName": "batch_id",
-              "condition": "eq",
               "keyValue": "={{ $json.batch_id }}"
             },
             {
               "keyName": "state",
-              "condition": "eq",
               "keyValue": "review_candidates"
             }
           ]
@@ -3869,7 +3875,6 @@
         900
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "const response=$input.first().json;\nif(response.ok!==true) return [];\nconst frozen=$('Freeze Clicked Message').first().json;\nif(frozen.action_id!=='uxr_approve_list_yes') return [];\nconst blocks=(frozen.frozenBlocks||[]).filter(b=>!(b.type==='context'&&(b.elements||[]).some(e=>e.text=== ':loading: Preparing email preview…')));\nreturn [{json:{channel_id:frozen.channel_id,message_ts:frozen.message_ts,frozenBlocks:blocks}}];"
       }
     },
@@ -3916,7 +3921,6 @@
         1696
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "const response=$input.first().json;\nif(response.ok!==true) return [];\nconst frozen=$('Freeze Clicked Message').first().json;\nif(frozen.action_id!=='uxr_send_approve') return [];\nconst blocks=(frozen.frozenBlocks||[]).filter(b=>!(b.type==='context'&&(b.elements||[]).some(e=>e.text=== ':loading: Sending invitations…')));\nreturn [{json:{channel_id:frozen.channel_id,message_ts:frozen.message_ts,frozenBlocks:blocks}}];"
       }
     },
@@ -4098,7 +4102,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        784,
+        560,
         432
       ],
       "parameters": {
@@ -4130,7 +4134,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        1008,
+        784,
         544
       ],
       "parameters": {
@@ -4153,8 +4157,8 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        736,
-        640
+        400,
+        560
       ],
       "parameters": {
         "content": "### pf_ route (DWN-6)\nThe Slack Bot app has one interactivity URL, so the participant follow-up buttons also arrive here. **PF Action?** sends actions whose id starts with `pf_` to **PF Button Router** (Participant follow-up folder) and stops. All `uxr_` actions continue to Load Session exactly as before.",
@@ -4162,20 +4166,220 @@
         "width": 380,
         "color": 7
       }
+    },
+    {
+      "id": "73e25460-4c79-4bd1-9781-4692c359c597",
+      "name": "Read Raw Request Body",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.2,
+      "position": [
+        -896,
+        208
+      ],
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "data",
+        "destinationKey": "rawBody",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "07ab074a-bcfe-4937-8878-90f701cf8215",
+      "name": "Sign Request Body",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        208
+      ],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "=v0:{{ $('Slack Interaction Webhook').first().json.headers['x-slack-request-timestamp'] }}:{{ $json.rawBody }}",
+        "dataPropertyName": "computedSignature",
+        "encoding": "hex"
+      },
+      "credentials": {
+        "crypto": {
+          "id": "OwQ5bGnh19gd9dkJ",
+          "name": "UXR Recruiting Slack signing secret"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b1ba9a04-5d43-44a6-a93d-787dc4dda2b5",
+      "name": "Keep Recent Requests",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -448,
+        208
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $vars.uxr_recruiting_skip_signature_check }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "fresh-timestamp",
+              "leftValue": "={{ Math.abs($now.toSeconds() - Number($('Slack Interaction Webhook').first().json.headers['x-slack-request-timestamp'])) }}",
+              "rightValue": 300,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0284dea3-f4c3-4920-a158-e3a47d800bbe",
+      "name": "Keep Requests Signed By Slack",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        208
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $vars.uxr_recruiting_skip_signature_check }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "signature-match",
+              "leftValue": "=v0={{ $json.computedSignature }}",
+              "rightValue": "={{ $('Slack Interaction Webhook').first().json.headers['x-slack-signature'] }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "85500768-c636-4c75-ab60-f3bdbc33dcf4",
+      "name": "Clicked By Session Owner?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        304
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "no-owner",
+              "leftValue": "={{ $json.slack_user }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "same-user",
+              "leftValue": "={{ $json.slack_user }}",
+              "rightValue": "={{ $('Parse Payload').first().json.user_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "106d8496-8383-4335-bd40-53fae6ef5e34",
+      "name": "Post Not-Owner Notice",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1120,
+        96
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Parse Payload').first().json.channel_id }}"
+        },
+        "text": "=⚠️ Only <@{{ $json.slack_user }}> can use the buttons of this recruiting. To recruit people yourself, ask Darwin in a new thread.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $('Parse Payload').first().json.thread_ts || $('Parse Payload').first().json.message_ts }}"
+            }
+          },
+          "ephemeral": {
+            "ephemeralValues": {
+              "user": {
+                "__rl": true,
+                "mode": "id",
+                "value": "={{ $('Parse Payload').first().json.user_id }}"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "BBkWcmrv3sWmNe1t",
+          "name": "Slack Bot"
+        }
+      },
+      "webhookId": "0365c8cc-abc3-4533-bc9c-b9a3cc4ca9f7"
     }
   ],
   "connections": {
-    "Slack Interaction Webhook": {
-      "main": [
-        [
-          {
-            "node": "Parse Payload",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Parse Payload": {
       "main": [
         [
@@ -4317,17 +4521,6 @@
         [
           {
             "node": "Post Out-of-Order Notice",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Load Session": {
-      "main": [
-        [
-          {
-            "node": "Freeze Clicked Message",
             "type": "main",
             "index": 0
           }
@@ -5236,6 +5429,90 @@
           }
         ]
       ]
+    },
+    "Slack Interaction Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Raw Request Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Raw Request Body": {
+      "main": [
+        [
+          {
+            "node": "Sign Request Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Request Body": {
+      "main": [
+        [
+          {
+            "node": "Keep Recent Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Recent Requests": {
+      "main": [
+        [
+          {
+            "node": "Keep Requests Signed By Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Requests Signed By Slack": {
+      "main": [
+        [
+          {
+            "node": "Parse Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Session": {
+      "main": [
+        [
+          {
+            "node": "Clicked By Session Owner?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clicked By Session Owner?": {
+      "main": [
+        [
+          {
+            "node": "Freeze Clicked Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Not-Owner Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -5245,7 +5522,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 1,
-  "versionId": "49a8d1b3-3dac-4c0b-b124-453095b240d6",
+  "versionId": "7045e5c6-8079-486d-a7d0-a080a53284e6",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

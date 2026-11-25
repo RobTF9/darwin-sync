@@ -5,9 +5,9 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## UXR Calendly Booking\nCalendly organization webhook (invitee.created) -> this URL. Only bookings made through a wizard link count: Prepare Send appends utm_source=uxr_recruiting and utm_campaign=<batch_id> to the Calendly link, Calendly echoes them in payload.tracking.\n\nFlow: match the invitee email to the batch candidate -> status booked + booked_at -> booked_count +1 on the session -> :tada: message in the recruiting thread (skipped when the session has no thread).\n\nThe webhook subscription lives in Calendly (organization scope) and was created via the API with Giulio's PAT. Signing-key check: not implemented yet (staging).",
-        "height": 300,
-        "width": 520
+        "content": "## UXR Calendly Booking\nCalendly organization webhook (invitee.created) -> this URL. Only bookings made through a wizard link count: Prepare Send appends utm_source=uxr_recruiting and utm_campaign=<batch_id> to the Calendly link, Calendly echoes them in payload.tracking.\n\n**Authenticity check.** The webhook URL is public, so the body is not trusted. *Keep Calendly API Invitees* keeps only invitee URIs on `https://api.calendly.com/scheduled_events/` (the Calendly credential must never go to another host). *Fetch Invitee From Calendly* reads that invitee from the Calendly API with the credential \"Giulio - Calendly - UXR Recruiting\" (HTTP Request: Calendly has no action node). *Keep Real Bookings* continues only if the invitee exists, is active, has the same email and the same utm_campaign batch. A forged request stops here: no table write, no Slack message. No signing key is needed.\n\nFlow after the check: match the invitee email to the batch candidate -> status booked + booked_at -> booked_count +1 on the session -> :tada: message in the recruiting thread (skipped when the session has no thread).\n\nThe webhook subscription lives in Calendly (organization scope) and was created via the API with Giulio's PAT.",
+        "height": 320,
+        "width": 1400
       },
       "id": "490090f4-50ae-49a1-80d8-4b8fd521fa6a",
       "name": "Sticky Note d5d6072b",
@@ -61,7 +61,7 @@
           "conditions": [
             {
               "keyName": "batch_id",
-              "keyValue": "={{ $json.batch_id }}"
+              "keyValue": "={{ $('Parse Booking').first().json.batch_id }}"
             }
           ]
         },
@@ -72,7 +72,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        672,
+        1344,
         0
       ]
     },
@@ -85,7 +85,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
+        1568,
         0
       ]
     },
@@ -124,7 +124,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1120,
+        1792,
         0
       ]
     },
@@ -153,7 +153,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1344,
+        2016,
         0
       ]
     },
@@ -166,7 +166,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1568,
+        2240,
         0
       ]
     },
@@ -205,7 +205,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1792,
+        2464,
         0
       ]
     },
@@ -218,7 +218,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2016,
+        2688,
         0
       ]
     },
@@ -245,7 +245,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
       "position": [
-        2240,
+        2912,
         0
       ],
       "webhookId": "15ff893a-92b7-4d3a-acf3-3c7c752911e7",
@@ -282,20 +282,124 @@
         224,
         0
       ]
+    },
+    {
+      "id": "55c5b018-4ae3-4fce-afc0-d4dffa0703d0",
+      "name": "Keep Calendly API Invitees",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "calendly-api-uri",
+              "leftValue": "={{ $json.invitee_uri }}",
+              "rightValue": "https://api.calendly.com/scheduled_events/",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4b0145e1-74ba-453a-8b31-adf519e06bee",
+      "name": "Fetch Invitee From Calendly",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.invitee_uri }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "calendlyApi",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "calendlyApi": {
+          "id": "yiU0KaLNinfA1n1r",
+          "name": "Giulio - Calendly - UXR Recruiting"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f6fb8e83-a7ba-4b5b-a51b-e7ec88dc1012",
+      "name": "Keep Real Bookings",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "same-email",
+              "leftValue": "={{ String($json.resource?.email || '').trim().toLowerCase() }}",
+              "rightValue": "={{ $('Parse Booking').first().json.email }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "active",
+              "leftValue": "={{ $json.resource?.status }}",
+              "rightValue": "active",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "same-batch",
+              "leftValue": "={{ $json.resource?.tracking?.utm_campaign }}",
+              "rightValue": "={{ $('Parse Booking').first().json.batch_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
-    "Parse Booking": {
-      "main": [
-        [
-          {
-            "node": "Get Batch Candidates",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Get Batch Candidates": {
       "main": [
         [
@@ -394,6 +498,50 @@
           }
         ]
       ]
+    },
+    "Parse Booking": {
+      "main": [
+        [
+          {
+            "node": "Keep Calendly API Invitees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Calendly API Invitees": {
+      "main": [
+        [
+          {
+            "node": "Fetch Invitee From Calendly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Invitee From Calendly": {
+      "main": [
+        [
+          {
+            "node": "Keep Real Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Real Bookings": {
+      "main": [
+        [
+          {
+            "node": "Get Batch Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -402,7 +550,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 1,
-  "versionId": "edd514a9-2df7-49e8-bf8a-d1bb7c658296",
+  "versionId": "7e5aaac0-4388-4f3c-ad34-e5417a88a8fa",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

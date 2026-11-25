@@ -21,6 +21,10 @@
             {
               "name": "excludeRecentDays",
               "type": "number"
+            },
+            {
+              "name": "excludeFreeEmail",
+              "type": "boolean"
             }
           ]
         }
@@ -171,7 +175,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const s = $('Pick Shards').first().json;\nconst pages = $input.all().map(i => i.json);\n\nlet error = null;\nlet rows = [];\nfor (const p of pages) {\n  if (p.error) {\n    error = 'Customer.io request failed: ' + (typeof p.error === 'string' ? p.error : (p.error.message || JSON.stringify(p.error).slice(0, 200)));\n    continue;\n  }\n  const status = p.statusCode || 0;\n  const body = p.body || p;\n  if (status >= 400) {\n    error = 'Customer.io API error (HTTP ' + status + '): ' + JSON.stringify(body).slice(0, 300);\n    continue;\n  }\n  const ids = (body && (body.identifiers || body.results || body.customers)) || [];\n  if (Array.isArray(ids)) rows = rows.concat(ids);\n}\n\nconst prior = Array.isArray(s.collected) ? s.collected : [];\nconst byId = new Map();\nfor (const r of prior) { const k = r.cio_id || r.id || r.email; if (k) byId.set(k, r); }\nfor (const r of rows) { const k = r.cio_id || r.id || r.email; if (k && !byId.has(k)) byId.set(k, r); }\nconst collected = Array.from(byId.values());\n\nconst attempt = (s.attempt || 0) + 1;\nconst enough = collected.length >= s.sampleSize;\nconst exhausted = attempt >= (s.maxAttempts || 3);\n// noShards: one paginated pass over the whole pool is the full answer. csvMode: walk every chunk, never stop early.\nconst done = s.noShards || (s.csvMode ? (exhausted || !!error) : (enough || exhausted || !!error));\n\nreturn [{ json: { ...s, attempt, collected, collectedCount: collected.length, totalMatching: collected.length, error, done } }];"
+        "jsCode": "const s = $('Pick Shards').first().json;\nconst pages = $input.all().map(i => i.json);\n\n// Free email filter (DWN-87): read from the trigger and Config, not from the loop state. Never for CSV: the researcher chose that list.\nconst rawExclude = $('When Called').first().json.excludeFreeEmail;\nconst excludeFreeEmail = !s.csvMode && (rawExclude === true || String(rawExclude) === 'true');\nconst freeDomains = (($('Load Config').first().json || {}).freeEmailDomains || []).map(d => String(d).trim().toLowerCase()).filter(Boolean);\n// An entry ending in .* matches every top-level domain (hotmail.* = hotmail.com, hotmail.it, ...)\nfunction isFreeEmail(email) {\n  const domain = String(email || '').trim().toLowerCase().split('@')[1] || '';\n  if (!domain) return false;\n  return freeDomains.some(p => p.endsWith('.*') ? domain.startsWith(p.slice(0, -1)) : domain === p);\n}\n\nlet error = null;\nlet rows = [];\nfor (const p of pages) {\n  if (p.error) {\n    error = 'Customer.io request failed: ' + (typeof p.error === 'string' ? p.error : (p.error.message || JSON.stringify(p.error).slice(0, 200)));\n    continue;\n  }\n  const status = p.statusCode || 0;\n  const body = p.body || p;\n  if (status >= 400) {\n    error = 'Customer.io API error (HTTP ' + status + '): ' + JSON.stringify(body).slice(0, 300);\n    continue;\n  }\n  const ids = (body && (body.identifiers || body.results || body.customers)) || [];\n  if (Array.isArray(ids)) rows = rows.concat(ids);\n}\n\n// Drop free emails before the count below, so a retry widens the shards until enough business emails are collected\nconst droppedIds = new Set(Array.isArray(s.freeEmailDroppedIds) ? s.freeEmailDroppedIds : []);\nif (excludeFreeEmail) {\n  rows = rows.filter(r => {\n    if (!isFreeEmail(r.email)) return true;\n    const k = r.cio_id || r.id || r.email;\n    if (k) droppedIds.add(k);\n    return false;\n  });\n}\n\nconst prior = Array.isArray(s.collected) ? s.collected : [];\nconst byId = new Map();\nfor (const r of prior) { const k = r.cio_id || r.id || r.email; if (k) byId.set(k, r); }\nfor (const r of rows) { const k = r.cio_id || r.id || r.email; if (k && !byId.has(k)) byId.set(k, r); }\nconst collected = Array.from(byId.values());\n\nconst attempt = (s.attempt || 0) + 1;\nconst enough = collected.length >= s.sampleSize;\nconst exhausted = attempt >= (s.maxAttempts || 3);\n// noShards: one paginated pass over the whole pool is the full answer. csvMode: walk every chunk, never stop early.\nconst done = s.noShards || (s.csvMode ? (exhausted || !!error) : (enough || exhausted || !!error));\n\nreturn [{ json: { ...s, attempt, collected, collectedCount: collected.length, totalMatching: collected.length, error, done, excludeFreeEmail, freeEmailDroppedIds: Array.from(droppedIds), freeEmailDropped: droppedIds.size } }];"
       },
       "id": "8158af58-0885-4390-b090-4496a2c0cd2a",
       "name": "Collect & Check",
@@ -231,7 +235,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const s = $input.first().json;\n// Rebuild the state for another Pick Shards pass. baseAndClauses persists.\nreturn [{ json: {\n  mode: s.mode, filters: s.filters, sampleSize: s.sampleSize, excludeRecentDays: s.excludeRecentDays,\n  cooldownField: s.cooldownField, cooldownCutoffTs: s.cooldownCutoffTs, shardField: s.shardField, shardCount: s.shardCount,\n  noShards: s.noShards, csvMode: s.csvMode, csvEmails: s.csvEmails, csvChunks: s.csvChunks,\n  baseAndClauses: s.baseAndClauses, attempt: s.attempt, maxAttempts: s.maxAttempts,\n  shardsUsed: s.shardsUsed, collected: s.collected, totalMatching: s.totalMatching\n} }];"
+        "jsCode": "const s = $input.first().json;\n// Rebuild the state for another Pick Shards pass. baseAndClauses persists.\nreturn [{ json: {\n  mode: s.mode, filters: s.filters, sampleSize: s.sampleSize, excludeRecentDays: s.excludeRecentDays,\n  cooldownField: s.cooldownField, cooldownCutoffTs: s.cooldownCutoffTs, shardField: s.shardField, shardCount: s.shardCount,\n  noShards: s.noShards, csvMode: s.csvMode, csvEmails: s.csvEmails, csvChunks: s.csvChunks,\n  baseAndClauses: s.baseAndClauses, attempt: s.attempt, maxAttempts: s.maxAttempts,\n  shardsUsed: s.shardsUsed, collected: s.collected, totalMatching: s.totalMatching,\n  // Free email filter counter (DWN-87): distinct profiles dropped across every pass\n  freeEmailDroppedIds: s.freeEmailDroppedIds || []\n} }];"
       },
       "id": "593cd3a4-5c8b-4251-853c-89677dcc0006",
       "name": "Prep Retry",
@@ -244,8 +248,8 @@
     },
     {
       "parameters": {
-        "content": "## UXR Search\nSub-workflow that queries Customer.io for matching candidate profiles.\n\n**Inputs:** mode (n8n_users | volunteers | csv; non_users = volunteers restricted to aware+new), filters (option values; for csv: { emails: [...] }), sampleSize (csv: 0 = everyone found, capped by csvMaxInvites), excludeRecentDays.\n\n1. Load Config: audiences, filter definitions (option values → attribute values, segment ids, extra clauses), cooldown segment, shard settings.\n2. Build CIO Filter: n8n users = email + not unsubscribed + created_n8n_account + confirmed + (not deleted unless Plan status chosen); volunteers = origin = user_research_webform only; csv = the uploaded emails in chunks of 50 (one query per chunk), unsubscribed dropped later unless origin = webform. All: not in cooldown segment 260. Only eq/exists/segment conditions are accepted by the search API.",
-        "height": 500,
+        "content": "## UXR Search\nSub-workflow that queries Customer.io for matching candidate profiles.\n\n**Inputs:** mode (n8n_users | volunteers | csv; non_users = volunteers restricted to aware+new), filters (option values; for csv: { emails: [...] }), sampleSize (csv: 0 = everyone found, capped by csvMaxInvites), excludeRecentDays, excludeFreeEmail (true = drop Config freeEmailDomains; ignored for csv).\n\n1. Load Config: audiences, filter definitions (option values → attribute values, segment ids, extra clauses), cooldown segment, shard settings, free email domains.\n2. Build CIO Filter: n8n users = email + not unsubscribed + created_n8n_account + confirmed + (not deleted unless Plan status chosen); volunteers = origin = user_research_webform only; csv = the uploaded emails in chunks of 50 (one query per chunk), unsubscribed dropped later unless origin = webform. All: not in cooldown segment 260. Only eq/exists/segment conditions are accepted by the search API, so the free email filter runs in Collect & Check.\n\n**Output:** Format Output builds the candidates; Add Free Email Stats adds excludeFreeEmail and freeEmailDropped for the candidate card.",
+        "height": 600,
         "width": 300,
         "color": 4
       },
@@ -260,7 +264,7 @@
     },
     {
       "parameters": {
-        "content": "## Random Shard Sampling\nPick Shards -> Query Customer.io -> Collect & Check runs as a loop (up to maxAttempts=3).\n\nEach pass picks fresh random shard values (from shardCount=4096), appends a shard OR-clause to the filter, and queries. Dedupes results. If enough collected (>= sampleSize) or attempts exhausted, exits to Format Output; otherwise Prep Retry loops back with wider shard coverage.",
+        "content": "## Random Shard Sampling\nPick Shards -> Query Customer.io -> Collect & Check runs as a loop (up to maxAttempts=3).\n\nEach pass picks fresh random shard values (from shardCount=4096), appends a shard OR-clause to the filter, and queries. Collect & Check dedupes results and, when excludeFreeEmail is true, drops profiles with a free email domain before counting them (the search API cannot filter on a domain). If enough collected (>= sampleSize) or attempts exhausted, exits to Format Output; otherwise Prep Retry loops back with wider shard coverage.",
         "height": 488,
         "width": 300,
         "color": 3
@@ -607,6 +611,43 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d2b724ca-9931-4b6a-9ba3-8ad0d1a65963",
+      "name": "Add Free Email Stats",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4032,
+        16
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "exclude-free-email",
+              "name": "excludeFreeEmail",
+              "type": "boolean",
+              "value": "={{ $('Collect & Check').first().json.excludeFreeEmail === true }}"
+            },
+            {
+              "id": "free-email-dropped",
+              "name": "freeEmailDropped",
+              "type": "number",
+              "value": "={{ Number($('Collect & Check').first().json.freeEmailDropped) || 0 }}"
+            },
+            {
+              "id": "filter-labels",
+              "name": "filterLabels",
+              "type": "array",
+              "value": "={{ $('Collect & Check').first().json.excludeFreeEmail === true ? ($json.filterLabels || []).concat([{ label: 'Email addresses', values: ['business only (' + (Number($('Collect & Check').first().json.freeEmailDropped) || 0) + ' free-email profiles skipped)'] }]) : ($json.filterLabels || []) }}"
+            }
+          ]
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -821,6 +862,17 @@
           }
         ]
       ]
+    },
+    "Format Output": {
+      "main": [
+        [
+          {
+            "node": "Add Free Email Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -830,7 +882,7 @@
     "binaryMode": "separate"
   },
   "triggerCount": 0,
-  "versionId": "c0a5ce56-66b6-4ac1-9bbc-3cd1dc174a12",
+  "versionId": "57e41433-aec2-4789-a0cb-cf56a1200e6d",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",

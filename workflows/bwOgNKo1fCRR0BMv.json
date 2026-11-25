@@ -23,19 +23,19 @@
             {
               "id": "live-mode",
               "name": "liveMode",
-              "value": false,
+              "value": "={{ String($vars.uxr_recruiting_live_mode ?? '').trim().toLowerCase() === 'true' }}",
               "type": "boolean"
             },
             {
               "id": "max-sample",
               "name": "maxSampleSize",
-              "value": 50,
+              "value": 200,
               "type": "number"
             },
             {
               "id": "csv-max-invites",
               "name": "csvMaxInvites",
-              "value": 200,
+              "value": 300,
               "type": "number"
             },
             {
@@ -167,9 +167,9 @@
     },
     {
       "parameters": {
-        "content": "## UXR Config\nCentralized configuration for the **UXR Recruiting** tool. Called as a sub-workflow to load limits, email template, quality gates, filter definitions, cooldown and shard settings.\n\n**SAFETY SWITCH: `liveMode` (boolean).** While it is `false` (or missing), UXR Send & Stamp rewrites EVERY recipient to `testRecipient`, caps the batch at `testMaxRecipients` and writes nothing to Customer.io. Set to `true` for production and real sends.\n\n**Cooldown.** The main tool is Customer.io segment **260** (\"User Research - 60 Day Cooldown\"): anyone invited to research in the last 60 days, by the wizard or by a broadcast. UXR Search excludes its members server-side, so they never appear in a sample.\n\n`cooldownDays` (60) is the safety net on our side: Search drops profiles stamped in the last 60 days, Send & Stamp skips emails already sent or booked in the last 60 days (Candidates table). It covers segment refresh lag and sends that never got stamped. Keep it equal to the segment window.\n\n`calendlyUtmSource` is read by the Handler (utm_source on the booking link) and by UXR Calendly Booking (webhook filter): change it in one place only.\n\n**Do not execute directly.**",
-        "height": 524,
-        "width": 540,
+        "content": "## UXR Config\nCentralized configuration for the **UXR Recruiting** tool. Called as a sub-workflow to load limits, email template, quality gates, filter definitions, cooldown and shard settings. **Config** holds the settings; **Free Email Domains** keeps them and adds the list of free email providers. Callers get the output of the last node.\n\n**SAFETY SWITCH: `liveMode` (boolean).** It comes from the n8n project variable `uxr_recruiting_live_mode` (Darwin project > Variables), not from this workflow. Only the exact text `true` turns live mode on. A missing variable or any other value means test mode: UXR Send & Stamp rewrites EVERY recipient to `testRecipient`, caps the batch at `testMaxRecipients` and writes nothing to Customer.io. Each instance has its own value (staging `false`, production `true`), so promoting this workflow never changes the mode.\n\n**Cooldown.** The main tool is Customer.io segment **260** (\"User Research - 60 Day Cooldown\"): anyone invited to research in the last 60 days, by the wizard or by a broadcast. UXR Search excludes its members server-side, so they never appear in a sample.\n\n`cooldownDays` (60) is the safety net on our side: Search drops profiles stamped in the last 60 days, Send & Stamp skips emails already sent or booked in the last 60 days (Candidates table). It covers segment refresh lag and sends that never got stamped. Keep it equal to the segment window.\n\n`freeEmailDomains`: free email providers. When the researcher ticks \"Business emails only\" on the How many card, UXR Search drops these emails (n8n users and volunteers, never CSV). An entry ending in `.*` matches every top-level domain (`hotmail.*` = hotmail.com, hotmail.it, ...).\n\n`calendlyUtmSource` is read by the Handler (utm_source on the booking link) and by UXR Calendly Booking (webhook filter): change it in one place only.\n\n**Do not execute directly.**",
+        "height": 640,
+        "width": 640,
         "color": 4
       },
       "id": "07d586a5-6a6f-4827-9c4d-b1d672edfc22",
@@ -178,8 +178,33 @@
       "typeVersion": 1,
       "position": [
         -96,
-        -576
+        -704
       ]
+    },
+    {
+      "id": "68f51c37-95d4-4357-98d2-4d4140a60489",
+      "name": "Free Email Domains",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "free-email-domains",
+              "name": "freeEmailDomains",
+              "type": "array",
+              "value": "={{ [\"gmail.com\", \"googlemail.com\", \"hotmail.*\", \"outlook.*\", \"live.*\", \"msn.com\", \"yahoo.*\", \"ymail.com\", \"rocketmail.com\", \"icloud.com\", \"me.com\", \"mac.com\", \"aol.com\", \"proton.me\", \"protonmail.com\", \"pm.me\", \"tutanota.com\", \"fastmail.com\", \"zoho.com\", \"gmx.*\", \"web.de\", \"t-online.de\", \"mail.com\", \"mail.ru\", \"yandex.*\", \"qq.com\", \"163.com\", \"126.com\", \"naver.com\", \"rediffmail.com\", \"libero.it\", \"virgilio.it\", \"tiscali.it\", \"free.fr\", \"orange.fr\", \"laposte.net\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -188,6 +213,17 @@
         [
           {
             "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Free Email Domains",
             "type": "main",
             "index": 0
           }
@@ -202,7 +238,7 @@
     "errorWorkflow": "iDcm070UekOYt0f1"
   },
   "triggerCount": 0,
-  "versionId": "f52369ff-16a7-4776-ba69-8378e95326ca",
+  "versionId": "0e03799b-8c70-42e4-834f-183907247732",
   "owner": {
     "type": "team",
     "teamId": "2uAQ2XYnaFVSte2z",
