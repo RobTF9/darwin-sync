@@ -1,0 +1,83 @@
+{
+  "id": "bPnDc3IgiDSmTD86",
+  "name": "CI Smoke Test",
+  "description": "DWN-89: minimal canary for the CI promotion pipeline. Returns { ok: true }. Keep it: future plumbing checks reuse it with action update.",
+  "nodes": [
+    {
+      "id": "61b32416-99ad-4402-bd51-6c5aae39dda5",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "0dde683c-98ea-4185-bce3-248bac6d761f",
+      "name": "Smoke Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ok",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "workflow",
+              "name": "workflow",
+              "value": "={{ $workflow.name }}",
+              "type": "string"
+            },
+            {
+              "id": "checked_at",
+              "name": "checked_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Smoke Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "triggerCount": 0,
+  "versionId": "1d702c3c-58e6-4b94-8ba1-316a82bef315",
+  "owner": {
+    "type": "team",
+    "teamId": "2uAQ2XYnaFVSte2z",
+    "teamName": "Darwin"
+  },
+  "parentFolderId": "fxhuxPGdNIHdYUsf",
+  "isArchived": false,
+  "nodeGroups": []
+}
